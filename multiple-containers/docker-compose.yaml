@@ -1,0 +1,102 @@
+version: '3.8'
+services:
+  postgres:
+    image: postgres:16
+    container_name: postgres_container
+    volumes:
+      - data-volume:/data/db
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_PASSWORD: k8d1XbA4GoMWBd+p
+      POSTGRES_USER: postgres
+      POSTGRES_DB: upstage
+    networks:
+     - upstage-network
+  mongodb:
+    image: mongo:latest
+    container_name: mongodb_container
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongo_data:/data/db
+    networks:
+    - upstage-network
+  mosquitto:
+    image: eclipse-mosquitto:2.0.19
+    container_name: mosquitto_container
+    ports:
+      - "1883:1883"
+      - "9001:9001"
+    volumes:
+      - mosquitto_data:/mosquitto/data
+      - mosquitto_log:/mosquitto/log
+      - ./../system/mqtt_server/mosquitto.conf:/etc/mosquitto/mosquitto.conf
+      - ./../system/mqtt_server/pw.txt:/etc/mosquitto/pw.txt
+    networks:
+     - upstage-network
+    command: >
+      /bin/sh -c "chmod 0700 /etc/mosquitto/pw.txt &&
+      mosquitto_passwd  -U /etc/mosquitto/pw.txt && 
+      mosquitto -c /etc/mosquitto/mosquitto.conf"
+
+
+  upstage:
+    build:
+      context: ../
+      dockerfile: ./multiple-containers/Dockerfile
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./system/upstage:/app
+      -  /home/upstage2/uploads:/usr/app/uploads
+      - /root/upstage/dashboard/demo:/usr/app/dashboard/demo
+    networks:
+      - upstage-network
+
+  upstage_event_archive:
+    build:
+      context: ../
+      dockerfile: ./multiple-containers/Dockerfile.upstage_event_archive
+    container_name: upstage_event_archive_container
+    ports:
+      - "83:80"
+      - "446:443"
+    volumes:
+      - ./system/event_archive:/app
+    networks:
+      - upstage-network
+
+  upstage_email:
+    build:
+      context: ../
+      dockerfile: ./multiple-containers/Dockerfile.upstage_email
+    container_name: upstage_email_container
+    ports:
+      - "81:80"
+      - "444:443"
+    volumes:
+      - ./system/email:/app
+    networks:
+      - upstage-network
+
+  upstage_stats:
+    build:
+      context: ../
+      dockerfile: ./multiple-containers/Dockerfile.upstage_stats
+    container_name: upstage_stats_container
+    ports:
+      - "82:80"
+      - "445:443"
+    volumes:
+      - ./system/stats:/app
+    networks:
+      - upstage-network
+
+networks:
+  upstage-network:
+volumes:
+  data-volume:
+  mongo_data:
+  mosquitto_data:
+  mosquitto_log:
