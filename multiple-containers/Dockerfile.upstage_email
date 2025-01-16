@@ -1,0 +1,16 @@
+FROM registry.access.redhat.com/ubi9/python-312:latest
+
+WORKDIR /usr/app
+
+COPY requirements.txt .
+
+RUN pip install -r requirements.txt
+
+ADD . .
+USER root
+RUN chmod +x ./scripts/setup.sh
+
+RUN ./scripts/setup.sh
+
+RUN chmod +x ./scripts/run_upstage_email.py
+CMD ["sh", "-c", "TIMESTAMP=$(date +%d_%m_%Y) python3 -m scripts.run_upstage_email"]
