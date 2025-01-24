@@ -24,9 +24,17 @@ db = declarative_base()
 database = Database(DATABASE_URL)
 metadata = MetaData()
 
-engine = create_engine(DATABASE_URL, poolclass=NullPool)
+engine = create_engine(DATABASE_URL, poolclass=NullPool, query_cache_size=0)
 metadata.create_all(engine)
-DBSession = scoped_session(sessionmaker(autocommit=False, autoflush=True, bind=engine))
+DBSession = scoped_session(
+    sessionmaker(
+        autobegin=True,
+        autoflush=False,
+        bind=engine,
+        join_transaction_mode="rollback_only",
+        expire_on_commit=True,
+    )
+)
 
 
 def get_scoped_session():
@@ -84,4 +92,5 @@ class ScopedSession(object):
         finally:
             print("Closing session")
             self.session.close()
-            self.session.remove
+            self.session.remove()
+            DBSession.expire_all()
