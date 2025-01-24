@@ -143,8 +143,8 @@ class StudioService:
                 session.add(user)
                 session.flush()
                 session.commit()
-            user = self._get_user(DBSession, input.id)
-            return convert_keys_to_camel_case(user.to_dict())
+                user = self._get_user(session, input.id)
+                return convert_keys_to_camel_case(user.to_dict())
         except Exception as e:
             raise GraphQLError(
                 f"There was an error updating this user information: {str(e)}. Please check the logs and try again later!"
@@ -184,7 +184,7 @@ class StudioService:
             user.last_name = input.lastName
         if input.displayName:
             user.display_name = input.displayName
-        if input.active:
+        if input.active != user.active:
             user.active = input.active
             await self._handle_active_status(user, input.active)
         if input.firebasePushnotId:
