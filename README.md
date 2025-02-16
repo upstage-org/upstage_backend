@@ -1,17 +1,25 @@
+This guide will help you set up and run the Upstage application using either Docker prebult images,
+or using Dokcer form the source code.
+
+It is recommended that you run three docker instances, preferably on three separate machines, with three separate subdomains. For example: streaming.myupstage.org, service.myupstage.org, app.myupstage.org
+
 # Upstage Setup Guide: From Official Docker Images:
+TBD
 
-This guide will help you set up and run the Upstage application using Docker.
-
-# Upstage Setup Guide: From Git Clone to Local Docker Images
+# Upstage Setup Guide: From Git Repo to Local Docker Images
 
 ## Setup OS
 
-You need to install Docker, Nginx, and Certbot.
+You need to install Docker, Nginx, and Certbot on all three machines.
 
 ### 1. Debian
 
 ```sh
 sh scripts/setup-os.sh
+```
+
+```sh
+sh scripts/setup-your-domain.sh
 ```
 ## Prerequisites
 
