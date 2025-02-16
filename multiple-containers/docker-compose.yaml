@@ -1,14 +1,14 @@
 version: '3.8'
 services:
   postgres:
-    image: postgres:16
+    image: postgres:latest
     container_name: postgres_container
     volumes:
       - data-volume:/data/db
     ports:
       - "5432:5432"
     environment:
-      POSTGRES_PASSWORD: k8d1XbA4GoMWBd+p
+      POSTGRES_PASSWORD: nas78a98sdfnwkjer2zkjhku
       POSTGRES_USER: postgres
       POSTGRES_DB: upstage
     networks:
@@ -23,7 +23,7 @@ services:
     networks:
     - upstage-network
   mosquitto:
-    image: eclipse-mosquitto:2.0.19
+    image: eclipse-mosquitto:latest
     container_name: mosquitto_container
     ports:
       - "1883:1883"

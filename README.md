@@ -1,6 +1,8 @@
-# Upstage Setup Guide
+# Upstage Setup Guide: From Official Docker Images:
 
 This guide will help you set up and run the Upstage application using Docker.
+
+# Upstage Setup Guide: From Git Clone to Local Docker Images
 
 ## Setup OS
 
@@ -11,7 +13,6 @@ You need to install Docker, Nginx, and Certbot.
 ```sh
 sh scripts/setup-os.sh
 ```
-
 ## Prerequisites
 
 - Docker

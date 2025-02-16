@@ -1,4 +1,8 @@
+# #!/bin/bash
 # Install and setup the OS
+sudo apt update
+sudo apt upgrade
+
 apt install ufw
 ufw allow ssh
 ufw enable
@@ -21,30 +25,15 @@ sudo apt-get update
 
 $(. /etc/os-release && echo "$VERSION_CODENAME")
 
+for pkg in docker.io docker-doc docker-compose podman-docker containerd runc; do sudo apt-get remove ; done
 sudo apt-get install docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
 
+sudo docker run hello-world
 
 # Setup Nginx
 
 sudo apt update
-sudo apt install nginx
 sudo ufw app list
-sudo ufw allow 'Nginx HTTP'
-sudo ufw status
-systemctl status nginx
-
-ip addr show eth0 | grep inet | awk '{ print $2; }' | sed 's/\/.*$//'
-
-# Setup Certbot
-
-sudo apt update
-sudo apt upgrade
-
-sudo apt install certbot python3-certbot-nginx
-
-
-# Allow fw port 443
-
-sudo ufw allow 443/tcp
-sudo ufw reload
+sudo ufw allow 'Nginx Full'
+sudo ufw delete allow 'Nginx HTTP'
 sudo ufw status
