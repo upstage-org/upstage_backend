@@ -18,8 +18,10 @@ You need to install Docker, Nginx, and Certbot on all three machines.
 ./scripts/setup-os.sh
 ```
 
+This assumes you wish to use Let's Encrypt:
 ```sh
 ./scripts/setup-your-domain.sh
+
 ```
 ## Prerequisites
 

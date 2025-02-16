@@ -1,12 +1,11 @@
-version: '3.8'
 services:
   postgres:
     image: postgres:latest
     container_name: postgres_container
     volumes:
-      - data-volume:/data/db
+      - /postgresql_data_volume:/data/db
     ports:
-      - "5432:5432"
+      - "5433:5432"
     environment:
       POSTGRES_PASSWORD: nas78a98sdfnwkjer2zkjhku
       POSTGRES_USER: postgres
@@ -17,26 +16,29 @@ services:
     image: mongo:latest
     container_name: mongodb_container
     ports:
-      - "27017:27017"
+      - "27018:27017"
     volumes:
-      - mongo_data:/data/db
+      - /mongodb_data_volume:/data/mongodb
     networks:
     - upstage-network
   mosquitto:
     image: eclipse-mosquitto:latest
     container_name: mosquitto_container
     ports:
-      - "1883:1883"
-      - "9001:9001"
+      - "1884:1883"
+      - "9002:9001"
     volumes:
       - mosquitto_data:/mosquitto/data
-      - mosquitto_log:/mosquitto/log
       - ./../system/mqtt_server/mosquitto.conf:/etc/mosquitto/mosquitto.conf
       - ./../system/mqtt_server/pw.txt:/etc/mosquitto/pw.txt
+      - ./../system/mqtt_server/local_mosquitto.conf /etc/mosquitto/conf.d/local_mosquitto.conf
+      - /etc/letsencrypt:/etc/letsencrypt
+      - ./../scripts:/scripts
     networks:
      - upstage-network
     command: >
       /bin/sh -c "chmod 0700 /etc/mosquitto/pw.txt &&
+      /scripts/add_mqtt_cert_crontab.sh &&
       mosquitto_passwd  -U /etc/mosquitto/pw.txt && 
       mosquitto -c /etc/mosquitto/mosquitto.conf"
 
