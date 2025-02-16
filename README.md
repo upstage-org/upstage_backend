@@ -32,7 +32,9 @@ sh scripts/setup-your-domain.sh
 
 Go to the `config_formatted_date.py` file and update your environment variables as needed.
 
-### 2. Start the Application
+### 2. Be sure to change these passwords and parameters before proceeding:
+
+### 3. Start the Application
 
 You can start the Upstage application using either a single container or multiple containers.
 
