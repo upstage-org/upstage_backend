@@ -15,11 +15,11 @@ You need to install Docker, Nginx, and Certbot on all three machines.
 ### 1. Debian
 
 ```sh
-sh scripts/setup-os.sh
+./scripts/setup-os.sh
 ```
 
 ```sh
-sh scripts/setup-your-domain.sh
+./scripts/setup-your-domain.sh
 ```
 ## Prerequisites
 
