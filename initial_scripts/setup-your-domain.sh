@@ -9,6 +9,10 @@ then
 	exit -1
 fi
 
+mkdir -p /etc/nginx/ssl
+cd /etc/nginx/ssl
+openssl dhparam 2048 -check -out dhparam.pem .
+
 cd /etc/nginx/sites-available
 echo "
 server {
