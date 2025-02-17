@@ -10,7 +10,7 @@ TBD
 
 ## Setup OS
 
-You need to install Docker, Nginx, and Certbot on all three machines.
+Install Docker, Nginx, and Certbot on all three machines.
 
 ### 1. Debian
 
