@@ -15,14 +15,17 @@ Install Docker, Nginx, and Certbot on all three machines.
 ### 1. Debian
 
 ```sh
-./scripts/setup-os.sh
+./initial_scripts/setup-os.sh
 ```
 
 This assumes you wish to use Let's Encrypt:
 ```sh
-./scripts/setup-your-domain.sh
-
+./initial_scripts/setup-your-domain.sh
 ```
+
+This will auto-generate passwords for avrious applications, and store them in a local config file:
+**************** Fill this in ***********************
+
 ## Prerequisites
 
 - Docker
