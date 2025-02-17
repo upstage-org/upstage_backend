@@ -7,11 +7,11 @@ apt install ufw
 ufw allow ssh
 ufw enable
 
+# Add Docker's official GPG key and other tools:
+sudo apt install ca-certificates curl logrotate
+
 cp initial_scripts/logrotate_for_docker.commands /etc/logrotate.d/docker
 logrotate -d /etc/logrotate.d/docker
-
-# Add Docker's official GPG key:
-sudo apt install ca-certificates curl logrotate
 
 sudo install -m 0755 -d /etc/apt/keyrings
 sudo curl -fsSL https://download.docker.com/linux/debian/gpg -o /etc/apt/keyrings/docker.asc
