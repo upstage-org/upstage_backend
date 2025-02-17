@@ -2,6 +2,13 @@
 # Make sure the setup-os.sh has been executed before this script.
 
 read -p "Enter the domain name, including subdomain. Ex: streaming.myupstage.org: " dname
+read -p "1: If this is a service machine (dbs, mqtt) enter 1,
+2: an app machine, enter 2,
+3: a streaming machine, enter 3,
+4: a front end machine, enter 4: " machinetype
+machinetype=$((machinetype))
+
+currdir=$PWD
 
 if [[ -z "$dname" ]]
 then
@@ -11,7 +18,7 @@ fi
 
 mkdir -p /etc/nginx/ssl
 cd /etc/nginx/ssl
-openssl dhparam 2048 -check -out dhparam.pem .
+openssl dhparam -out dhparam.pem 2048
 
 cd /etc/nginx/sites-available
 echo "
@@ -29,3 +36,23 @@ systemctl restart nginx
 # Setup Certbot
 
 sudo apt install certbot python3-certbot-nginx
+
+certbot --nginx -d $dname
+
+cd $currdir
+
+case $machinetype in
+	1) sed "s/YOUR_DOMAIN_NAME/$dname/g" ./initial_scripts/nginx_template_for_svc_machines.conf >/etc/nginx/sites-available/$dname.conf
+		;;
+	2) sed "s/YOUR_DOMAIN_NAME/$dname/g" ./initial_scripts/nginx_template_for_app_machines.conf >/etc/nginx/sites-available/$dname.conf
+		;;
+	3) sed "s/YOUR_DOMAIN_NAME/$dname/g" ./initial_scripts/nginx_template_for_streaming_machines.conf >/etc/nginx/sites-available/$dname.conf
+		;;
+	4) sed "s/YOUR_DOMAIN_NAME/$dname/g" ./initial_scripts/nginx_template_for_front_end_machines.conf >/etc/nginx/sites-available/$dname.conf
+		;;
+	*) echo "No match for machine type $machinetype, exiting."
+		;;
+esac
+
+nginx -t
+systemctl restart nginx
