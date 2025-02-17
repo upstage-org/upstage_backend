@@ -286,6 +286,7 @@ type_defs = gql("""
         description: String
         assetType: AssetType
         owner: User
+        dormant: Boolean
         stages: [Stage]
         tags: [String]
         copyrightLevel: Int
@@ -604,7 +605,7 @@ type_defs = gql("""
         updateStage(input: StageInput!): Stage
         duplicateStage(id: ID!, name: String!): Stage
         deleteStage(id: ID!): CommonResponse
-        assignMedia(input: AssignMediaInput!): Asset
+        assignMedia(input: AssignMediaInput!): Stage
         uploadMedia(input: UploadMediaInput!): Asset
         updateMedia(input: UpdateMediaInput!): Asset
         deleteMediaOnStage(id: ID!): CommonResponse
