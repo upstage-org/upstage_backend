@@ -97,7 +97,7 @@ UPLOAD_USER_CONTENT_FOLDER = "/usr/app/uploads"
 
 UPSTAGE_FRONTEND_URL = os.getenv("UPSTAGE_FRONTEND_URL", "http://localhost:3000")
 ENV_TYPE = os.getenv("ENV_TYPE", "development")
-hstr = "from .config_{} import *".format(str(os.getenv("TIMESTAMP", "formatted_date")))
+hstr = "from .load_env import *"
 
 VIDEO_MAX_SIZE = 300 * 1024 * 1024  # KB
 OTHER_MAX_SIZE = 1 * 1024 * 1024  # KB
