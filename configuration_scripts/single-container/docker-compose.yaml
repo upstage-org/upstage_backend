@@ -24,8 +24,8 @@ services:
       - api-network
   upstage:
     build:
-      context: ../
-      dockerfile: ./single-container/Dockerfile.app
+      context: ../../
+      dockerfile: ./configuration_scripts/single-container/Dockerfile.app
     container_name: upstage_app
     ports:
       - "3000:3000"

@@ -35,7 +35,28 @@ This will auto-generate passwords for avrious applications, and store them in a 
 
 ### 1. Configure Environment Variables
 
-Go to the `config_formatted_date.py` file and update your environment variables as needed.
+To generate and update the environment variables, run the following command:
+
+```sh
+sh configuration_scripts/environments/generate_environments_script.sh
+```
+
+This script will create the necessary environment configuration files required for the application to run. Make sure to review and update any generated environment variables as needed.
+
+### 2. Input Required Environment Variables
+
+You will be prompted to enter the following environment variables. Please provide the necessary values when prompted:
+
+```sh
+Enter value for EMAIL_HOST: 
+Enter value for EMAIL_HOST_USER: 
+Enter value for EMAIL_HOST_PASSWORD: 
+Enter value for EMAIL_PORT: 
+Enter value for STRIPE_KEY: 
+Enter value for STRIPE_PRODUCT_ID: 
+```
+
+Make sure to input accurate values for each prompt to ensure the application runs correctly.
 
 ### 2. Be sure to change these passwords and parameters before proceeding:
 
@@ -48,7 +69,7 @@ You can start the Upstage application using either a single container or multipl
 To start the application using a single container, run the following command:
 
 ```sh
-cd single-container
+cd configuration_scripts/single-container
 sh startup.sh
 ```
 
@@ -57,8 +78,8 @@ sh startup.sh
 To start the application using multiple containers, use Docker Compose. First, ensure you have a `docker-compose.yml` file configured. Then, run the following command:
 
 ```sh
-cd multiple-containers
-docker-compose up -d
+cd configuration_scripts multiple-containers
+docker-compose up -d --build
 ```
 
 This will start all the services defined in your `docker-compose.yml` file.
@@ -69,12 +90,6 @@ This will start all the services defined in your `docker-compose.yml` file.
 
 ```sh
 docker exec -it {upstage_backend_container_id} bash
-```
-
-- Set up environment variables:
-
-```sh
-export TIMESTAMP=$(date +"%d_%m_%Y")
 ```
 
 - Create initial accounts:

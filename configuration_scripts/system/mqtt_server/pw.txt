@@ -1,0 +1,2 @@
+performance:{MQTT_PASSWORD}
+admin:{MQTT_PASSWORD}

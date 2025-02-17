@@ -39,8 +39,8 @@ done
 
 echo "Application is ready!"
 
-docker exec -d upstage_app /bin/bash -c "TIMESTAMP=$(date +%d_%m_%Y) python3 -m scripts.run_upstage_email > upstage_email.log 2>&1 &"
-docker exec -d upstage_app /bin/bash -c "TIMESTAMP=$(date +%d_%m_%Y) python3 -m scripts.run_event_archive > event_archive.log 2>&1 &"
-docker exec -d upstage_app /bin/bash -c "TIMESTAMP=$(date +%d_%m_%Y) python3 -m scripts.run_upstage_stats > upstage_stats.log 2>&1 &"
+docker exec -d upstage_app /bin/bash -c "python3 -m container_scripts.run_upstage_email > upstage_email.log 2>&1 &"
+docker exec -d upstage_app /bin/bash -c "python3 -m container_scripts.run_event_archive > event_archive.log 2>&1 &"
+docker exec -d upstage_app /bin/bash -c "python3 -m container_scripts.run_upstage_stats > upstage_stats.log 2>&1 &"
 
 echo "Timestamp is ready!"
