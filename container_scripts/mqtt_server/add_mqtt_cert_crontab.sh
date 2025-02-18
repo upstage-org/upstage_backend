@@ -11,3 +11,4 @@ chown mosquitto:mosquitto /etc/mosquitto/ca_certificates/*
 echo '0 0 * * * "cp /etc/letsencrypt/live/*/* /etc/mosquitto/ca_certificates/ && chown mosquitto:mosquitto /etc/mosquitto/ca_certificates/*"' > /tmp/mqttcron
 crontab /tmp/mqttcron
 rm -rf /tmp/mqttcron
+

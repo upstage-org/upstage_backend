@@ -12,4 +12,4 @@ USER root
 RUN chmod +x ./startup.sh
 
 EXPOSE 3000
-CMD ["/bin/bash","-c","./startup.sh"] 
+CMD ["/bin/sh","-c","./startup.sh"] 

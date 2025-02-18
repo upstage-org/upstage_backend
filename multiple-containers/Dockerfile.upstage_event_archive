@@ -13,4 +13,4 @@ RUN chmod +x ./scripts/setup.sh
 RUN ./scripts/setup.sh
 
 RUN chmod +x ./scripts/run_event_archive.py
-CMD ["sh", "-c", "TIMESTAMP=$(date +%d_%m_%Y) python3 -m scripts.run_event_archive"]
+CMD ["/bin/sh", "-c", "TIMESTAMP=$(date +%d_%m_%Y) python3 -m scripts.run_event_archive"]
