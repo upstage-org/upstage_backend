@@ -43,6 +43,8 @@ cd $currdir
 
 case $machinetype in
 	1) sed "s/YOUR_DOMAIN_NAME/$dname/g" ./initial_scripts/nginx_template_for_svc_machines.conf >/etc/nginx/sites-available/$dname.conf
+           mkdir /postgresql_data_volume
+           mkdir /mongodb_data_volume
 		;;
 	2) sed "s/YOUR_DOMAIN_NAME/$dname/g" ./initial_scripts/nginx_template_for_app_machines.conf >/etc/nginx/sites-available/$dname.conf
 		;;
