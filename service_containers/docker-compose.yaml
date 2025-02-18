@@ -56,6 +56,6 @@ services:
 networks:
   upstage-network:
 volumes:
-  data-volume:
-  mongo_data:
+  postgresql_data_volume:
+  mongodb_data_volume:
   mosquitto_data:
