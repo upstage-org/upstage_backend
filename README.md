@@ -3,6 +3,8 @@ or using Dokcer form the source code.
 
 It is recommended that you run three docker instances, preferably on three separate machines, with three separate subdomains. For example: streaming.myupstage.org, service.myupstage.org, app.myupstage.org
 
+We do provide scripts to run all containers on one machine, but it is not recommended.
+
 # Upstage Setup Guide: From Official Docker Images:
 TBD
 
@@ -23,25 +25,41 @@ This assumes you wish to use Let's Encrypt:
 ./initial_scripts/setup-your-domain.sh
 ```
 
-This will auto-generate passwords for avrious applications, and store them in a local config file:
+This will auto-generate passwords for various applications, and store them in a local config file:
 **************** Fill this in ***********************
 
-## Prerequisites
+## Prerequisites (installed above)
 
 - Docker
 - Docker Compose
 
-## Setup Instructions
+## Setup Instructions for your service machine: Postgresql, Mongodb, Mosquitto
 
-### 1. Configure Environment Variables
+### 1. Run script to configure service env and set default passwords:
 
-Go to the `config_formatted_date.py` file and update your environment variables as needed.
+?????
 
-### 2. Be sure to change these passwords and parameters before proceeding:
+#Go to the `config_formatted_date.py` file and update your environment variables as needed.
 
-### 3. Start the Application
+### 2. Spin up the three containers in your service machine:
+```
+cd service_containers
+docker compose up -d
+docker compose ps
+```
 
-You can start the Upstage application using either a single container or multiple containers.
+## Setup Instructions for your application machine: Upstage, Upstage Event Capture, Upstage Email (optional)
+
+### 1. Run script to configure service env and set default passwords:
+
+?????
+
+### 3. Spin up the three containers in your service machine:
+```
+cd app_containers
+docker compose up -d
+docker compose ps
+```
 
 #### Single Container
 
