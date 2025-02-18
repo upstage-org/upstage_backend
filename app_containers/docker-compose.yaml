@@ -1,0 +1,53 @@
+services:
+  upstage:
+    build:
+      dockerfile: ./Dockerfile.upstage
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./system/upstage:/app
+      -  /home/upstage2/uploads:/usr/app/uploads
+      - /root/upstage/dashboard/demo:/usr/app/dashboard/demo
+    networks:
+      - upstage-network
+
+  upstage_event_archive:
+    build:
+      dockerfile: ./Dockerfile.upstage_event_archive
+    container_name: upstage_event_archive_container
+    ports:
+      - "83:80"
+      - "446:443"
+    volumes:
+      - ./system/event_archive:/app
+    networks:
+      - upstage-network
+
+  upstage_email_server:
+    build:
+      dockerfile: ./Dockerfile.upstage_email
+    container_name: upstage_email_container
+    ports:
+      - "81:80"
+      - "444:443"
+    volumes:
+      - ./system/email:/app
+    networks:
+      - upstage-network
+
+  upstage_stats:
+    build:
+      dockerfile: ./Dockerfile.upstage_stats
+    container_name: upstage_stats_container
+    ports:
+      - "82:80"
+      - "445:443"
+    volumes:
+      - ./system/stats:/app
+    networks:
+      - upstage-network
+
+networks:
+  upstage-network:
+volumes:
+  app:
