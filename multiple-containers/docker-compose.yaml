@@ -12,6 +12,7 @@ services:
       POSTGRES_DB: upstage
     networks:
      - upstage-network
+
   mongodb:
     image: mongo:latest
     container_name: mongodb_container
@@ -21,6 +22,7 @@ services:
       - /mongodb_data_volume:/data/mongodb
     networks:
     - upstage-network
+
   mosquitto:
     image: eclipse-mosquitto:latest
     container_name: mosquitto_container
@@ -28,19 +30,21 @@ services:
       - "1884:1883"
       - "9002:9001"
     volumes:
-      - mosquitto_data:/mosquitto/data
-      - ./../system/mqtt_server/mosquitto.conf:/etc/mosquitto/mosquitto.conf
-      - ./../system/mqtt_server/pw.txt:/etc/mosquitto/pw.txt
-      - ./../system/mqtt_server/local_mosquitto.conf /etc/mosquitto/conf.d/local_mosquitto.conf
+      - ./mosquitto_data:/mosquitto/data
+      - ./../container_scripts/mqtt_server/mosquitto.conf:/etc/mosquitto/mosquitto.conf
+      - ./../container_scripts/mqtt_server/pw.txt:/etc/mosquitto/pw.txt
+      - ./../container_scripts/mqtt_server/local_mosquitto.conf:/etc/mosquitto/conf.d/local_mosquitto.conf
+      - ./../container_scripts/mqtt_server/add_mqtt_cert_crontab.sh:/cron_scipts/add_mqtt_cert_crontab.sh
       - /etc/letsencrypt:/etc/letsencrypt
-      - ./../scripts:/scripts
     networks:
      - upstage-network
-    command: >
+    command:
       /bin/sh -c "chmod 0700 /etc/mosquitto/pw.txt &&
-      /scripts/add_mqtt_cert_crontab.sh &&
-      mosquitto_passwd  -U /etc/mosquitto/pw.txt && 
+      mosquitto_passwd -U /etc/mosquitto/pw.txt && 
+      /cron_scripts/add_mqtt_cert_crontab.sh &&
       mosquitto -c /etc/mosquitto/mosquitto.conf"
+      #/bin/sh -c "/bin/sh"
+    restart: no
 
 
   upstage:
@@ -101,4 +105,3 @@ volumes:
   data-volume:
   mongo_data:
   mosquitto_data:
-  mosquitto_log:
