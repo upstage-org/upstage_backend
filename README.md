@@ -39,13 +39,10 @@ This will auto-generate passwords for various applications, and store them in a 
 
 ?????
 
-#Go to the `config_formatted_date.py` file and update your environment variables as needed.
-
 ### 2. Spin up the three containers in your service machine:
 ```
 cd service_containers
-docker compose up -d
-docker compose ps
+./run_docker_compose.sh
 ```
 
 ## Setup Instructions for your application machine: Upstage, Upstage Event Capture, Upstage Email (optional)
@@ -57,8 +54,7 @@ docker compose ps
 ### 3. Spin up the three containers in your service machine:
 ```
 cd app_containers
-docker compose up -d
-docker compose ps
+./run_docker_compose.sh
 ```
 
 #### Single Container
@@ -69,17 +65,6 @@ To start the application using a single container, run the following command:
 cd single-container
 sh startup.sh
 ```
-
-#### Multiple Containers
-
-To start the application using multiple containers, use Docker Compose. First, ensure you have a `docker-compose.yml` file configured. Then, run the following command:
-
-```sh
-cd multiple-containers
-docker-compose up -d
-```
-
-This will start all the services defined in your `docker-compose.yml` file.
 
 ### 3. Insert Seeding Data
 
