@@ -30,7 +30,11 @@ from stages.db_models.parent_stage import ParentStageModel
 from stages.db_models.stage import StageModel
 from assets.db_models.asset import AssetModel
 from stages.db_models.stage_attribute import StageAttributeModel
-from studios.http.validation import BatchUserInput, ChangePasswordInput, UpdateUserInput
+from studio_management.http.validation import (
+    BatchUserInput,
+    ChangePasswordInput,
+    UpdateUserInput,
+)
 from users.db_models.user import ADMIN, GUEST, SUPER_ADMIN, UserModel
 from graphql import GraphQLError
 

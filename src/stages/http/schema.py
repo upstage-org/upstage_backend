@@ -2,7 +2,7 @@ from ariadne import MutationType, QueryType, make_executable_schema
 from global_config import authenticated
 from performance_config.services.performance import PerformanceService
 from performance_config.services.scene import SceneService
-from studios.http.graphql import type_defs
+from studio_management.http.graphql import type_defs
 from ariadne.asgi import GraphQL
 
 from stages.http.validation import (

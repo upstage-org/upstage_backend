@@ -6,7 +6,7 @@ from assets.db_models.asset import AssetModel
 from assets.db_models.asset_usage import AssetUsageModel
 from stages.db_models.stage import StageModel
 from stages.tests.test_stage import TestStageController
-from studios.http.schema import studio_graphql_app
+from studio_management.http.schema import studio_graphql_app
 from users.db_models.user import GUEST, PLAYER, SUPER_ADMIN, UserModel
 from global_config import DBSession, ScopedSession
 from src.main import app
