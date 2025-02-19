@@ -13,7 +13,7 @@ from ariadne.asgi import GraphQL
 
 def config_graphql_endpoints(app: FastAPI):
     from assets.http.schema import query as asset_query, mutation as asset_mutation
-    from studios.http.schema import (
+    from studio_management.http.schema import (
         query as studio_query,
         mutation as studio_mutation,
     )
@@ -21,7 +21,7 @@ def config_graphql_endpoints(app: FastAPI):
     from licenses.http.schema import mutation as license_mutation
     from mails.http.schema import mutation as mail_mutation
     from payments.http.schema import mutation as payment_mutation
-    from studios.http.graphql import type_defs as studio_type_defs
+    from studio_management.http.graphql import type_defs as studio_type_defs
     from performance_config.http.schema import query as performance_query
     from stages.http.schema import query as stage_query, mutation as stage_mutation
     from upstage_options.http.schema import (

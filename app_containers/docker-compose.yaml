@@ -1,53 +1,60 @@
 services:
   upstage:
-    build:
-      dockerfile: ./Dockerfile.upstage
+    image: registry.access.redhat.com/ubi9/python-312:latest
+    container_name: upstage_container
     ports:
       - "3000:3000"
     volumes:
-      - ./system/upstage:/app
+      - ../:/usr/app
       -  /home/upstage2/uploads:/usr/app/uploads
       - /root/upstage/dashboard/demo:/usr/app/dashboard/demo
+
+    command: >
+      /bin/bash -c "
+      cd /usr/app &&
+      pip install --upgrade pip &&
+      pip install -r requirements.txt &&
+      chmod +x ./startup.sh &&
+      ./startup.sh"
     networks:
-      - upstage-network
+      - service_containers_upstage-network
 
   upstage_event_archive:
-    build:
-      dockerfile: ./Dockerfile.upstage_event_archive
+    image: registry.access.redhat.com/ubi9/python-312:latest
     container_name: upstage_event_archive_container
     ports:
       - "83:80"
       - "446:443"
     volumes:
-      - ./system/event_archive:/app
-    networks:
-      - upstage-network
+      - ../:/usr/app
 
-  upstage_email_server:
-    build:
-      dockerfile: ./Dockerfile.upstage_email
-    container_name: upstage_email_container
-    ports:
-      - "81:80"
-      - "444:443"
-    volumes:
-      - ./system/email:/app
+    command: >
+      /bin/bash -c "
+      cd /usr/app &&
+      pip install --upgrade pip &&
+      pip install -r requirements.txt &&
+      python3 -m scripts.run_event_archive"
     networks:
-      - upstage-network
+      - service_containers_upstage-network    
 
   upstage_stats:
-    build:
-      dockerfile: ./Dockerfile.upstage_stats
+    image: registry.access.redhat.com/ubi9/python-312:latest
     container_name: upstage_stats_container
     ports:
-      - "82:80"
-      - "445:443"
+      - "84:80"
+      - "447:443"
     volumes:
-      - ./system/stats:/app
+      - ../:/usr/app
+    command: >
+      /bin/bash -c "
+      cd /usr/app &&
+      pip install --upgrade pip &&
+      pip install -r requirements.txt &&
+      python3 -m scripts.run_upstage_stats"
     networks:
-      - upstage-network
+      - service_containers_upstage-network   
 
 networks:
-  upstage-network:
+  service_containers_upstage-network:
 volumes:
   app:

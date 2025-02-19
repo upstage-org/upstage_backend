@@ -89,7 +89,7 @@ class TestUserController:
         data = await test_AuthenticationController.test_02_login_successfully(client)
 
         headers = {
-            "Authorization": f'Bearer {data["data"]["login"]["access_token"]}',
+            "Authorization": f"Bearer {data['data']['login']['access_token']}",
             JWT_HEADER_NAME: data["data"]["login"]["refresh_token"],
         }
 

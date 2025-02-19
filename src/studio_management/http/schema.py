@@ -3,9 +3,13 @@ from ariadne import MutationType, QueryType, make_executable_schema
 from global_config import authenticated, convert_keys_to_camel_case
 from ariadne.asgi import GraphQL
 from mails.helpers.mail import send
-from studios.http.graphql import type_defs
-from studios.http.validation import BatchUserInput, ChangePasswordInput, UpdateUserInput
-from studios.services.studio import StudioService
+from studio_management.http.graphql import type_defs
+from studio_management.http.validation import (
+    BatchUserInput,
+    ChangePasswordInput,
+    UpdateUserInput,
+)
+from studio_management.services.studio import StudioService
 from users.db_models.user import ADMIN, ROLES, SUPER_ADMIN, UserModel
 
 

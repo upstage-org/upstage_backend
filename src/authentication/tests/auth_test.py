@@ -117,7 +117,7 @@ class TestAuthenticationController:
         )
         data = response.json()
         headers = {
-            "Authorization": f'Bearer {data["data"]["login"]["access_token"]}',
+            "Authorization": f"Bearer {data['data']['login']['access_token']}",
             JWT_HEADER_NAME: data["data"]["login"]["refresh_token"],
         }
         response = client.post(
@@ -160,7 +160,7 @@ class TestAuthenticationController:
         )
         data = response.json()
         headers = {
-            "Authorization": f'Bearer {data["data"]["login"]["access_token"]}',
+            "Authorization": f"Bearer {data['data']['login']['access_token']}",
             JWT_HEADER_NAME: data["data"]["login"]["refresh_token"],
         }
 
@@ -212,6 +212,6 @@ class TestAuthenticationController:
         )
         data = response.json()
         return {
-            "Authorization": f'Bearer {data["data"]["login"]["access_token"]}',
+            "Authorization": f"Bearer {data['data']['login']['access_token']}",
             JWT_HEADER_NAME: data["data"]["login"]["refresh_token"],
         }

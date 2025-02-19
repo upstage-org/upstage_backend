@@ -20,7 +20,7 @@ Install Docker, Nginx, and Certbot on all three machines.
 ./initial_scripts/setup-os.sh
 ```
 
-This assumes you wish to use Let's Encrypt:
+This assumes you wish to use Let's Encrypt and will also run the script to configure the service environment and set default passwords:
 ```sh
 ./initial_scripts/setup-your-domain.sh
 ```
@@ -35,36 +35,36 @@ This will auto-generate passwords for various applications, and store them in a 
 
 ## Setup Instructions for your service machine: Postgresql, Mongodb, Mosquitto
 
-### 1. Run script to configure service env and set default passwords:
+We provides two different ways to start services on your service machine. Here's a breakdown
 
-?????
-
-### 2. Spin up the three containers in your service machine:
+### 1. Spin up the three containers in your service machine:
 ```
 cd service_containers
 ./run_docker_compose.sh
 ```
 
+### 2: Spin up the one container in your service machine:
+```
+cd standalone_service_containers
+./run_docker_compose.sh
+```
+
+To check the health of the services, run the following command:
+
+```sh
+cd standalone_service_containers
+./run_health_check.sh
+```
+
 ## Setup Instructions for your application machine: Upstage, Upstage Event Capture, Upstage Email (optional)
 
-### 1. Run script to configure service env and set default passwords:
-
-?????
-
-### 3. Spin up the three containers in your service machine:
+### 1. Spin up the three containers in your service machine:
 ```
 cd app_containers
 ./run_docker_compose.sh
 ```
 
-#### Single Container
-
-To start the application using a single container, run the following command:
-
-```sh
-cd single-container
-sh startup.sh
-```
+## Setup Instructions for inserting Seeding Data
 
 ### 3. Insert Seeding Data
 
@@ -72,12 +72,6 @@ sh startup.sh
 
 ```sh
 docker exec -it {upstage_backend_container_id} bash
-```
-
-- Set up environment variables:
-
-```sh
-export TIMESTAMP=$(date +"%d_%m_%Y")
 ```
 
 - Create initial accounts:

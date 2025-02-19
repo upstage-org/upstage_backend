@@ -11,7 +11,8 @@ DATABASE_PORT = os.getenv("DATABASE_PORT")
 DATABASE_USER = os.getenv("DATABASE_USER")
 DATABASE_PASSWORD = os.getenv("DATABASE_PASSWORD")
 DATABASE_NAME = os.getenv("DATABASE_NAME")
-
+MONGO_PASSWORD = os.getenv("MONGO_PASSWORD")
+MONGO_USER = os.getenv("MONGO_USER")
 
 # payment
 STRIPE_KEY = ""
@@ -97,9 +98,9 @@ UPLOAD_USER_CONTENT_FOLDER = "/usr/app/uploads"
 
 UPSTAGE_FRONTEND_URL = os.getenv("UPSTAGE_FRONTEND_URL", "http://localhost:3000")
 ENV_TYPE = os.getenv("ENV_TYPE", "development")
-hstr = "from .config_{} import *".format(str(os.getenv("TIMESTAMP", "formatted_date")))
+hstr = "from .load_env import *"
 
-VIDEO_MAX_SIZE = 300 * 1024 * 1024 # KB
+VIDEO_MAX_SIZE = 300 * 1024 * 1024  # KB
 OTHER_MAX_SIZE = 1 * 1024 * 1024  # KB
 
 print(hstr)
@@ -107,5 +108,3 @@ print(hstr)
 exec(hstr)
 
 DATABASE_URL = f"{DATABASE_CONNECT}://{DATABASE_USER}:{DATABASE_PASSWORD}@{DATABASE_HOST}:{DATABASE_PORT}/{DATABASE_NAME}"
-
-
