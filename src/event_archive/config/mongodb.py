@@ -6,17 +6,29 @@ from global_config import (
     MONGO_HOST,
     MONGO_PORT,
     MONGODB_COLLECTION_TOKEN,
+    MONGO_USER,
+    MONGO_PASSWORD,
 )
 import pymongo
 
 
-def build_mongo_client(host=MONGO_HOST, port=MONGO_PORT):
+def build_mongo_client(
+    host=MONGO_HOST, port=MONGO_PORT, username=MONGO_USER, password=MONGO_PASSWORD
+):
     print(f"Connecting to MongoDB at {host}:{port}")
-    return pymongo.MongoClient(host, port)
+    uri = f"mongodb://{username}:{password}@{host}:{port}"
+    print(f"URI: {uri}")
+    return pymongo.MongoClient(uri)
 
 
-def build_mongo_email_client(host=MONGO_EMAIL_HOST, port=MONGO_EMAIL_PORT):
-    return pymongo.MongoClient(host, port)
+def build_mongo_email_client(
+    host=MONGO_EMAIL_HOST,
+    port=MONGO_EMAIL_PORT,
+    username=MONGO_USER,
+    password=MONGO_PASSWORD,
+):
+    uri = f"mongodb://{username}:{password}@{host}:{port}"
+    return pymongo.MongoClient(uri)
 
 
 def get_mongo_token_collection():

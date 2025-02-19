@@ -58,3 +58,12 @@ esac
 
 nginx -t
 systemctl restart nginx
+
+read -p "Do you want to fill in environment variables? (yes/no): " fill_env
+if [[ "$fill_env" == "yes" ]]; then
+	cd $currdir
+    sh configuration_scripts/environments/generate_environments_script.sh
+else
+    echo "Exiting without filling environment variables."
+    exit 0
+fi

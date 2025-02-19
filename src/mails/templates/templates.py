@@ -143,8 +143,8 @@ def permission_response_for_media(user, media, note, approved, studio_url):
 Hi <b>{display_user(user)}</b>,
 <br>
 <br>
-Your permission request for <b>{media.name}</b> with purpose \"{note}\" has been {'approved' if approved else 'denied'} by the owner.
-{f'<br><br>You can now use the media in the <a href="{studio_url}">Studio</a>.' if approved else ''}
+Your permission request for <b>{media.name}</b> with purpose \"{note}\" has been {"approved" if approved else "denied"} by the owner.
+{f'<br><br>You can now use the media in the <a href="{studio_url}">Studio</a>.' if approved else ""}
 <br>
 <br>
 {footer}

@@ -35,7 +35,7 @@ class TestAssetController:
         data = await test_AuthenticationController.test_02_login_successfully(client)
 
         headers = {
-            "Authorization": f'Bearer {data["data"]["login"]["access_token"]}',
+            "Authorization": f"Bearer {data['data']['login']['access_token']}",
             JWT_HEADER_NAME: data["data"]["login"]["refresh_token"],
         }
 
@@ -77,7 +77,7 @@ class TestAssetController:
         )
 
         headers = {
-            "Authorization": f'Bearer {data["data"]["login"]["access_token"]}',
+            "Authorization": f"Bearer {data['data']['login']['access_token']}",
             JWT_HEADER_NAME: data["data"]["login"]["refresh_token"],
         }
 
@@ -160,7 +160,7 @@ class TestAssetController:
         data = await test_AuthenticationController.test_02_login_successfully(client)
         asset = DBSession.query(AssetModel).join(UserModel).first()
         headers = {
-            "Authorization": f'Bearer {data["data"]["login"]["access_token"]}',
+            "Authorization": f"Bearer {data['data']['login']['access_token']}",
             JWT_HEADER_NAME: data["data"]["login"]["refresh_token"],
         }
 
@@ -216,7 +216,7 @@ class TestAssetController:
         data = await test_AuthenticationController.test_02_login_successfully(client)
         asset = DBSession.query(AssetModel).join(UserModel).first()
         headers = {
-            "Authorization": f'Bearer {data["data"]["login"]["access_token"]}',
+            "Authorization": f"Bearer {data['data']['login']['access_token']}",
             JWT_HEADER_NAME: data["data"]["login"]["refresh_token"],
         }
 
@@ -256,7 +256,7 @@ class TestAssetController:
         asset = DBSession.query(AssetModel).join(UserModel).first()
 
         headers = {
-            "Authorization": f'Bearer {data["data"]["login"]["access_token"]}',
+            "Authorization": f"Bearer {data['data']['login']['access_token']}",
             JWT_HEADER_NAME: data["data"]["login"]["refresh_token"],
         }
 
@@ -300,7 +300,7 @@ class TestAssetController:
         asset = DBSession.query(AssetModel).join(UserModel).first()
 
         headers = {
-            "Authorization": f'Bearer {data["data"]["login"]["access_token"]}',
+            "Authorization": f"Bearer {data['data']['login']['access_token']}",
             JWT_HEADER_NAME: data["data"]["login"]["refresh_token"],
         }
 
@@ -344,7 +344,7 @@ class TestAssetController:
         )
 
         headers = {
-            "Authorization": f'Bearer {data["data"]["login"]["access_token"]}',
+            "Authorization": f"Bearer {data['data']['login']['access_token']}",
             JWT_HEADER_NAME: data["data"]["login"]["refresh_token"],
         }
 
@@ -365,7 +365,7 @@ class TestAssetController:
 
         data = await test_AuthenticationController.test_02_login_successfully(client)
         headers = {
-            "Authorization": f'Bearer {data["data"]["login"]["access_token"]}',
+            "Authorization": f"Bearer {data['data']['login']['access_token']}",
             JWT_HEADER_NAME: data["data"]["login"]["refresh_token"],
         }
 
@@ -381,7 +381,7 @@ class TestAssetController:
         asset = DBSession.query(AssetModel).first()
         data = await test_AuthenticationController.test_02_login_successfully(client)
         headers = {
-            "Authorization": f'Bearer {data["data"]["login"]["access_token"]}',
+            "Authorization": f"Bearer {data['data']['login']['access_token']}",
             JWT_HEADER_NAME: data["data"]["login"]["refresh_token"],
         }
 
@@ -408,7 +408,7 @@ class TestAssetController:
         data = await test_AuthenticationController.test_02_login_successfully(client)
 
         headers = {
-            "Authorization": f'Bearer {data["data"]["login"]["access_token"]}',
+            "Authorization": f"Bearer {data['data']['login']['access_token']}",
             JWT_HEADER_NAME: data["data"]["login"]["refresh_token"],
         }
 

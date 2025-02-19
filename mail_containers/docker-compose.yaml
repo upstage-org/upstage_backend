@@ -1,0 +1,19 @@
+services:
+  upstage_event_archive:
+    image: registry.access.redhat.com/ubi9/python-312:latest
+    container_name: upstage_event_archive_container
+    ports:
+      - "83:80"
+      - "446:443"
+    volumes:
+      - ../:/usr/app
+
+    command: >
+      /bin/bash -c "
+      cd /usr/app &&
+      pip install --upgrade pip &&
+      pip install -r requirements.txt &&
+      python3 -m scripts.run_upstage_email"
+
+volumes:
+  app:
