@@ -2,7 +2,7 @@ from ariadne import MutationType, QueryType, make_executable_schema
 from ariadne.asgi import GraphQL
 from assets.http.validation import MediaTableInput, SaveMediaInput
 from global_config import authenticated
-from studios.http.graphql import type_defs
+from studio_management.http.graphql import type_defs
 from assets.services.asset import AssetService
 from users.db_models.user import ADMIN, PLAYER, SUPER_ADMIN, UserModel
 

@@ -22,7 +22,7 @@ class TestStageController:
         data = await test_AuthenticationController.test_02_login_successfully(client)
 
         headers = {
-            "Authorization": f'Bearer {data["data"]["login"]["access_token"]}',
+            "Authorization": f"Bearer {data['data']['login']['access_token']}",
             JWT_HEADER_NAME: data["data"]["login"]["refresh_token"],
         }
 
@@ -64,7 +64,7 @@ class TestStageController:
 
     def update_stage(self, client, id: int, data):
         headers = {
-            "Authorization": f'Bearer {data["data"]["login"]["access_token"]}',
+            "Authorization": f"Bearer {data['data']['login']['access_token']}",
             JWT_HEADER_NAME: data["data"]["login"]["refresh_token"],
         }
 
@@ -117,7 +117,7 @@ class TestStageController:
 
     async def duplicate_stage(self, client, id: int, data):
         headers = {
-            "Authorization": f'Bearer {data["data"]["login"]["access_token"]}',
+            "Authorization": f"Bearer {data['data']['login']['access_token']}",
             JWT_HEADER_NAME: data["data"]["login"]["refresh_token"],
         }
 
@@ -167,7 +167,7 @@ class TestStageController:
 
     def remove_media(self, client, id: int, data):
         headers = {
-            "Authorization": f'Bearer {data["data"]["login"]["access_token"]}',
+            "Authorization": f"Bearer {data['data']['login']['access_token']}",
             JWT_HEADER_NAME: data["data"]["login"]["refresh_token"],
         }
 

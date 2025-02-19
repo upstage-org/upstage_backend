@@ -3,7 +3,7 @@ from ariadne import MutationType, QueryType, make_executable_schema
 from global_config import authenticated
 from upstage_options.http.validation import ConfigInput, SystemEmailInput
 from upstage_options.services.upstage_option import SettingService
-from studios.http.graphql import type_defs
+from studio_management.http.graphql import type_defs
 from ariadne.asgi import GraphQL
 
 from users.db_models.user import ADMIN, SUPER_ADMIN

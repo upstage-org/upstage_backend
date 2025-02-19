@@ -311,7 +311,9 @@ class AssetService:
         if len(input.stageIds):
             asset.stages.delete()
             for id in input.stageIds:
-                asset.stages.append(ParentStageModel(stage_id=id, child_asset_id=asset.id))
+                asset.stages.append(
+                    ParentStageModel(stage_id=id, child_asset_id=asset.id)
+                )
 
     def change_owner(self, owner: UserModel, local_db_session, asset: AssetModel):
         if owner:
