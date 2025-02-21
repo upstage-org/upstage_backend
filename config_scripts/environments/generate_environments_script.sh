@@ -2,10 +2,9 @@
 
 output_file="./src/global_config/load_env.py"
 template_file="./config_scripts/environments/env_app_template.py"
+pwd_template_file="./config_scripts/environments/pwd_template.txt"
 pw_file="./container_scripts/mqtt_server/pw.txt"
-standalone_pw_file="./standalone_service_containers/mqtt_server/pw.txt"
 service_containers_file="./service_containers/run_docker_compose.sh"  # This is the docker-compose file for the multiple containers
-standalone_service_containers_file="./standalone_service_containers/run_docker_compose.sh"  # This is the docker-compose file for the standalone container
 
 echo "$(dirname "$output_file")"
 
@@ -58,6 +57,17 @@ generate_config() {
 
     echo "Configuration file generated at $output_file"
 
+      # Replace placeholders in pwd_template.txt and copy to pw.txt
+    > "$pw_file"
+    while IFS= read -r line; do
+        for i in "${!keys[@]}"; do
+            line="${line//${keys[$i]}/${values[$i]}}"
+        done
+        echo "$line" >> "$pw_file"
+    done < "$pwd_template_file"
+
+    echo "Passwords generated and saved to $pw_file"
+
     # Function to replace placeholders in a given file
     replace_placeholders() {
         local file=$1
@@ -65,19 +75,8 @@ generate_config() {
             sed -i '' "s|${keys[$i]}|${values[$i]}|g" "$file"
         done
     }
-
-    replace_placeholders "$pw_file"
-    echo "Passwords generated and saved to $pw_file"
-
     replace_placeholders "$service_containers_file"
     echo "Passwords generated and saved to $service_containers_file"
-
-    replace_placeholders "$standalone_pw_file"
-    echo "Passwords generated and saved to $standalone_pw_file"
-
-    replace_placeholders "$standalone_service_containers_file"
-    echo "Passwords generated and saved to $standalone_service_containers_file"
-
 }
 
 # Generate the configuration file
