@@ -35,25 +35,10 @@ This will auto-generate passwords for various applications, and store them in a 
 
 ## Setup Instructions for your service machine: Postgresql, Mongodb, Mosquitto
 
-We provides two different ways to start services on your service machine. Here's a breakdown
-
 ### 1. Spin up the three containers in your service machine:
 ```
 cd service_containers
 ./run_docker_compose.sh
-```
-
-### 2: Spin up the one container in your service machine:
-```
-cd standalone_service_containers
-./run_docker_compose.sh
-```
-
-To check the health of the services, run the following command:
-
-```sh
-cd standalone_service_containers
-./run_health_check.sh
 ```
 
 ## Setup Instructions for your application machine: Upstage, Upstage Event Capture, Upstage Email (optional)
