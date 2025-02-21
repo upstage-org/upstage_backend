@@ -53,26 +53,27 @@ cd app_containers
 
 ### 3. Insert Seeding Data
 
+
+### Default Admin User
+
+Upon initial setup, a default administrator account is created with the following credentials:
+
+- **Username:** `admin`
+- **Password:** `Secret@123`
+
+It is highly recommended to change the default password upon first login to ensure the security of your application. To change the password, follow these steps:
+
+1. Log in to the application using the default credentials.
+2. Navigate to the account settings or profile section.
+3. Update the password to a strong, unique password.
+
+Ensure that the new password meets the security requirements of your organization.
+
 - Exec into the backend container:
 
 ```sh
 docker exec -it {upstage_backend_container_id} bash
 ```
-
-- Create initial accounts:
-
-Change default accounts by editing the following file:
-
-```sh
-vi src/users/scripts/create_test_users.py
-```
-
-After updating the information in this file, run the script to create accounts:
-
-```sh
-python3 -m src.users.scripts.create_test_users
-```
-
 - Create default data:
 
 ```sh
