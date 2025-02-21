@@ -1,5 +1,7 @@
+#!/bin/bash -x
+
 output_file="./src/global_config/load_env.py"
-template_file="./configuration_scripts/environments/env_app_template.py"
+template_file="./config_scripts/environments/env_app_template.py"
 pw_file="./container_scripts/mqtt_server/pw.txt"
 standalone_pw_file="./standalone_service_containers/mqtt_server/pw.txt"
 service_containers_file="./service_containers/run_docker_compose.sh"  # This is the docker-compose file for the multiple containers
@@ -19,7 +21,7 @@ fi
 # Function to prompt user for input and replace placeholders
 generate_config() {
     local key value
-    keys=("REPLACE_POSTGRES_PASSWORD" "REPLACE_MQTT_P_PASSWORD" "REPLACE_MQTT_A_PASSWORD" "REPLACE_MONGO_PASSWORD"  "SVC_HOST" "EMAIL_HOST" "EMAIL_HOST_USER" "EMAIL_HOST_PASSWORD" "EMAIL_PORT" "STRIPE_KEY" "STRIPE_PRODUCT_ID")
+    keys=("REPLACE_POSTGRES_PASSWORD" "REPLACE_MQTT_P_PASSWORD" "REPLACE_MQTT_A_PASSWORD" "REPLACE_MONGO_PASSWORD" "EMAIL_HOST" "EMAIL_HOST_USER" "EMAIL_HOST_PASSWORD" "EMAIL_PORT")
     values=()
 
     # Generate POSTGRES_PASSWORD and MQTT_PASSWORD using openssl
@@ -38,6 +40,13 @@ generate_config() {
         read -p "Enter value for ${key}: " value
         values+=("$value")
     done
+
+    a=`hostanme -I`
+    read -a arr <<< "$a"
+    echo "Note that on Digital Ocean, the third IP in the 'hostname -I' command: ${arr[2]} is the local network IP, used for faster connection without going out to the internet. If this is incorrect in your environment, please change this IP address in the generated config file $output_file. All IPs for this server are: ${arr[@]}"
+    SVC_HOST="$arr[2]"
+    keys+=("SVC_HOST")
+    values+=("$SVC_HOST")
 
     # Replace placeholders with values
     while IFS= read -r line; do
