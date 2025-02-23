@@ -55,7 +55,10 @@ case $machinetype in
            mkdir /postgresql_data_volume
            mkdir /mongodb_data_volume
            ./initial_scripts/environments/generate_environments_script.sh
-	   ./service_containers/run_docker_compose.sh 
+	   cd ./service_containers && ./run_docker_compose.sh 
+	   cd $currdir
+	   echo "
+Completed service container setup."
 		;;
 	2) sed "s/YOUR_DOMAIN_NAME/$dname/g" ./nginx_templates/nginx_template_for_app_machines.conf >/etc/nginx/sites-available/$dname.conf
 		;;
