@@ -1,4 +1,4 @@
-#!/bin/bash -x
+#!/bin/bash
 
 output_file="./src/global_config/load_env.py"
 template_file="./config_scripts/environments/env_app_template.py"
@@ -40,10 +40,10 @@ generate_config() {
         values+=("$value")
     done
 
-    a=`hostanme -I`
+    a=`hostname -I`
     read -a arr <<< "$a"
-    echo "Note that on Digital Ocean, the third IP in the 'hostname -I' command: ${arr[2]} is the local network IP, used for faster connection without going out to the internet. If this is incorrect in your environment, please change this IP address in the generated config file $output_file. All IPs for this server are: ${arr[@]}"
-    SVC_HOST="$arr[2]"
+    echo "\nNote that on Digital Ocean, the third IP in the 'hostname -I' command: ${arr[2]} is the local network IP, used for faster connection without going out to the internet. If this is incorrect in your environment, please change this IP address in the generated config file $output_file. All IPs for this server are: ${arr[@]}"
+    SVC_HOST="${arr[2]}"
     keys+=("SVC_HOST")
     values+=("$SVC_HOST")
 
@@ -55,7 +55,7 @@ generate_config() {
         echo "$line" >> "$output_file"
     done < "$template_file"
 
-    echo "Configuration file generated at $output_file"
+    echo "\nConfiguration file generated at $output_file"
 
       # Replace placeholders in pwd_template.txt and copy to pw.txt
     > "$pw_file"
@@ -66,21 +66,20 @@ generate_config() {
         echo "$line" >> "$pw_file"
     done < "$pwd_template_file"
 
-    echo "Passwords generated and saved to $pw_file"
+    echo "\nPasswords generated and saved to $pw_file"
 
     # Function to replace placeholders in a given file
     replace_placeholders() {
         local file=$1
         for i in "${!keys[@]}"; do
-            sed -i '' "s|${keys[$i]}|${values[$i]}|g" "$file"
+            sed -i "s|${keys[$i]}|${values[$i]}|g" "$file"
         done
     }
     replace_placeholders "$service_containers_file"
-    echo "Passwords generated and saved to $service_containers_file"
+    echo "\nPasswords generated and saved to $service_containers_file"
 }
 
 # Generate the configuration file
 generate_config
 
-# Exit the script
-exit 0
+echo "\nIf no errors have occurred, you are ready to set up the app server now. Just a heads-up: you will be instructed to copy-paste or transfer over the configuration file generated here: $output_file"
