@@ -31,14 +31,6 @@ sudo apt install docker-ce docker-ce-cli containerd.io docker-buildx-plugin dock
 
 sudo docker run hello-world
 
-# Setup Nginx
-
-sudo apt update
-sudo apt upgrade
-
-sudo ufw status
-sudo ufw allow 'Nginx Full'
-sudo ufw delete allow 'Nginx HTTP'
 sudo ufw status
 
 echo "
