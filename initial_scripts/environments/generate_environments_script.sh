@@ -1,10 +1,10 @@
 #!/bin/bash
 
-output_file="./src/global_config/load_env.py"
-template_file="./config_scripts/environments/env_app_template.py"
-pwd_template_file="./config_scripts/environments/pwd_template.txt"
-pw_file="./container_scripts/mqtt_server/pw.txt"
-service_containers_file="./service_containers/run_docker_compose.sh"  # This is the docker-compose file for the multiple containers
+output_file="../src/global_config/load_env.py"
+template_file="../config_scripts/environments/env_app_template.py"
+pwd_template_file="./environments/pwd_template.txt"
+pw_file="../container_scripts/mqtt_server/pw.txt"
+service_containers_file="../service_containers/run_docker_compose.sh"  # This is the docker-compose file for the multiple containers
 
 echo "$(dirname "$output_file")"
 
