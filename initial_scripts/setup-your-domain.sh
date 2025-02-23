@@ -42,15 +42,16 @@ certbot --nginx -d $dname
 cd $currdir
 
 case $machinetype in
-	1) sed "s/YOUR_DOMAIN_NAME/$dname/g" ./initial_scripts/nginx_template_for_svc_machines.conf >/etc/nginx/sites-available/$dname.conf
+	1) sed "s/YOUR_DOMAIN_NAME/$dname/g" ./initial_scripts/nginx_templates/nginx_template_for_svc_machines.conf >/etc/nginx/sites-available/$dname.conf
            mkdir /postgresql_data_volume
            mkdir /mongodb_data_volume
+           ./environments/generate_environments_script.sh
 		;;
-	2) sed "s/YOUR_DOMAIN_NAME/$dname/g" ./initial_scripts/nginx_template_for_app_machines.conf >/etc/nginx/sites-available/$dname.conf
+	2) sed "s/YOUR_DOMAIN_NAME/$dname/g" ./initial_scripts/nginx_templates/nginx_template_for_app_machines.conf >/etc/nginx/sites-available/$dname.conf
 		;;
-	3) sed "s/YOUR_DOMAIN_NAME/$dname/g" ./initial_scripts/nginx_template_for_streaming_machines.conf >/etc/nginx/sites-available/$dname.conf
+	3) sed "s/YOUR_DOMAIN_NAME/$dname/g" ./initial_scripts/nginx_templates/nginx_template_for_streaming_machines.conf >/etc/nginx/sites-available/$dname.conf
 		;;
-	4) sed "s/YOUR_DOMAIN_NAME/$dname/g" ./initial_scripts/nginx_template_for_front_end_machines.conf >/etc/nginx/sites-available/$dname.conf
+	4) sed "s/YOUR_DOMAIN_NAME/$dname/g" ./initial_scripts/nginx_templates/nginx_template_for_front_end_machines.conf >/etc/nginx/sites-available/$dname.conf
 		;;
 	*) echo "No match for machine type $machinetype, exiting."
 		;;
@@ -59,4 +60,3 @@ esac
 nginx -t
 systemctl restart nginx
 
-./config_scripts/environments/generate_environments_script.sh
