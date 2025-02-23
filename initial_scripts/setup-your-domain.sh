@@ -1,8 +1,10 @@
 # #!/bin/bash 
 # Make sure the setup-os.sh has been executed before this script.
 
-read -p "Enter the domain name, including subdomain. Ex: streaming.myupstage.org: " dname
-read -p "1: If this is a service machine (dbs, mqtt) enter 1,
+read -p "
+Enter the domain name, including subdomain. Ex: streaming.myupstage.org: " dname
+read -p "
+1: If this is a service machine (dbs, mqtt) enter 1,
 2: an app machine, enter 2,
 3: a streaming machine, enter 3,
 4: a front end machine, enter 4: " machinetype
@@ -42,16 +44,16 @@ certbot --nginx -d $dname
 cd $currdir
 
 case $machinetype in
-	1) sed "s/YOUR_DOMAIN_NAME/$dname/g" ./initial_scripts/nginx_templates/nginx_template_for_svc_machines.conf >/etc/nginx/sites-available/$dname.conf
+	1) sed "s/YOUR_DOMAIN_NAME/$dname/g" ./nginx_templates/nginx_template_for_svc_machines.conf >/etc/nginx/sites-available/$dname.conf
            mkdir /postgresql_data_volume
            mkdir /mongodb_data_volume
            ./environments/generate_environments_script.sh
 		;;
-	2) sed "s/YOUR_DOMAIN_NAME/$dname/g" ./initial_scripts/nginx_templates/nginx_template_for_app_machines.conf >/etc/nginx/sites-available/$dname.conf
+	2) sed "s/YOUR_DOMAIN_NAME/$dname/g" ./nginx_templates/nginx_template_for_app_machines.conf >/etc/nginx/sites-available/$dname.conf
 		;;
-	3) sed "s/YOUR_DOMAIN_NAME/$dname/g" ./initial_scripts/nginx_templates/nginx_template_for_streaming_machines.conf >/etc/nginx/sites-available/$dname.conf
+	3) sed "s/YOUR_DOMAIN_NAME/$dname/g" ./nginx_templates/nginx_template_for_streaming_machines.conf >/etc/nginx/sites-available/$dname.conf
 		;;
-	4) sed "s/YOUR_DOMAIN_NAME/$dname/g" ./initial_scripts/nginx_templates/nginx_template_for_front_end_machines.conf >/etc/nginx/sites-available/$dname.conf
+	4) sed "s/YOUR_DOMAIN_NAME/$dname/g" ./nginx_templates/nginx_template_for_front_end_machines.conf >/etc/nginx/sites-available/$dname.conf
 		;;
 	*) echo "No match for machine type $machinetype, exiting."
 		;;
