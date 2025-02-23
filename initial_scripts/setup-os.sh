@@ -40,3 +40,14 @@ sudo ufw status
 sudo ufw allow 'Nginx Full'
 sudo ufw delete allow 'Nginx HTTP'
 sudo ufw status
+
+echo "
+Before proceeding to the next script, be sure that you have a domain name registered with a DNS registrar like namecheap, gandi, etc.
+Also ensure that in your DNS records, an 'A' record points to the IP address of your app server, not your svc server.
+
+Your 'svc dot domain_name' server will run the back end services, while the app server will run Upstage.
+
+We will use Let's Encrypt to generate SSL keys for that domain. If you do not want to use Let's Encrypt, you may want to cherrypick lines from the next script and run them manually.
+
+Please see the README for further details.
+"
