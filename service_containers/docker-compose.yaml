@@ -45,10 +45,11 @@ services:
      - upstage-network
     command:
       /bin/sh -c "chmod 0700 /etc/mosquitto/pw.txt &&
+      chown root:root /etc/mosquitto/pw.txt &&
       mosquitto_passwd -U /etc/mosquitto/pw.txt && 
       chown mosquitto:mosquitto /etc/mosquitto/pw.txt &&
       /etc/mosquitto/cron/add_mqtt_cert_crontab.sh &&
-      mkdir /etc/http &&
+      mkdir -p /etc/http &&
       mosquitto -c /etc/mosquitto/mosquitto.conf"
       #/bin/sh -c "/bin/sh"
     restart: no
