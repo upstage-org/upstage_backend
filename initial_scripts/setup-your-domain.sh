@@ -18,6 +18,17 @@ then
 	exit -1
 fi
 
+# Setup Nginx and Certbot
+sudo apt install certbot python3-certbot-nginx
+
+sudo apt update
+sudo apt upgrade
+
+sudo ufw status
+sudo ufw allow 'Nginx Full'
+sudo ufw delete allow 'Nginx HTTP'
+sudo ufw status
+
 mkdir -p /etc/nginx/ssl
 cd /etc/nginx/ssl
 openssl dhparam -out dhparam.pem 2048
@@ -35,10 +46,6 @@ ln -s ../sites-available/${dname}.conf .
 nginx -t
 systemctl restart nginx
 
-# Setup Certbot
-
-sudo apt install certbot python3-certbot-nginx
-
 certbot --nginx -d $dname
 
 cd $currdir
@@ -47,7 +54,8 @@ case $machinetype in
 	1) sed "s/YOUR_DOMAIN_NAME/$dname/g" ./nginx_templates/nginx_template_for_svc_machines.conf >/etc/nginx/sites-available/$dname.conf
            mkdir /postgresql_data_volume
            mkdir /mongodb_data_volume
-           ./environments/generate_environments_script.sh
+           ./initial_scripts/environments/generate_environments_script.sh
+	   ./service_containers/run_docker_compose.sh 
 		;;
 	2) sed "s/YOUR_DOMAIN_NAME/$dname/g" ./nginx_templates/nginx_template_for_app_machines.conf >/etc/nginx/sites-available/$dname.conf
 		;;
@@ -58,7 +66,3 @@ case $machinetype in
 	*) echo "No match for machine type $machinetype, exiting."
 		;;
 esac
-
-nginx -t
-systemctl restart nginx
-

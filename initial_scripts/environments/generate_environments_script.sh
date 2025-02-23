@@ -1,10 +1,13 @@
 #!/bin/bash
 
-output_file="../src/global_config/load_env.py"
-template_file="./environments/env_app_template.py"
-pwd_template_file="./environments/pwd_template.txt"
-pw_file="../container_scripts/mqtt_server/pw.txt"
-service_containers_file="../service_containers/run_docker_compose.sh"  # This is the docker-compose file for the multiple containers
+# Running from the root dir...
+#
+output_file="./src/global_config/load_env.py"
+template_file="./initial_scripts/environments/env_app_template.py"
+pwd_template_file="./initial_scripts/environments/pwd_template.txt"
+pw_file="./container_scripts/mqtt_server/pw.txt"
+service_containers_template_file="./initial_scripts/environments/run_docker_compose_service_template.txt"
+service_containers_file="./service_containers/run_docker_compose.sh" 
 
 echo "$(dirname "$output_file")"
 
@@ -13,9 +16,6 @@ mkdir -p "$(dirname "$output_file")"
 if [ ! -f "$output_file" ]; then
     touch "$output_file"
 fi
-
-# Clear the output file
-> "$output_file"
 
 # Function to prompt user for input and replace placeholders
 generate_config() {
@@ -48,7 +48,10 @@ Note that on Digital Ocean, the third IP in the 'hostname -I' command: ${arr[2]}
     keys+=("SVC_HOST")
     values+=("$SVC_HOST")
 
-    # Replace placeholders with values
+    # Clear the output file
+    > "$output_file"
+
+    # Replace placeholders with values in app config file.
     while IFS= read -r line; do
         for i in "${!keys[@]}"; do
             line="${line//\{${keys[$i]}\}/${values[$i]}}"
@@ -59,7 +62,7 @@ Note that on Digital Ocean, the third IP in the 'hostname -I' command: ${arr[2]}
     echo "
 Configuration file generated at $output_file"
 
-      # Replace placeholders in pwd_template.txt and copy to pw.txt
+    # Replace placeholders in pwd_template.txt and copy to pw.txt
     > "$pw_file"
     while IFS= read -r line; do
         for i in "${!keys[@]}"; do
@@ -71,7 +74,8 @@ Configuration file generated at $output_file"
     echo "
 Passwords generated and saved to $pw_file"
 
-    # Function to replace placeholders in a given file
+    # Function to replace placeholders in docker compose service file.
+    cp "$service_containers_template_file" "$service_containers_file"
     replace_placeholders() {
         local file=$1
         for i in "${!keys[@]}"; do
@@ -87,4 +91,6 @@ Passwords generated and saved to $service_containers_file"
 generate_config
 
 echo "
-If no errors have occurred, you are ready to set up the app server now. Just a heads-up: you will be instructed to copy-paste or transfer over the configuration file generated here: $output_file"
+If no errors have occurred, you are ready to set up the app server now. Just a heads-up: you will be instructed to copy-paste or transfer over the configuration file generated here: $output_file
+
+"
