@@ -29,6 +29,10 @@ generate_config() {
     echo "Enter the following values"
     for key in "${keys[@]:4}"; do
         read -p "Enter value for ${key}: " value
+	if [[ "$key" =~ .*"PORT".* ]] && [[ -z "$value" ]]
+	then 
+            value=0
+	fi
         values+=("$value")
     done
 
