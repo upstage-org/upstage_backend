@@ -3,13 +3,15 @@ services:
     image: postgres:latest
     container_name: postgres_container
     volumes:
-      - /postgresql_data_volume:/data/db
+      - /postgresql_data/var:/var/lib/postgresql
+      - /postgresql_data/data:/data/postgres
     ports:
       - "5433:5432"
     environment:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
       POSTGRES_USER: postgres
       POSTGRES_DB: upstage
+      PGDATA: /data/postgres
     networks:
      - upstage-network
 
@@ -22,7 +24,7 @@ services:
     ports:
       - "27018:27017"
     volumes:
-      - /mongodb_data_volume:/data/mongodb
+      - /mongodb_data_volume:/data
     restart: unless-stopped
     networks:
     - upstage-network
@@ -35,11 +37,7 @@ services:
       - "9002:9001"
     volumes:
       # Auto-change the password in the pw.txt file referenced below:
-      - ./mosquitto_data:/mosquitto/data
-      - ./../container_scripts/mqtt_server/mosquitto.conf:/etc/mosquitto/mosquitto.conf
-      - ./../container_scripts/mqtt_server/pw.txt:/etc/mosquitto/pw.txt
-      - ./../container_scripts/mqtt_server/local_mosquitto.conf:/etc/mosquitto/conf.d/local_mosquitto.conf
-      - ./../container_scripts/mqtt_server/add_mqtt_cert_crontab.sh:/etc/mosquitto/cron/add_mqtt_cert_crontab.sh
+      - /mosquitto_files/etc/mosquitto:/etc/mosquitto
       - /etc/letsencrypt:/etc/letsencrypt
     networks:
      - upstage-network
@@ -57,6 +55,6 @@ services:
 networks:
   upstage-network:
 volumes:
-  postgresql_data_volume:
+  postgresql_files:
   mongodb_data_volume:
-  mosquitto_data:
+  mosquitto_files:
