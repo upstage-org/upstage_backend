@@ -9,14 +9,6 @@ pw_file="./container_scripts/mqtt_server/pw.txt"
 service_containers_template_file="./initial_scripts/environments/run_docker_compose_service_template.txt"
 service_containers_file="./service_containers/run_docker_compose.sh" 
 
-echo "$(dirname "$output_file")"
-
-mkdir -p "$(dirname "$output_file")"
-
-if [ ! -f "$output_file" ]; then
-    touch "$output_file"
-fi
-
 # Function to prompt user for input and replace placeholders
 generate_config() {
     local key value
