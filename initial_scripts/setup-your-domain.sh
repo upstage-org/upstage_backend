@@ -73,6 +73,11 @@ Completed service container setup."
            mkdir -p /app_code/demo
            mkdir -p /app_code/uploads
            cp -r ./src /app_code
+           cp -r ./scripts /app_code
+           cp -r ./dashboard/demo /app_code
+           cp -r ./requirements.txt /app_code
+           cp -r ./startup.sh /app_code
+
 	   read -p "Now is the perfect time to copy your load_env.py file generated on your service machine (most likely here: /root/upstage_backend/src/global_config ) to /app_code/src/global_config on this machine. Once this is done, press enter to continue: " ready
 	   cd ./app_containers && ./run_docker_compose.sh 
 		;;
