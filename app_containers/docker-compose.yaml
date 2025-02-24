@@ -5,16 +5,17 @@ services:
     ports:
       - "3000:3000"
     volumes:
-      - /app_code/src:/usr/app
+      - /app_code/src:/usr/app/src
+      - /app_code/requirements.txt:/usr/app/requirements.txt
       - /app_code/uploads:/usr/app/uploads
       - /app_code/demo:/usr/app/dashboard/demo
+      - /app_code/startup.sh:/usr/app/startup.sh
 
     command: >
       /bin/bash -c "
       cd /usr/app &&
       pip install --upgrade pip &&
-      pip install -r requirements.txt &&
-      chmod +x ./startup.sh &&
+      pip install -r ./requirements.txt &&
       ./startup.sh"
     networks:
       - upstage-network
@@ -26,7 +27,10 @@ services:
       - "83:80"
       - "446:443"
     volumes:
-      - /app_code/src:/usr/app
+      - /app_code/src:/usr/app/src
+      - /app_code/requirements.txt:/usr/app/requirements.txt
+      - /app_code/scripts:/usr/app/scripts
+      - /app_code/startup.sh:/usr/app/startup.sh
 
     command: >
       /bin/bash -c "
@@ -44,7 +48,10 @@ services:
       - "84:80"
       - "447:443"
     volumes:
-      - /app_code/src:/usr/app
+      - /app_code/src:/usr/app/src
+      - /app_code/requirements.txt:/usr/app/requirements.txt
+      - /app_code/scripts:/usr/app/scripts
+      - /app_code/startup.sh:/usr/app/startup.sh
     command: >
       /bin/bash -c "
       cd /usr/app &&
@@ -55,8 +62,4 @@ services:
       - upstage-network   
 
 networks:
-  service_containers_upstage-network:
-volumes:
-  /app_code/src:
-  /app_code/uploads:
-  /app_code/demo:
+  upstage-network:
