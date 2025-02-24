@@ -51,7 +51,7 @@ certbot --nginx -d $dname
 cd $currdir
 
 case $machinetype in
-	1) sed "s/YOUR_DOMAIN_NAME/$dname/g" ./nginx_templates/nginx_template_for_svc_machines.conf >/etc/nginx/sites-available/$dname.conf
+	1) sed "s/YOUR_DOMAIN_NAME/$dname/g" ./initial_scripts/nginx_templates/nginx_template_for_svc_machines.conf >/etc/nginx/sites-available/$dname.conf
            mkdir -p /postgresql_data/var
            mkdir -p /postgresql_data/data
            mkdir -p /mongodb_data_volume
@@ -69,16 +69,16 @@ case $machinetype in
 	   echo "
 Completed service container setup."
 		;;
-	2) sed "s/YOUR_DOMAIN_NAME/$dname/g" ./nginx_templates/nginx_template_for_app_machines.conf >/etc/nginx/sites-available/$dname.conf
+	2) sed "s/YOUR_DOMAIN_NAME/$dname/g" ./initial_scripts/nginx_templates/nginx_template_for_app_machines.conf >/etc/nginx/sites-available/$dname.conf
            mkdir -p /app_code/demo
            mkdir -p /app_code/uploads
            cp -r ./src /app_code
 	   read -p "Now is the perfect time to copy your load_env.py file generated on your service machine (most likely here: /root/upstage_backend/src/global_config ) to /app_code/src/global_config on this machine. Once this is done, press enter to continue: " ready
 	   cd ./app_containers && ./run_docker_compose.sh 
 		;;
-	3) sed "s/YOUR_DOMAIN_NAME/$dname/g" ./nginx_templates/nginx_template_for_streaming_machines.conf >/etc/nginx/sites-available/$dname.conf
+	3) sed "s/YOUR_DOMAIN_NAME/$dname/g" ./initial_scripts/nginx_templates/nginx_template_for_streaming_machines.conf >/etc/nginx/sites-available/$dname.conf
 		;;
-	4) sed "s/YOUR_DOMAIN_NAME/$dname/g" ./nginx_templates/nginx_template_for_front_end_machines.conf >/etc/nginx/sites-available/$dname.conf
+	4) sed "s/YOUR_DOMAIN_NAME/$dname/g" ./initial_scripts/nginx_templates/nginx_template_for_front_end_machines.conf >/etc/nginx/sites-available/$dname.conf
 		;;
 	*) echo "No match for machine type $machinetype, exiting."
 		;;
