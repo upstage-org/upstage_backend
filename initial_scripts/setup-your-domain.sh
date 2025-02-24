@@ -72,14 +72,14 @@ Completed service container setup."
 	2) sed "s/YOUR_DOMAIN_NAME/$dname/g" ./initial_scripts/nginx_templates/nginx_template_for_app_machines.conf >/etc/nginx/sites-available/$dname.conf
            mkdir -p /app_code/demo
            mkdir -p /app_code/uploads
-           mkdir -p /app_code/ruff_cache
-           chmod 777 /app_code/ruff_cache
            cp -r ./src /app_code
+           cp -r ./alembic /app_code
            cp -r ./scripts /app_code
            cp -r ./dashboard/demo /app_code
            cp -r ./requirements.txt /app_code
            cp -r ./alembic.ini /app_code
            cp -r ./startup.sh /app_code
+           chmod -R 777 /app_code/alembic
 
 	   read -p "Now is the perfect time to copy your load_env.py file generated on your service machine (most likely here: /root/upstage_backend/src/global_config ) to /app_code/src/global_config on this machine. Once this is done, press enter to continue: " ready
            chmod 755 /app_code/src/global_config/load_env.py

@@ -5,7 +5,7 @@ services:
     ports:
       - "3000:3000"
     volumes:
-      - /app_code/ruff_cache:/usr/app/ruff_cache
+      - /app_code/alembic:/usr/app/alembic
       - /app_code/src:/usr/app/src
       - /app_code/requirements.txt:/usr/app/requirements.txt
       - /app_code/uploads:/usr/app/uploads
@@ -29,7 +29,7 @@ services:
       - "83:80"
       - "446:443"
     volumes:
-      - /app_code/ruff_cache:/usr/app/ruff_cache
+      - /app_code/alembic:/usr/app/alembic
       - /app_code/src:/usr/app/src
       - /app_code/requirements.txt:/usr/app/requirements.txt
       - /app_code/scripts:/usr/app/scripts
@@ -52,7 +52,7 @@ services:
       - "84:80"
       - "447:443"
     volumes:
-      - /app_code/ruff_cache:/usr/app/ruff_cache
+      - /app_code/alembic:/usr/app/alembic
       - /app_code/src:/usr/app/src
       - /app_code/requirements.txt:/usr/app/requirements.txt
       - /app_code/scripts:/usr/app/scripts
