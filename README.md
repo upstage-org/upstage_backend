@@ -68,19 +68,3 @@ It is highly recommended to change the default password upon first login to ensu
 3. Update the password to a strong, unique password.
 
 Ensure that the new password meets the security requirements of your organization.
-
-- Exec into the backend container:
-
-```sh
-docker exec -it {upstage_backend_container_id} bash
-```
-- Create default data:
-
-```sh
-python3 -m src.stages.scripts.scaffold-base-media
-```
-
-Input variables:
-- `/usr/app/uploads`: This is the default directory for `UPLOAD_USER_CONTENT_FOLDER` in `env.py`. If you modify this path, ensure to update the corresponding path in the docker-compose file as well.
-- `{administrator_username}`: This placeholder should be replaced with the username of the administrator account created in the previous steps.
-

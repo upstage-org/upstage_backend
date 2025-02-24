@@ -40,31 +40,11 @@ if ENV_TYPE == 'Production':
     exit()
 """
 
-demo_media_folder = "../../dashboard/demo"
+demo_media_folder = "./dashboard/demo"
 owner_id = 0
 
-while not os.path.exists(demo_media_folder):
-    demo_media_folder = input(
-        bcolors.WARNING
-        + 'The folder "{}" does not exist. Please put all demo media you wish to scaffold inside that folder, or enter a custom folder to scaffold from: '.format(
-            demo_media_folder
-        )
-        + bcolors.ENDC
-    )
-
-
-while not owner_id:
-    username = input(
-        bcolors.BOLD
-        + "Please enter the username of the owner whose these base media belong to: "
-        + bcolors.ENDC
-    )
-    owner = DBSession.query(UserModel).filter(UserModel.username == username).first()
-    if not owner:
-        print('❌ The user "{}" does not exist.'.format(username))
-    else:
-        owner_id = owner.id
-
+owner = DBSession.query(UserModel).filter(UserModel.username == "admin").first()
+owner_id = owner.id
 
 def scan_demo_folder():
     for type in os.listdir(demo_media_folder):
