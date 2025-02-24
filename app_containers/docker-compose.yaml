@@ -5,9 +5,9 @@ services:
     ports:
       - "3000:3000"
     volumes:
-      - ../:/usr/app
-      -  /home/upstage2/uploads:/usr/app/uploads
-      - /root/upstage/dashboard/demo:/usr/app/dashboard/demo
+      - /app_code/src:/usr/app
+      - /app_code/uploads:/usr/app/uploads
+      - /app_code/demo:/usr/app/dashboard/demo
 
     command: >
       /bin/bash -c "
@@ -17,7 +17,7 @@ services:
       chmod +x ./startup.sh &&
       ./startup.sh"
     networks:
-      - service_containers_upstage-network
+      - upstage-network
 
   upstage_event_archive:
     image: registry.access.redhat.com/ubi9/python-312:latest
@@ -26,7 +26,7 @@ services:
       - "83:80"
       - "446:443"
     volumes:
-      - ../:/usr/app
+      - /app_code/src:/usr/app
 
     command: >
       /bin/bash -c "
@@ -35,7 +35,7 @@ services:
       pip install -r requirements.txt &&
       python3 -m scripts.run_event_archive"
     networks:
-      - service_containers_upstage-network    
+      - upstage-network    
 
   upstage_stats:
     image: registry.access.redhat.com/ubi9/python-312:latest
@@ -44,7 +44,7 @@ services:
       - "84:80"
       - "447:443"
     volumes:
-      - ../:/usr/app
+      - /app_code/src:/usr/app
     command: >
       /bin/bash -c "
       cd /usr/app &&
@@ -52,9 +52,9 @@ services:
       pip install -r requirements.txt &&
       python3 -m scripts.run_upstage_stats"
     networks:
-      - service_containers_upstage-network   
+      - upstage-network   
 
 networks:
   service_containers_upstage-network:
 volumes:
-  app:
+  /app_code:
