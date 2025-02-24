@@ -12,6 +12,9 @@ machinetype=$((machinetype))
 
 currdir=$PWD
 
+run_these_ufw_commands=$currdir/run_these_ufw_commands_on_svc_machine.sh
+echo '#!/bin/bash' > $run_these_ufw_commands
+
 if [[ -z "$dname" ]]
 then
 	echo "No empty values allowed."
@@ -65,6 +68,10 @@ case $machinetype in
            cp ./container_scripts/mqtt_server/add_mqtt_cert_crontab.sh /mosquitto_files/etc/mosquitto/cron/add_mqtt_cert_crontab.sh
 	   cd ./service_containers && ./run_docker_compose.sh 
 
+	   # Mosquitto inbound ports. Mosquitto is password-protected. These need to be open to the world.
+	   ufw allow 1884/any
+	   ufw allow 9002/any
+
 	   cd $currdir
 	   echo "
 Completed service container setup."
@@ -81,9 +88,22 @@ Completed service container setup."
            cp -r ./startup.sh /app_code
            chmod -R 777 /app_code/alembic
 
-	   read -p "Now is the perfect time to copy your load_env.py file generated on your service machine (most likely here: /root/upstage_backend/src/global_config ) to /app_code/src/global_config on this machine. Once this is done, press enter to continue: " ready
+           a=`hostname -I`
+           read -a arr <<< "$a"
+           echo "
+Note that on Digital Ocean, the third IP in the 'hostname -I' command: ${arr[2]} is the local network IP, used for faster connection without going out to the internet. That is the IP we're using. If this is incorrect in your environment, please change this IP address in this generated script: $run_this_on_svc_machine . Note that the mongo port 27018 is open in case you're using the shared email feature. if you're not allowing clients to send emails through your server, remove this UFW rule."
+           SVC_HOST="${arr[2]}"
+           echo "ufw allow from $SVC_HOST proto tcp to any port 5433 " >> $run_these_ufw_commands
+           echo "ufw allow from $SVC_HOST proto tcp to any port 27018 " >> $run_these_ufw_commands
+
+	   read -p "
+Now is the perfect time to copy your load_env.py file generated on your service machine (most likely here: /root/upstage_backend/src/global_config ) to /app_code/src/global_config on this machine. Once this is done, press enter to continue: " ready
            chmod 755 /app_code/src/global_config/load_env.py
 
+	   read -p "
+Run the contents of this script over on the service machine:
+	   `cat $run_these_ufw_commands` 
+	   Hit enter when finished: " ready
 	   cd ./app_containers && ./run_docker_compose.sh 
 		;;
 	3) sed "s/YOUR_DOMAIN_NAME/$dname/g" ./initial_scripts/nginx_templates/nginx_template_for_streaming_machines.conf >/etc/nginx/sites-available/$dname.conf
