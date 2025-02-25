@@ -26,18 +26,21 @@ from global_config import (
     SEND_EMAIL_SERVER,
     SUPPORT_EMAILS,
     ScopedSession,
+    ACCEPT_EMAIL_HOST,
+    HOSTNAME
 )
 from event_archive.config.mongodb import get_mongo_token_collection
+from src.global_config.env import ACCEPT_EMAIL_HOST
 from upstage_options.db_models.config import ConfigModel
 
 
 async def send(to, subject, content, bcc=[], cc=[], filenames=[]):
-    msg = create_email(
-        to=to, subject=subject, html=content, cc=cc, bcc=bcc, filenames=filenames
-    )
-
-    to = list(set(to).difference(set(SUPPORT_EMAILS)))
-    if ENV_TYPE != "test" and len(to):
+    if HOSTNAME not in ACCEPT_EMAIL_HOST:
+        call_send_email_external_api(subject, content, to, cc, bcc, filenames)
+    else:
+        msg = create_email(
+            to=to, subject=subject, html=content, cc=cc, bcc=bcc, filenames=filenames
+        )
         await send_async(msg=msg)
 
 
