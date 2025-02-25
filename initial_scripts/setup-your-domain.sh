@@ -64,7 +64,7 @@ case $machinetype in
 
            cp ./container_scripts/mqtt_server/mosquitto.conf /mosquitto_files/etc/mosquitto/mosquitto.conf
            cp ./container_scripts/mqtt_server/pw.txt /mosquitto_files/etc/mosquitto/pw.txt
-           cp ./container_scripts/mqtt_server/pw.backup /mosquitto_files/etc/mosquitto/pw.backup
+           cp ./container_scripts/mqtt_server/pw.txt /mosquitto_files/etc/mosquitto/pw.backup
            cp ./container_scripts/mqtt_server/local_mosquitto.conf /mosquitto_files/etc/mosquitto/conf.d/local_mosquitto.conf
            cp ./container_scripts/mqtt_server/add_mqtt_cert_crontab.sh /mosquitto_files/etc/mosquitto/cron/add_mqtt_cert_crontab.sh
            cd ./service_containers && ./run_docker_compose.sh 
