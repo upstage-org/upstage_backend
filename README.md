@@ -11,6 +11,8 @@ TBD
 # Upstage Setup Guide: From Git Repo to Local Docker Images
 
 ## Setup OS-level services in Debian: 
+Run everything as root.
+
 Run ``` apt install git ```
 
 Then git clone this repo.
