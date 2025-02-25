@@ -59,6 +59,7 @@ case $machinetype in
            mkdir -p /mongodb_data_volume
            mkdir -p /mosquitto_files/etc/mosquitto/conf.d
            mkdir -p /mosquitto_files/etc/mosquitto/cron
+           mkdir -p /mosquitto_files/var/lib/mosquitto
            ./initial_scripts/environments/generate_environments_script.sh
 
            cp ./container_scripts/mqtt_server/mosquitto.conf /mosquitto_files/etc/mosquitto/mosquitto.conf
