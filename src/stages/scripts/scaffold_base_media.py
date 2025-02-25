@@ -17,7 +17,7 @@ from stages.db_models.stage_attribute import StageAttributeModel
 from stages.db_models.parent_stage import ParentStageModel
 from users.db_models.user import UserModel, ADMIN, GUEST
 from upstage_options.db_models.config import ConfigModel
-from global_config import encrypt, UPLOAD_USER_CONTENT_FOLDER, global_session
+from global_config import encrypt, UPLOAD_USER_CONTENT_FOLDER, global_session, DEMO_MEDIA_FOLDER
 
 DBSession = global_session
 
@@ -40,16 +40,15 @@ if ENV_TYPE == 'Production':
     exit()
 """
 
-demo_media_folder = "./dashboard/demo"
 owner_id = 0
 
 owner = DBSession.query(UserModel).filter(UserModel.username == "admin").first()
 owner_id = owner.id
 
 def scan_demo_folder():
-    for type in os.listdir(demo_media_folder):
+    for type in os.listdir(DEMO_MEDIA_FOLDER):
         if "." not in type:
-            for media in os.listdir("{}/{}".format(demo_media_folder, type)):
+            for media in os.listdir("{}/{}".format(DEMO_MEDIA_FOLDER, type)):
                 yield type, media
 
 
@@ -107,7 +106,7 @@ def create_media(type, path):
     if "." in path:
         asset.name = os.path.basename(path).split(".")[0]
         # copy asset to uploads folder
-        src_path = os.path.join(demo_media_folder, type, path)
+        src_path = os.path.join(DEMO_MEDIA_FOLDER, type, path)
         dest_path = os.path.join(type, path)
         print(src_path, dest_path)
         copy_file(src_path, dest_path, type)
@@ -118,8 +117,8 @@ def create_media(type, path):
     else:
         attributes["multi"] = True
         asset.name = path
-        for frame in os.listdir(os.path.join(demo_media_folder, type, path)):
-            src_path = os.path.join(demo_media_folder, type, path, frame)
+        for frame in os.listdir(os.path.join(DEMO_MEDIA_FOLDER, type, path)):
+            src_path = os.path.join(DEMO_MEDIA_FOLDER, type, path, frame)
             dest_path = os.path.join(type, "{}_{}".format(path, frame))
             copy_file(src_path, dest_path, type)
             size += os.path.getsize(src_path)
@@ -162,7 +161,7 @@ def create_demo_stage():
     visibility = StageAttributeModel(name="visibility", description="1", stage=stage)
     stage.attributes.append(visibility)
 
-    cover_src = os.path.join(demo_media_folder, "demo-stage-cover.jpg")
+    cover_src = os.path.join(DEMO_MEDIA_FOLDER, "demo-stage-cover.jpg")
     cover_path = os.path.join("media", "demo-stage-cover.jpg")
     copy_file(cover_src, cover_path, "media")
     cover = StageAttributeModel(name="cover", description=cover_path, stage=stage)
