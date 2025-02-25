@@ -41,6 +41,7 @@ Also ensure that in your DNS records:
 1: an 'A' record points to the IP address of your app server, not your svc server.
 2: an 'A' record points to the IP address of your svc server.
 3: an 'A' record points to the IP address of your streaming server.
+4: a working email address, such as support@your_upstage.org, to use when registering with Let's Encrypt.
 
 We recommend domain names such as your_upstage.org , svc.your_upstage.org , streaming.your_upstage.org .
 

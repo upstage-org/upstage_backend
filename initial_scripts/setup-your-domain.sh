@@ -64,6 +64,7 @@ case $machinetype in
 
            cp ./container_scripts/mqtt_server/mosquitto.conf /mosquitto_files/etc/mosquitto/mosquitto.conf
            cp ./container_scripts/mqtt_server/pw.txt /mosquitto_files/etc/mosquitto/pw.txt
+           cp ./container_scripts/mqtt_server/pw.backup /mosquitto_files/etc/mosquitto/pw.backup
            cp ./container_scripts/mqtt_server/local_mosquitto.conf /mosquitto_files/etc/mosquitto/conf.d/local_mosquitto.conf
            cp ./container_scripts/mqtt_server/add_mqtt_cert_crontab.sh /mosquitto_files/etc/mosquitto/cron/add_mqtt_cert_crontab.sh
            cd ./service_containers && ./run_docker_compose.sh 
@@ -100,7 +101,7 @@ Note that on Digital Ocean, the third IP in the 'hostname -I' command: ${arr[2]}
            echo "ufw allow from $APP_HOST proto any to any port 1884 " >> $run_these_ufw_commands
 
            read -p "
-Now is the perfect time to copy your load_env.py file generated on your service machine (most likely here: /root/upstage_backend/src/global_config ) to /app_code/src/global_config on this machine. Once this is done, press enter to continue: " ready
+Please log into your service machine in another shell, and copy your load_env.py file generated on your service machine (most likely here: /root/upstage_backend/src/global_config ) to /app_code/src/global_config on this machine. Once this is done, press enter to continue: " ready
            chmod 755 /app_code/src/global_config/load_env.py
 
            read -p "
