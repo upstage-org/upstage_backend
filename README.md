@@ -15,7 +15,7 @@ Run ``` apt install git ```
 
 Then git clone this repo.
 
-### 1.  Install Docker, Nginx, and Certbot on all three machines:
+### Install Docker, Nginx, and Certbot on all three machines:
 
 ```sh
 ./initial_scripts/setup-os.sh
@@ -25,35 +25,24 @@ This assumes you wish to use Let's Encrypt and will also run the script to confi
 ```sh
 ./initial_scripts/setup-your-domain.sh
 ```
+Choose option 1
 
-This will auto-generate passwords for various applications, and store them in a local config file:
-**************** Fill this in ***********************
+This will auto-generate passwords for various applications, and will store them in a local config file.
 
-## Prerequisites (installed above)
-
-- Docker
-- Docker Compose
-
-## Setup Instructions for your service machine: Postgresql, Mongodb, Mosquitto
-
-### 1. Spin up the three containers in your service machine:
-```
-cd service_containers
-./run_docker_compose.sh
-```
+It will also start three docker containers, one for MongoDB, one for Postgresql, one for Mosquitto.
 
 ## Setup Instructions for your application machine: Upstage, Upstage Event Capture, Upstage Email (optional)
 
-### 1. Spin up the three containers in your service machine:
+```sh
+./initial_scripts/setup-your-domain.sh
 ```
-cd app_containers
-./run_docker_compose.sh
-```
+Choose option 2
+
+This will start three "app" containers: Upstage, Upstage-Event, Upstage-Email
 
 ## Setup Instructions for inserting Seeding Data
 
 ### 3. Insert Seeding Data
-
 
 ### Default Admin User
 
