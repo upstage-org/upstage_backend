@@ -10,11 +10,12 @@ TBD
 
 # Upstage Setup Guide: From Git Repo to Local Docker Images
 
-## Setup OS
+## Setup OS-level services in Debian: 
+Run ``` apt install git ```
 
-Install Docker, Nginx, and Certbot on all three machines.
+Then git clone this repo.
 
-### 1. Debian
+### 1.  Install Docker, Nginx, and Certbot on all three machines:
 
 ```sh
 ./initial_scripts/setup-os.sh
