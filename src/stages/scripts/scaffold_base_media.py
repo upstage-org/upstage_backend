@@ -1,7 +1,6 @@
 import os
 import sys
 import shutil
-from tokenize import Number
 from graphql_server import json_encode
 from PIL import Image
 
@@ -11,17 +10,29 @@ if projdir not in sys.path:
     sys.path.append(appdir)
     sys.path.append(projdir)
 
-from sqlalchemy import not_
-from core.asset.models import Asset, AssetType, Stage, StageAttribute
-from core.licenses.models import AssetLicense, AssetUsage
-from core.performance_config.models import ParentStage, Performance, Scene
-from core.user.models import ADMIN, GUEST, User
-from core.event_archive.db import build_pg_session
-from core.event_archive.models import Event
-from terminal_colors import bcolors
-from config import UPLOAD_USER_CONTENT_FOLDER, ENV_TYPE
-from core.settings.models import Config
-from core.auth.fernet_crypto import encrypt
+from assets.db_models.asset_type import AssetTypeModel
+from assets.db_models.asset import AssetModel
+from stages.db_models.stage import StageModel
+from stages.db_models.stage_attribute import StageAttributeModel
+from stages.db_models.parent_stage import ParentStageModel
+from users.db_models.user import UserModel, ADMIN, GUEST
+from upstage_options.db_models.config import ConfigModel
+from global_config import encrypt, UPLOAD_USER_CONTENT_FOLDER, global_session
+
+DBSession = global_session
+
+
+class bcolors:
+    HEADER = "\033[95m"
+    OKBLUE = "\033[94m"
+    OKCYAN = "\033[96m"
+    OKGREEN = "\033[92m"
+    WARNING = "\033[93m"
+    FAIL = "\033[91m"
+    ENDC = "\033[0m"
+    BOLD = "\033[1m"
+    UNDERLINE = "\033[4m"
+
 
 """
 if ENV_TYPE == 'Production':
@@ -29,32 +40,11 @@ if ENV_TYPE == 'Production':
     exit()
 """
 
-demo_media_folder = "dashboard/demo"
+demo_media_folder = "./dashboard/demo"
 owner_id = 0
 
-while not os.path.exists(demo_media_folder):
-    demo_media_folder = input(
-        bcolors.WARNING
-        + 'The folder "{}" does not exist. Please put all demo media you wish to scaffold inside that folder, or enter a custom folder to scaffold from: '.format(
-            demo_media_folder
-        )
-        + bcolors.ENDC
-    )
-
-session = build_pg_session()
-
-while not owner_id:
-    username = input(
-        bcolors.BOLD
-        + "Please enter the username of the owner whose these base media belong to: "
-        + bcolors.ENDC
-    )
-    owner = session.query(User).filter(User.username == username).first()
-    if not owner:
-        print('❌ The user "{}" does not exist.'.format(username))
-    else:
-        owner_id = owner.id
-
+owner = DBSession.query(UserModel).filter(UserModel.username == "admin").first()
+owner_id = owner.id
 
 def scan_demo_folder():
     for type in os.listdir(demo_media_folder):
@@ -103,13 +93,15 @@ def down_size(size):
 
 
 def create_media(type, path):
-    asset_type = session.query(AssetType).filter(AssetType.name == type).first()
+    asset_type = (
+        DBSession.query(AssetTypeModel).filter(AssetTypeModel.name == type).first()
+    )
     if not asset_type:
-        asset_type = AssetType(name=type)
-        session.add(asset_type)
-        session.commit()
+        asset_type = AssetTypeModel(name=type, file_location="")
+        DBSession.add(asset_type)
+        DBSession.commit()
 
-    asset = Asset(asset_type=asset_type, owner_id=owner_id)
+    asset = AssetModel(asset_type=asset_type, owner_id=owner_id, file_location="")
     attributes = {}
     size = 0
     if "." in path:
@@ -117,6 +109,7 @@ def create_media(type, path):
         # copy asset to uploads folder
         src_path = os.path.join(demo_media_folder, type, path)
         dest_path = os.path.join(type, path)
+        print(src_path, dest_path)
         copy_file(src_path, dest_path, type)
         asset.file_location = dest_path
         size += os.path.getsize(src_path)
@@ -138,8 +131,8 @@ def create_media(type, path):
 
     asset.description = json_encode(attributes)
     asset.size = size
-    session.add(asset)
-    session.commit()
+    DBSession.add(asset)
+    DBSession.commit()
     created_media_ids.append(asset.id)
     print(
         "✅ Created{} {} {}".format(
@@ -154,39 +147,39 @@ def create_demo_media():
 
 
 def create_demo_stage():
-    if session.query(Stage).filter(Stage.name == "Demo").first():
+    if DBSession.query(StageModel).filter(StageModel.name == "Demo").first():
         print('⏩ A stage named "Demo" already exists.')
         return
-    stage = Stage(
+    stage = StageModel(
         name="Demo Stage",
         owner_id=owner_id,
         description="This is a demo stage to help you learn how to use and customise UpStage for your own performances.",
         file_location="demo",
     )
-    status = StageAttribute(name="status", description="live", stage=stage)
+    status = StageAttributeModel(name="status", description="live", stage=stage)
     stage.attributes.append(status)
 
-    visibility = StageAttribute(name="visibility", description="1", stage=stage)
+    visibility = StageAttributeModel(name="visibility", description="1", stage=stage)
     stage.attributes.append(visibility)
 
     cover_src = os.path.join(demo_media_folder, "demo-stage-cover.jpg")
     cover_path = os.path.join("media", "demo-stage-cover.jpg")
     copy_file(cover_src, cover_path, "media")
-    cover = StageAttribute(name="cover", description=cover_path, stage=stage)
+    cover = StageAttributeModel(name="cover", description=cover_path, stage=stage)
     stage.attributes.append(cover)
 
-    all_users = [x.id for x in session.query(User.id).all()]
+    all_users = [x.id for x in DBSession.query(UserModel.id).all()]
     accesses = [[], all_users]
-    player_access = StageAttribute(
+    player_access = StageAttributeModel(
         name="playerAccess", description=json_encode(accesses), stage=stage
     )
     stage.attributes.append(player_access)
 
-    session.add(stage)
-    session.commit()
+    DBSession.add(stage)
+    DBSession.commit()
     for media_id in created_media_ids:
-        session.add(ParentStage(stage_id=stage.id, child_asset_id=media_id))
-    session.commit()
+        DBSession.add(ParentStageModel(stage_id=stage.id, child_asset_id=media_id))
+    DBSession.commit()
     print("✅ Created demo stage")
 
 
@@ -201,18 +194,18 @@ def create_demo_users():
     test_user_password = "12345678"
 
     if (
-        session.query(User).filter(User.username == admin_username).first()
-        or session.query(User).filter(User.email == admin_email).first()
+        DBSession.query(UserModel).filter(UserModel.username == admin_username).first()
+        or DBSession.query(UserModel).filter(UserModel.email == admin_email).first()
     ):
         print('⏩ An admin user with email "{}" already exists.'.format(admin_email))
     else:
-        admin = User()
+        admin = UserModel()
         admin.username = admin_username
         admin.password = encrypt(test_user_password)
         admin.email = admin_email
         admin.role = ADMIN
         admin.active = True
-        session.add(admin)
+        DBSession.add(admin)
         print(
             '✅ Created admin account with credentials: "{}" and password "{}"'.format(
                 admin_username, test_user_password
@@ -220,35 +213,35 @@ def create_demo_users():
         )
 
     if (
-        session.query(User).filter(User.username == guest_username).first()
-        or session.query(User).filter(User.email == guest_email).first()
+        DBSession.query(UserModel).filter(UserModel.username == guest_username).first()
+        or DBSession.query(UserModel).filter(UserModel.email == guest_email).first()
     ):
         print('⏩ A guest user with email "{}" already exists.'.format(guest_username))
     else:
-        guest = User()
+        guest = UserModel()
         guest.username = guest_username
         guest.password = encrypt(test_user_password)
         guest.email = guest_email
         guest.role = GUEST
         guest.active = True
-        session.add(guest)
+        DBSession.add(guest)
         print(
             '✅ Created guest account with credentials: "{}" and password "{}"'.format(
                 guest_username, test_user_password
             )
         )
 
-    session.commit()
+    DBSession.commit()
 
 
 def save_config(name, value):
-    config = session.query(Config).filter(Config.name == name).first()
+    config = DBSession.query(ConfigModel).filter(ConfigModel.name == name).first()
     if config:
         config.value = value
     else:
-        config = Config(name=name, value=value)
-        session.add(config)
-    session.commit()
+        config = ConfigModel(name=name, value=value)
+        DBSession.add(config)
+    DBSession.commit()
 
 
 def scaffold_foyer():
