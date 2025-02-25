@@ -14,7 +14,6 @@ machinetype=$((machinetype))
 currdir=$PWD
 
 run_these_ufw_commands=$currdir/run_these_ufw_commands_on_svc_machine.sh
-echo '#!/bin/bash' > $run_these_ufw_commands
 
 if [[ -z "$dname" ]]
 then
@@ -72,7 +71,6 @@ case $machinetype in
            # Mosquitto inbound websocket port. Mosquitto is password-protected. 
            # The websocket needs to be open to the world, since the front end attaches to it.
            # The TCP port is private, only used by our app server.
-           ufw allow 1884/any
            ufw allow 9002/any
 
            cd $currdir
@@ -95,9 +93,11 @@ Completed service container setup."
            read -a arr <<< "$a"
            echo "
 Note that on Digital Ocean, the third IP in the 'hostname -I' command: ${arr[2]} is the local network IP, used for faster connection without going out to the internet. That is the IP we're using. If this is incorrect in your environment, please change this IP address in this generated script: $run_this_on_svc_machine . Note that the mongo port 27018 is open in case you're using the shared email feature. if you're not allowing clients to send emails through your server, remove this UFW rule."
-           SVC_HOST="${arr[2]}"
-           echo "ufw allow from $SVC_HOST proto tcp to any port 5433 " >> $run_these_ufw_commands
-           echo "ufw allow from $SVC_HOST proto tcp to any port 27018 " >> $run_these_ufw_commands
+           APP_HOST="${arr[2]}"
+           echo '#!/bin/bash' > $run_these_ufw_commands
+           echo "ufw allow from $APP_HOST proto tcp to any port 5433 " >> $run_these_ufw_commands
+           echo "ufw allow from $APP_HOST proto tcp to any port 27018 " >> $run_these_ufw_commands
+           echo "ufw allow from $APP_HOST proto any to any port 1884 " >> $run_these_ufw_commands
 
            read -p "
 Now is the perfect time to copy your load_env.py file generated on your service machine (most likely here: /root/upstage_backend/src/global_config ) to /app_code/src/global_config on this machine. Once this is done, press enter to continue: " ready
