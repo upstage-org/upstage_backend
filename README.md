@@ -61,14 +61,12 @@ It is highly recommended to change the default password upon first login to ensu
 
 Ensure that the new password meets the security requirements of your organization.
 
-- Exec into the backend container:
+## Insert Demo Data
+
+To insert demo data into your application, you can use the provided `scaffold_base_media.sh` script
 
 ```sh
-docker exec -it {upstage_backend_container_id} bash
-```
-- Create default data:
-
-```sh
-python3 -m src.stages.scripts.scaffold_base_media
+./initial_scripts/post_install/scaffold_base_media.sh
 ```
 
+This script will insert the necessary demo data into your application. Make sure to verify that the data has been correctly inserted by checking the relevant sections of your application.

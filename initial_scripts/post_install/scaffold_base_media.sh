@@ -11,5 +11,4 @@ echo "Please ensure that the database connection parameters are correctly config
 
 container=docker ps | grep upstage_container| awk '{print $1}'
 
-
-docker exec -it $container "python3 -m src.stages.scripts.scaffold_base_media"
+docker exec -it $container sh -c "cd /usr/app/ && python3 -m src.stages.scripts.scaffold_base_media"
