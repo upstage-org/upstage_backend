@@ -1,5 +1,6 @@
 # #!/bin/bash 
 # Make sure the setup-os.sh has been executed before this script.
+export DEBIAN_FRONTEND=noninteractive
 
 read -p "
 Enter the domain name, including subdomain. Ex: streaming.myupstage.org: " dname
@@ -22,15 +23,15 @@ then
 fi
 
 # Setup Nginx and Certbot
-sudo apt install certbot python3-certbot-nginx
+apt -y install certbot python3-certbot-nginx
 
-sudo apt update
-sudo apt upgrade
+apt -y update
+apt -y upgrade
 
-sudo ufw status
-sudo ufw allow 'Nginx Full'
-sudo ufw delete allow 'Nginx HTTP'
-sudo ufw status
+ufw status
+ufw allow 'Nginx Full'
+ufw delete allow 'Nginx HTTP'
+ufw status
 
 mkdir -p /etc/nginx/ssl
 cd /etc/nginx/ssl
