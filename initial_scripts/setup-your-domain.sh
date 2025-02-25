@@ -7,8 +7,7 @@ Enter the domain name, including subdomain. Ex: streaming.myupstage.org: " dname
 read -p "
 1: If this is a service machine (dbs, mqtt) enter 1,
 2: an app machine, enter 2,
-3: a streaming machine, enter 3,
-4: a front end machine, enter 4: " machinetype
+3: a streaming machine, enter 3: " machinetype
 machinetype=$((machinetype))
 
 currdir=$PWD
@@ -111,8 +110,6 @@ Run the contents of this script over on the service machine:
            cd ./app_containers && ./run_docker_compose.sh 
                 ;;
         3) sed "s/YOUR_DOMAIN_NAME/$dname/g" ./initial_scripts/nginx_templates/nginx_template_for_streaming_machines.conf >/etc/nginx/sites-available/$dname.conf
-                ;;
-        4) sed "s/YOUR_DOMAIN_NAME/$dname/g" ./initial_scripts/nginx_templates/nginx_template_for_front_end_machines.conf >/etc/nginx/sites-available/$dname.conf
                 ;;
         *) echo "No match for machine type $machinetype, exiting."
                 ;;
