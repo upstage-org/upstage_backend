@@ -5,6 +5,13 @@ set -a
 export POSTGRES_PASSWORD=REPLACE_POSTGRES_PASSWORD
 export MONGO_INITDB_ROOT_PASSWORD=REPLACE_MONGO_PASSWORD
 
+echo "
+If you need to run this installation more than once, and generated passwords have changed,
+be sure to remove and recreate the /postgresql_data/* dirs.
+"
+
+docker compose down
+docker compose rm -f
 docker compose up -d
 sleep 5
 docker compose ps
