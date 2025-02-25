@@ -95,6 +95,7 @@ else:
     print("Loading local settings from %s.py" % HOSTNAME)
 
 UPLOAD_USER_CONTENT_FOLDER = "./uploads"
+DEMO_MEDIA_FOLDER="./dashboard/demo"
 
 UPSTAGE_FRONTEND_URL = os.getenv("UPSTAGE_FRONTEND_URL", "http://localhost:3000")
 ENV_TYPE = os.getenv("ENV_TYPE", "development")
