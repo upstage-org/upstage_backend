@@ -81,10 +81,7 @@ PERFORMANCE_TOPIC_RULE = os.getenv("PERFORMANCE_TOPIC_RULE", "#")
 
 EVENT_COLLECTION = os.getenv("EVENT_COLLECTION")
 
-
-NGINX_CONFIG_FILE = os.getenv(
-    "NGINX_CONFIG_FILE", "config/dev/dev_app1_nginx_upstage.conf"
-)
+CLIENT_MAX_BODY_SIZE = os.getenv("CLIENT_MAX_BODY_SIZE", 0)
 
 if "HARDCODED_HOSTNAME" in os.environ:
     ORIG_HOSTNAME = HOSTNAME = os.environ["HARDCODED_HOSTNAME"]

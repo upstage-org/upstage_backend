@@ -1,6 +1,6 @@
 import os
 from global_config import (
-    NGINX_CONFIG_FILE,
+    CLIENT_MAX_BODY_SIZE,
     DBSession,
     ScopedSession,
     convert_keys_to_camel_case,
@@ -27,20 +27,12 @@ class SettingService:
         return session.query(ConfigModel).filter_by(name=name).first()
 
     def upload_limit(self):
-        limit = 0
-        with open(NGINX_CONFIG_FILE) as file:
-            for line in file:
-                line = line.strip().lower()
-                if line.startswith("client_max_body_size"):
-                    limit = line.split(" ")[1]
-                    if limit.endswith(";"):
-                        limit = limit[0:-1]
-                    if limit.endswith("k"):
-                        limit = int(limit[0:-1]) * 1024
-                    if limit.endswith("m"):
-                        limit = int(limit[0:-1]) * 1024 * 1024
-
-        return {"limit": limit}
+        '''
+        In the future this will be 0 in nginx, and value for
+        code will be in the database. The code itself will enforce
+        the limit.
+        '''
+        return {"limit": CLIENT_MAX_BODY_SIZE}
 
     def system_info(self):
         return convert_keys_to_camel_case(
