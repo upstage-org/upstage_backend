@@ -38,6 +38,7 @@ services:
     volumes:
       # Auto-change the password in the pw.txt file referenced below:
       - /mosquitto_files/etc/mosquitto:/etc/mosquitto
+      - /mosquitto_files/var/lib/mosquitto:/var/lib/mosquitto
       - /etc/letsencrypt:/etc/letsencrypt
     networks:
      - upstage-network
@@ -47,6 +48,7 @@ services:
       chown root:root /etc/mosquitto/pw.txt &&
       mosquitto_passwd -U /etc/mosquitto/pw.txt && 
       chown mosquitto:mosquitto /etc/mosquitto/pw.txt &&
+      chown mosquitto:mosquitto /var/lib/mosquitto &&
       /etc/mosquitto/cron/add_mqtt_cert_crontab.sh &&
       mkdir -p /etc/http &&
       mosquitto -c /etc/mosquitto/mosquitto.conf"
