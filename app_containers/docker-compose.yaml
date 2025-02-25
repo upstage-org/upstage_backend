@@ -10,15 +10,14 @@ services:
       - /app_code/requirements.txt:/usr/app/requirements.txt
       - /app_code/uploads:/usr/app/uploads
       - /app_code/demo:/usr/app/dashboard/demo
-      - /app_code/startup.sh:/usr/app/startup.sh
-      - /app_code/alembic.ini:/usr/app/alembic.ini
+      - /app_code/scripts:/usr/app/scripts
 
     command: >
       /bin/bash -c "
       cd /usr/app &&
       pip install --upgrade pip &&
       pip install -r ./requirements.txt &&
-      ./startup.sh"
+      ./scripts/start_upstage.sh"
     networks:
       - upstage-network
 
@@ -33,8 +32,6 @@ services:
       - /app_code/src:/usr/app/src
       - /app_code/requirements.txt:/usr/app/requirements.txt
       - /app_code/scripts:/usr/app/scripts
-      - /app_code/startup.sh:/usr/app/startup.sh
-      - /app_code/alembic.ini:/usr/app/alembic.ini
 
     command: >
       /bin/bash -c "
@@ -56,8 +53,6 @@ services:
       - /app_code/src:/usr/app/src
       - /app_code/requirements.txt:/usr/app/requirements.txt
       - /app_code/scripts:/usr/app/scripts
-      - /app_code/startup.sh:/usr/app/startup.sh
-      - /app_code/alembic.ini:/usr/app/alembic.ini
     command: >
       /bin/bash -c "
       cd /usr/app &&
