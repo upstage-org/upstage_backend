@@ -31,6 +31,9 @@ MQTT_USER = "admin"
 MQTT_PASSWORD = "{REPLACE_MQTT_P_PASSWORD}"
 
 
+UPLOAD_USER_CONTENT_FOLDER="./uploads"
+DEMO_MEDIA_FOLDER="./dashboard/demo"
+
 # payment
 STRIPE_KEY = ""
 STRIPE_PRODUCT_ID = ""
