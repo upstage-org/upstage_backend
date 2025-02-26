@@ -1,3 +1,5 @@
+HOSTNAME="{APP_HOST}"
+
 DATABASE_CONNECT = "postgresql"
 DATABASE_HOST = "{SVC_HOST}"
 DATABASE_PORT = 5433
@@ -24,6 +26,7 @@ EMAIL_HOST_USER = "{EMAIL_HOST_USER}"
 EMAIL_HOST_PASSWORD = "{EMAIL_HOST_PASSWORD}"
 EMAIL_PORT = int("{EMAIL_PORT}")
 EMAIL_HOST_DISPLAY_NAME = "UpStage Support"
+
 MQTT_BROKER = "{SVC_HOST}"
 MQTT_TRANSPORT = "tcp"
 MQTT_ADMIN_USER = "admin"
@@ -41,8 +44,16 @@ CLIENT_MAX_BODY_SIZE=300 * 1024 * 1024
 UPLOAD_USER_CONTENT_FOLDER="./uploads"
 DEMO_MEDIA_FOLDER="./dashboard/demo"
 
+# These settings are only for the upstage.live server. 
 # payment
 STRIPE_KEY = ""
 STRIPE_PRODUCT_ID = ""
+
+# This is the upstage.live host/hosts that will act as an email proxy 
+# for servers specified below. 
+ACCEPT_EMAIL_HOST = ["upstage.live"]
+# These are the domain names of machines from which upstage.live will accept
+# and send external email. We act as a mail proxy for approved clients.
+ACCEPT_SERVER_SEND_EMAIL_EXTERNAL = []
 
 SEND_EMAIL_SERVER = "https://upstage.live"
