@@ -79,6 +79,7 @@ case $machinetype in
 Completed service container setup."
                 ;;
         2) sed "s/YOUR_DOMAIN_NAME/$dname/g" ./initial_scripts/nginx_templates/nginx_template_for_app_machines.conf >/etc/nginx/sites-available/$dname.conf
+           mkdir -p /frontend_code
            mkdir -p /app_code/demo
            mkdir -p /app_code/uploads
            cp -r ./src /app_code
