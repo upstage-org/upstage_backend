@@ -2,11 +2,15 @@
 # Make sure the setup-os.sh has been executed before this script.
 export DEBIAN_FRONTEND=noninteractive
 
+# Running from the root dir...
+# Make sure this setting matches the setting in ./initial_scripts/environments/generate_environments_script.sh
+output_file="./src/global_config/load_env.py"
+
 read -p "
 Enter the domain name, including subdomain. Ex: streaming.myupstage.org: " dname
 read -p "
 1: If this is a service machine (dbs, mqtt) enter 1,
-2: an app machine, enter 2,
+2: an app machine (running Upstage application code), enter 2,
 3: a streaming machine, enter 3: " machinetype
 machinetype=$((machinetype))
 
@@ -79,6 +83,8 @@ case $machinetype in
 Completed service container setup."
                 ;;
         2) sed "s/YOUR_DOMAIN_NAME/$dname/g" ./initial_scripts/nginx_templates/nginx_template_for_app_machines.conf >/etc/nginx/sites-available/$dname.conf
+           sed -i "s/\{APP_HOST\}/$dname/g" $output_file
+
            mkdir -p /frontend_code
            mkdir -p /app_code/demo
            mkdir -p /app_code/uploads
@@ -87,7 +93,6 @@ Completed service container setup."
            cp -r ./scripts /app_code
            cp -r ./dashboard/demo /app_code
            cp -r ./requirements.txt /app_code
-           cp -r ./alembic.ini /app_code
            cp -r ./startup.sh /app_code
            chmod -R 777 /app_code/alembic
            chmod -R 777 /app_code/uploads
