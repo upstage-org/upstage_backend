@@ -24,11 +24,7 @@ services:
   upstage_event_archive:
     image: registry.access.redhat.com/ubi9/python-312:latest
     container_name: upstage_event_archive_container
-    ports:
-      - "83:80"
-      - "446:443"
     volumes:
-      - /app_code/alembic:/usr/app/alembic
       - /app_code/src:/usr/app/src
       - /app_code/requirements.txt:/usr/app/requirements.txt
       - /app_code/scripts:/usr/app/scripts
@@ -45,11 +41,7 @@ services:
   upstage_stats:
     image: registry.access.redhat.com/ubi9/python-312:latest
     container_name: upstage_stats_container
-    ports:
-      - "84:80"
-      - "447:443"
     volumes:
-      - /app_code/alembic:/usr/app/alembic
       - /app_code/src:/usr/app/src
       - /app_code/requirements.txt:/usr/app/requirements.txt
       - /app_code/scripts:/usr/app/scripts
@@ -61,6 +53,23 @@ services:
       python3 -m scripts.run_upstage_stats"
     networks:
       - upstage-network   
+
+  # For Upstage internal use only.
+  #upstage_emails:
+  #  image: registry.access.redhat.com/ubi9/python-312:latest
+  #  container_name: upstage_external_email_tokens
+  #  volumes:
+  #    - /app_code/src:/usr/app/src
+  #    - /app_code/requirements.txt:/usr/app/requirements.txt
+  #    - /app_code/scripts:/usr/app/scripts
+  #  command: >
+  #    /bin/bash -c "
+  #    cd /usr/app &&
+  #    pip install --upgrade pip &&
+  #    pip install -r requirements.txt &&
+  #    python3 -m scripts.run_upstage_email"
+  #  networks:
+  #    - upstage-network   
 
 networks:
   upstage-network:
