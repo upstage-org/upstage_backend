@@ -12,7 +12,7 @@ service_containers_file="./service_containers/run_docker_compose.sh"
 # Function to prompt user for input and replace placeholders
 generate_config() {
     local key value
-    keys=("REPLACE_POSTGRES_PASSWORD" "REPLACE_MQTT_P_PASSWORD" "REPLACE_MQTT_A_PASSWORD" "REPLACE_MONGO_PASSWORD" "EMAIL_HOST" "EMAIL_HOST_USER" "EMAIL_HOST_PASSWORD" "EMAIL_PORT")
+    keys=("REPLACE_POSTGRES_PASSWORD" "REPLACE_MQTT_P_PASSWORD" "REPLACE_MQTT_A_PASSWORD" "REPLACE_MONGO_PASSWORD" "REPLACE_CLOUDFLARE_CAPTCHA_SECRETKEY" "EMAIL_HOST" "EMAIL_HOST_USER" "EMAIL_HOST_PASSWORD" "EMAIL_PORT")
     values=()
 
     # Generate POSTGRES_PASSWORD and MQTT_PASSWORD using openssl

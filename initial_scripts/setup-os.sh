@@ -48,5 +48,8 @@ We recommend domain names such as your_upstage.org , svc.your_upstage.org , stre
 We will use Let's Encrypt to generate SSL keys for these domain. 
 If you do not want to use Let's Encrypt, you may want to cherrypick lines from the next script and run them manually.
 
+Also set up a CloudFlare Captcha, under their Turnstyle service, which is free. Choose Non-interactive, and No for pre-clearance. 
+You will be prompted for the CloudFlare Captcha key on this back end, and the Site key on the front end.
+
 Please see the README for further details.
 "
