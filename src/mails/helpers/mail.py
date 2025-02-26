@@ -52,13 +52,11 @@ def call_send_email_external_api(subject, body, recipients, cc, bcc, filenames):
         if subject_prefix:
             subject = f"{subject_prefix.value}: {subject}"
 
-        s = requests.Session()
-        url = f"{SEND_EMAIL_SERVER}/api/studio_graphql/"
-        client = get_mongo_token_collection()
-        token = client.find_one(
-            {"from_server": FULL_DOMAIN}, sort=[("_id", pymongo.DESCENDING)]
-        )
-
+    url = f"{SEND_EMAIL_SERVER}/api/email_graphql"
+    client = get_mongo_token_collection()
+    token = client.find_one(
+        {"from_server": FULL_DOMAIN}, sort=[("_id", pymongo.DESCENDING)]
+    )
     headers = {}
     if token and "token" in token:
         headers["X-Email-Token"] = token["token"]
@@ -88,14 +86,14 @@ def call_send_email_external_api(subject, body, recipients, cc, bcc, filenames):
         "bcc": bcc,
         "filenames": filenames,
     }
-    result = s.post(
+    result = requests.post(
         url=url,
         data={"query": data, "variables": json.dumps(variables)},
         headers=headers,
     )
     if (
         result.ok
-        and json.loads(result.text)["data"]["sendEmailExternal"]["success"] == True
+        and "errors" not in json.loads(result.text)
     ):
         return headers["X-Email-Token"]
     else:

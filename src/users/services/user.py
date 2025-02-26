@@ -1,4 +1,5 @@
 from operator import or_
+import asyncio
 
 from fastapi import Request
 from graphql import GraphQLError
@@ -8,7 +9,7 @@ from global_config import (
     CLOUDFLARE_CAPTCHA_SECRETKEY,
     CLOUDFLARE_CAPTCHA_VERIFY_ENDPOINT,
     SUPPORT_EMAILS,
-    UPSTAGE_FRONTEND_URL,
+    HOSTNAME,
     DBSession,
     ScopedSession,
 )
@@ -70,15 +71,16 @@ class UserService:
             .first()
         )
 
-        await send([user.email], f"Welcome to UpStage!", user_registration(user))
+        asyncio.create_task(send([user.email], f"Welcome to UpStage!", user_registration(user)))
         admin_emails = SUPPORT_EMAILS
-        approval_url = f"{UPSTAGE_FRONTEND_URL}/admin/player?sortByCreated=true"
-        await send(
-            admin_emails,
-            f"Approval required for {user.username}'s registration",
-            admin_registration_notification(user, approval_url),
+        approval_url = f"{HOSTNAME}/admin/player?sortByCreated=true"
+        asyncio.create_task(
+            send(
+                admin_emails,
+                f"Approval required for {user.username}'s registration",
+                admin_registration_notification(user, approval_url),
+            )
         )
-
         return {"user": user.to_dict()}
 
     def verify_captcha(self, data: CreateUserInput, request: Request):
