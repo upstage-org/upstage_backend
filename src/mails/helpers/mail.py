@@ -21,7 +21,6 @@ from global_config import (
     EMAIL_PORT,
     EMAIL_TIME_EXPIRED_TOKEN,
     EMAIL_USE_TLS,
-    ENV_TYPE,
     FULL_DOMAIN,
     SEND_EMAIL_SERVER,
     SUPPORT_EMAILS,
@@ -30,7 +29,6 @@ from global_config import (
     HOSTNAME
 )
 from event_archive.config.mongodb import get_mongo_token_collection
-from src.global_config.env import ACCEPT_EMAIL_HOST
 from upstage_options.db_models.config import ConfigModel
 
 
@@ -55,7 +53,7 @@ def call_send_email_external_api(subject, body, recipients, cc, bcc, filenames):
             subject = f"{subject_prefix.value}: {subject}"
 
         s = requests.Session()
-        url = f"{SEND_EMAIL_SERVER}/api/email_graphql/"
+        url = f"{SEND_EMAIL_SERVER}/api/studio_graphql/"
         client = get_mongo_token_collection()
         token = client.find_one(
             {"from_server": FULL_DOMAIN}, sort=[("_id", pymongo.DESCENDING)]
