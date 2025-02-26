@@ -44,3 +44,5 @@ DEMO_MEDIA_FOLDER="./dashboard/demo"
 # payment
 STRIPE_KEY = ""
 STRIPE_PRODUCT_ID = ""
+
+SEND_EMAIL_SERVER = "http://localhost:3000"
