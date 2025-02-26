@@ -534,14 +534,26 @@ type_defs = gql("""
     scalar JSONString
 
     enum AssetSortEnum {
+        ID_ASC
+        ID_DESC
+        NAME_ASC
+        NAME_DESC
         ASSET_TYPE_ID_ASC
         ASSET_TYPE_ID_DESC
         OWNER_ID_ASC
         OWNER_ID_DESC
-        NAME_ASC
-        NAME_DESC
+        DESCRIPTION_ASC
+        DESCRIPTION_DESC
+        FILE_LOCATION_ASC
+        FILE_LOCATION_DESC
         CREATED_ON_ASC
         CREATED_ON_DESC
+        UPDATED_ON_ASC
+        UPDATED_ON_DESC
+        SIZE_ASC
+        SIZE_DESC
+        COPYRIGHT_LEVEL_ASC
+        COPYRIGHT_LEVEL_DESC
     }
     
     enum AdminPlayerSortEnum {
@@ -558,14 +570,20 @@ type_defs = gql("""
     }
                 
     enum StageSortEnum {
-        ASSET_TYPE_ID_ASC
-        ASSET_TYPE_ID_DESC
-        OWNER_ID_ASC
-        OWNER_ID_DESC
+        ID_ASC
+        ID_DESC
         NAME_ASC
         NAME_DESC
+        DESCRIPTION_ASC
+        DESCRIPTION_DESC
+        OWNER_ID_ASC
+        OWNER_ID_DESC
+        FILE_LOCATION_ASC
+        FILE_LOCATION_DESC
         CREATED_ON_ASC
         CREATED_ON_DESC
+        LAST_ACCESS_ASC
+        LAST_ACCESS_DESC
     }
                 
     type Mutation { 
