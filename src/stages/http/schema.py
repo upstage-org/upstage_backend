@@ -13,6 +13,7 @@ from stages.http.validation import (
     RecordInput,
     SceneInput,
     SearchStageInput,
+    UpdateStageInput,
     StageInput,
     StageStreamInput,
     UpdateMediaInput,
@@ -73,7 +74,7 @@ def create_stage(_, info, input):
 @authenticated(allowed_roles=[SUPER_ADMIN, ADMIN, PLAYER])
 def update_stage(_, info, input):
     return StageService().update_stage(
-        UserModel(**info.context["request"].state.current_user), StageInput(**input)
+        UserModel(**info.context["request"].state.current_user), UpdateStageInput(**input)
     )
 
 

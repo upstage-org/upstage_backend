@@ -19,6 +19,7 @@ from stages.http.validation import (
     DuplicateStageInput,
     SearchStageInput,
     StageInput,
+    UpdateStageInput,
     StageStreamInput,
 )
 
@@ -216,15 +217,16 @@ class StageService:
             )
             return convert_keys_to_camel_case(stage.to_dict())
 
-    def update_stage(self, user: UserModel, input: StageInput):
+    def update_stage(self, user: UserModel, input: UpdateStageInput):
         with ScopedSession() as local_db_session:
             stage = local_db_session.query(StageModel).filter_by(id=input.id).first()
             if not stage or not input.id:
                 raise GraphQLError("Stage not found")
 
-            stage.name = input.name
-            stage.description = input.description
-            stage.file_location = input.fileLocation
+            stage.name = input.name if hasattr(input,'name') and input.name else stage.name
+            stage.description = input.description if hasattr(input,'description') and input.description else stage.description
+            stage.file_location = input.fileLocation if hasattr(input,'fileLocation') and input.fileLocation else stage.file_location
+
             self.update_stage_attribute(
                 stage.id, "cover", input.cover, local_db_session
             )
@@ -240,7 +242,6 @@ class StageService:
             self.update_stage_attribute(
                 stage.id, "playerAccess", input.playerAccess, local_db_session
             )
-
             self.update_stage_attribute(
                 stage.id, "config", input.config, local_db_session
             )

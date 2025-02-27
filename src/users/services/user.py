@@ -19,7 +19,7 @@ from mails.templates.templates import (
     password_reset,
     user_registration,
 )
-from users.db_models.user import PLAYER, UserModel
+from users.db_models.user import PLAYER, SUPER_ADMIN, UserModel
 from users.http.validation import CreateUserInput
 from users.db_models.one_time_totp import OneTimeTOTPModel
 
@@ -56,7 +56,7 @@ class UserService:
 
             user.password = encrypt(data["password"])
             user.role = PLAYER if not user.role else user.role
-            user.active = True
+            user.active = True if user.role == SUPER_ADMIN else False
             user.email = data.get("email", "")
             user.first_name = data.get("firstName", "")
             user.last_name = data.get("lastName", "")

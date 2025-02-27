@@ -14,6 +14,17 @@ class StageInput(BaseModel):
     playerAccess: Optional[str] = Field(None, description="Player access information")
     config: Optional[str] = Field(None, description="Configuration of the stage")
 
+class UpdateStageInput(BaseModel):
+    id: Optional[int] = Field(None, description="ID of the stage")
+    fileLocation: Optional[str] = Field(None, description="Location of the file")
+    status: Optional[str] = Field(None, description="Status of the stage")
+    visibility: Optional[bool] = Field(None, description="Visibility of the stage")
+    cover: Optional[str] = Field(None, description="Cover image URL")
+    name: Optional[str] = Field(None, description="Name of the stage")
+    description: Optional[str] = Field(None, description="Description of the stage")
+    playerAccess: Optional[str] = Field(None, description="Player access information")
+    config: Optional[str] = Field(None, description="Configuration of the stage")
+
 
 class DuplicateStageInput(BaseModel):
     id: int = Field(..., description="ID of the stage")
