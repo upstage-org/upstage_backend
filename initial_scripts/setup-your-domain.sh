@@ -83,7 +83,6 @@ case $machinetype in
 Completed service container setup."
                 ;;
         2) sed "s/YOUR_DOMAIN_NAME/$dname/g" ./initial_scripts/nginx_templates/nginx_template_for_app_machines.conf >/etc/nginx/sites-available/$dname.conf
-           sed -i "s/{APP_HOST}/$dname/g" $output_file
 
            mkdir -p /frontend_code
            mkdir -p /app_code/demo
@@ -110,6 +109,7 @@ Note that on Digital Ocean, the third IP in the 'hostname -I' command: ${arr[2]}
            read -p "
 Please log into your service machine in another shell, and copy your load_env.py file generated on your service machine (most likely here: /root/upstage_backend/src/global_config ) to /app_code/src/global_config on this machine. Once this is done, press enter to continue: " ready
            chmod 755 /app_code/src/global_config/load_env.py
+           sed -i "s/{APP_HOST}/$dname/g" $output_file
 
            read -p "
 Run the contents of this script over on the service machine:
