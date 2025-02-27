@@ -85,9 +85,12 @@ class UserService:
 
     def verify_captcha(self, data: CreateUserInput, request: Request):
         ip = request.headers.get("X-Forwarded-For", request.client.host)
+        '''
+        Allow CloudFlare to be turned off for testing.
+        '''
         formData = {
             "secret": CLOUDFLARE_CAPTCHA_SECRETKEY,
-            "response": data["token"],
+            "response": data["token"] if 'token' in data else None,
             "remoteip": ip,
         }
 
