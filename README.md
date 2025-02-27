@@ -40,7 +40,7 @@ It will also start three docker containers, one for MongoDB, one for Postgresql,
 ```
 Choose option 2
 
-This will start three "app" containers: Upstage, Upstage-Event, Upstage-Email
+This will start three "app" containers: Upstage, Upstage-Event, Upstage-Stats
 
 ## Setup Instructions for inserting Seeding Data
 
