@@ -13,7 +13,7 @@ async def lifespan(app: FastAPI):
 
 
 def add_cors_middleware(app):
-    if ENV_TYPE == "Production":
+    if ENV_TYPE != "Production":
         app.add_middleware(
             CORSMiddleware,
             allow_origins=["*"],
