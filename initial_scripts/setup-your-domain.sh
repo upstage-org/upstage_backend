@@ -4,7 +4,7 @@ export DEBIAN_FRONTEND=noninteractive
 
 # Running from the root dir...
 # Make sure this setting matches the setting in ./initial_scripts/environments/generate_environments_script.sh
-output_file="./src/global_config/load_env.py"
+output_file="/app_code/src/global_config/load_env.py"
 
 read -p "
 Enter the domain name, including subdomain. Ex: streaming.myupstage.org: " dname
@@ -83,7 +83,7 @@ case $machinetype in
 Completed service container setup."
                 ;;
         2) sed "s/YOUR_DOMAIN_NAME/$dname/g" ./initial_scripts/nginx_templates/nginx_template_for_app_machines.conf >/etc/nginx/sites-available/$dname.conf
-           sed -i "s/\{APP_HOST\}/$dname/g" $output_file
+           sed -i "s/{APP_HOST}/$dname/g" $output_file
 
            mkdir -p /frontend_code
            mkdir -p /app_code/demo
