@@ -51,7 +51,7 @@ class StageService:
             query = query.filter(StageModel.name.ilike(f"%{input.name}%"))
 
         if input.owners:
-            query = query.filter(StageModel.owner_id.in_(input.owners))
+            query = query.filter(UserModel.username.in_(input.owners))
 
         if input.createdBetween:
             query = query.filter(
