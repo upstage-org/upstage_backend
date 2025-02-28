@@ -57,3 +57,7 @@ ACCEPT_EMAIL_HOST = ["upstage.live"]
 ACCEPT_SERVER_SEND_EMAIL_EXTERNAL = []
 
 SEND_EMAIL_SERVER = "https://upstage.live"
+
+
+JWT_ACCESS_TOKEN_MINUTES = "86400" # 1 day
+JWT_REFRESH_TOKEN_DAYS = "30" # 30 days
