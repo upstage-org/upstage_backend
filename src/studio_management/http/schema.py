@@ -49,7 +49,7 @@ def create_users(_, __, users: List[BatchUserInput]):
 
 
 @mutation.field("updateUser")
-@authenticated(allowed_roles=[SUPER_ADMIN, ADMIN])
+@authenticated(allowed_roles=[SUPER_ADMIN, ADMIN, PLAYER])
 async def update_user(_, __, input: UpdateUserInput, studio_service=StudioService()):
     return await studio_service.update_user(UpdateUserInput(**input))
 

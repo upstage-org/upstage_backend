@@ -185,6 +185,8 @@ class StageService:
                 **stage.to_dict(),
                 "assets": [asset.child_asset.to_dict() for asset in stage.assets],
                 "permission": self.resolve_permission(user.id, stage),
+                "visibility": stage.visibility,
+                "status": stage.status,
             }
         )
 
