@@ -485,10 +485,10 @@ class StageService:
             )
 
             if attribute is not None:
-                attribute.description = True if attribute.description == "" else ""
+                attribute.description = "true" if attribute.description == "" else ""
             else:
                 attribute = StageAttributeModel(
-                    stage_id=id, name="visibility", description=True
+                    stage_id=id, name="visibility", description="true"
                 )
 
             local_db_session.add(attribute)
