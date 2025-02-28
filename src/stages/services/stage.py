@@ -487,7 +487,7 @@ class StageService:
             )
 
             if attribute is not None:
-                attribute.description = "true" if attribute.description == "" else ""
+                attribute.description = "true" if attribute.description != "true"  else "false"
             else:
                 attribute = StageAttributeModel(
                     stage_id=id, name="visibility", description="true"
