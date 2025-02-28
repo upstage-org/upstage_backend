@@ -70,3 +70,6 @@ class FileHandling:
     def delete_file(self, path: str):
         if os.path.exists(path):
             os.remove(path)
+
+    def get_file_size(self, base64: str) -> int:
+        return b64decode(base64.split(",")[1])

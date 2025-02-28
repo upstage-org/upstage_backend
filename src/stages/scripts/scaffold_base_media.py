@@ -164,7 +164,7 @@ def create_demo_stage():
     status = StageAttributeModel(name="status", description="live", stage=stage)
     stage.attributes.append(status)
 
-    visibility = StageAttributeModel(name="visibility", description="1", stage=stage)
+    visibility = StageAttributeModel(name="visibility", description="true", stage=stage)
     stage.attributes.append(visibility)
 
     cover_src = os.path.join(DEMO_MEDIA_FOLDER, "demo-stage-cover.jpg")

@@ -58,6 +58,7 @@ class MediaService:
     def upload_media(self, user: UserModel, input: UploadMediaInput):
         with ScopedSession() as local_db_session:
             asset_type = self.asset_service.validate_asset_type(input, local_db_session)
+            size = self.file_handling.get_file_size(input.base64)
             file_location = self.file_handling.upload_file(
                 base64=input.base64,
                 file_name=input.filename,
@@ -71,6 +72,7 @@ class MediaService:
                 asset_type_id=asset_type.id,
                 name=input.name,
                 file_location=file_location,
+                size=size,
                 local_db_session=local_db_session,
             )
 

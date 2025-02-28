@@ -112,3 +112,4 @@ class SearchStageInput(BaseModel):
 class StageStreamInput(BaseModel):
     fileLocation: Optional[str] = Field(None, description="Location of the file")
     performanceId: Optional[int] = Field(None, description="ID of the performance")
+    cursor: Optional[int] = Field(None, description="Cursor for pagination")
