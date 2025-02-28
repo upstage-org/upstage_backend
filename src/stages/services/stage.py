@@ -44,7 +44,7 @@ class StageService:
             .outerjoin(UserModel)
             .outerjoin(ParentStageModel)
             .outerjoin(AssetModel)
-            .distinct(StageModel.id)
+            .group_by(StageModel.id)
         )
 
         if input.name:
@@ -59,8 +59,6 @@ class StageService:
                     input.createdBetween[0], input.createdBetween[1]
                 )
             )
-
-        query = query.order_by(StageModel.id)
 
         if input.sort:
             sort = input.sort
@@ -118,7 +116,7 @@ class StageService:
             .outerjoin(StageAttributeModel)
             .outerjoin(ParentStageModel)
             .outerjoin(AssetModel)
-            .distinct(StageModel.id)
+            .group_by(StageModel.id)
         )
 
         if input.fileLocation:
@@ -144,10 +142,12 @@ class StageService:
         ]
 
     def get_event_list(self, input: StageStreamInput, stage: StageModel):
+        cursor = input.cursor if input.cursor else 0
         events = (
             DBSession.query(EventModel)
             .filter(EventModel.performance_id == input.performanceId)
             .filter(EventModel.topic.like("%/{}/%".format(stage.file_location)))
+            .filter(EventModel.id > cursor)
             .order_by(EventModel.mqtt_timestamp.asc())
             .all()
         )

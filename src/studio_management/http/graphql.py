@@ -221,6 +221,7 @@ type_defs = gql("""
     input StageStreamInput {
         fileLocation: String
         performanceId: ID
+        cursor: Int
     }
                 
    type StagesResponse {

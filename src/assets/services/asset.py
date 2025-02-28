@@ -73,7 +73,7 @@ class AssetService:
                 ParentStageModel, AssetModel.id == ParentStageModel.child_asset_id
             )
             .outerjoin(StageModel, ParentStageModel.stage_id == AssetModel.id)
-            .distinct(AssetModel.id)
+            .group_by(AssetModel.id)
         )
         if search_assets.name:
             query = query.filter(AssetModel.name.like(f"%{search_assets.name}%"))
@@ -101,11 +101,8 @@ class AssetService:
                 )
             )
 
-        query = query.order_by(AssetModel.id)
-
         if search_assets.sort:
-            sort = search_assets.sort
-            for sort_option in sort:
+            for sort_option in search_assets.sort:
                 field, direction = sort_option.rsplit("_", 1)
                 if field == "ASSET_TYPE_ID":
                     sort_field = AssetModel.asset_type_id
@@ -115,6 +112,10 @@ class AssetService:
                     sort_field = AssetModel.name
                 elif field == "CREATED_ON":
                     sort_field = AssetModel.created_on
+                elif field == "SIZE":
+                    sort_field = AssetModel.size
+                else:
+                    continue
 
                 if direction == "ASC":
                     query = query.order_by(sort_field.asc())
@@ -215,6 +216,7 @@ class AssetService:
         asset_type_id: int,
         name: str,
         file_location: str,
+        size: int,
         local_db_session,
     ):
         asset = AssetModel(
@@ -222,6 +224,7 @@ class AssetService:
             asset_type_id=asset_type_id,
             name=name,
             file_location=file_location,
+            size=size,
         )
         local_db_session.add(asset)
         local_db_session.flush()
