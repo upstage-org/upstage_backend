@@ -204,7 +204,7 @@ class StageService:
                 stage.id, "cover", input.cover, local_db_session
             )
             self.update_stage_attribute(
-                stage.id, "visibility", str(input.visibility), local_db_session
+                stage.id, "visibility", str(input.visibility).lower(), local_db_session
             )
             self.update_stage_attribute(
                 stage.id, "description", input.description, local_db_session
@@ -241,7 +241,7 @@ class StageService:
                 stage.id, "cover", input.cover, local_db_session
             )
             self.update_stage_attribute(
-                stage.id, "visibility", str(input.visibility), local_db_session
+                stage.id, "visibility", str(input.visibility).lower(), local_db_session
             )
             self.update_stage_attribute(
                 stage.id, "description", input.description, local_db_session
@@ -277,9 +277,10 @@ class StageService:
             if stage_attribute:
                 stage_attribute.description = value
                 return
-        local_db_session.add(
-            StageAttributeModel(stage_id=stage_id, name=name, description=value)
-        )
+            local_db_session.add(
+                StageAttributeModel(stage_id=stage_id, name=name, description=value)
+            )
+            local_db_session.flush()
 
     def delete_stage(self, user: UserModel, id: int):
         with ScopedSession() as local_db_session:
