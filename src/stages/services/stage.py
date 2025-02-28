@@ -223,9 +223,19 @@ class StageService:
             if not stage or not input.id:
                 raise GraphQLError("Stage not found")
 
-            stage.name = input.name if hasattr(input,'name') and input.name else stage.name
-            stage.description = input.description if hasattr(input,'description') and input.description else stage.description
-            stage.file_location = input.fileLocation if hasattr(input,'fileLocation') and input.fileLocation else stage.file_location
+            stage.name = (
+                input.name if hasattr(input, "name") and input.name else stage.name
+            )
+            stage.description = (
+                input.description
+                if hasattr(input, "description") and input.description
+                else stage.description
+            )
+            stage.file_location = (
+                input.fileLocation
+                if hasattr(input, "fileLocation") and input.fileLocation
+                else stage.file_location
+            )
 
             self.update_stage_attribute(
                 stage.id, "cover", input.cover, local_db_session

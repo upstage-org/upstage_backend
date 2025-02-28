@@ -71,7 +71,9 @@ class UserService:
             .first()
         )
 
-        asyncio.create_task(send([user.email], f"Welcome to UpStage!", user_registration(user)))
+        asyncio.create_task(
+            send([user.email], f"Welcome to UpStage!", user_registration(user))
+        )
         admin_emails = SUPPORT_EMAILS
         approval_url = f"{HOSTNAME}/admin/player?sortByCreated=true"
         asyncio.create_task(
@@ -85,12 +87,12 @@ class UserService:
 
     def verify_captcha(self, data: CreateUserInput, request: Request):
         ip = request.headers.get("X-Forwarded-For", request.client.host)
-        '''
+        """
         Allow CloudFlare to be turned off for testing.
-        '''
+        """
         formData = {
             "secret": CLOUDFLARE_CAPTCHA_SECRETKEY,
-            "response": data["token"] if 'token' in data else None,
+            "response": data["token"] if "token" in data else None,
             "remoteip": ip,
         }
 

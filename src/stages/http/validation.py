@@ -14,6 +14,7 @@ class StageInput(BaseModel):
     playerAccess: Optional[str] = Field(None, description="Player access information")
     config: Optional[str] = Field(None, description="Configuration of the stage")
 
+
 class UpdateStageInput(BaseModel):
     id: Optional[int] = Field(None, description="ID of the stage")
     fileLocation: Optional[str] = Field(None, description="Location of the file")

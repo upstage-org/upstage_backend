@@ -17,7 +17,12 @@ from stages.db_models.stage_attribute import StageAttributeModel
 from stages.db_models.parent_stage import ParentStageModel
 from users.db_models.user import UserModel, ADMIN, GUEST
 from upstage_options.db_models.config import ConfigModel
-from global_config import encrypt, UPLOAD_USER_CONTENT_FOLDER, global_session, DEMO_MEDIA_FOLDER
+from global_config import (
+    encrypt,
+    UPLOAD_USER_CONTENT_FOLDER,
+    global_session,
+    DEMO_MEDIA_FOLDER,
+)
 
 DBSession = global_session
 
@@ -44,6 +49,7 @@ owner_id = 0
 
 owner = DBSession.query(UserModel).filter(UserModel.username == "admin").first()
 owner_id = owner.id
+
 
 def scan_demo_folder():
     for type in os.listdir(DEMO_MEDIA_FOLDER):
