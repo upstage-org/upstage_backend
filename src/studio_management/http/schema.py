@@ -10,7 +10,7 @@ from studio_management.http.validation import (
     UpdateUserInput,
 )
 from studio_management.services.studio import StudioService
-from users.db_models.user import ADMIN, ROLES, SUPER_ADMIN, UserModel
+from users.db_models.user import ADMIN, ROLES, SUPER_ADMIN, PLAYER, UserModel
 
 
 query = QueryType()
@@ -37,7 +37,7 @@ def stages(_, __):
 
 
 @query.field("users")
-@authenticated(allowed_roles=[SUPER_ADMIN, ADMIN])
+@authenticated(allowed_roles=[SUPER_ADMIN, ADMIN, PLAYER])
 def users(_, __, active: bool = True):
     return StudioService().get_users(active)
 
