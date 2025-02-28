@@ -3,10 +3,10 @@ import re
 import json
 from multiprocessing import Process, cpu_count
 import os
+import time
 
 from global_config import EVENT_COLLECTION, MONGO_DB
 from event_archive.config.mongodb import build_mongo_client
-
 
 _payload_map = {}
 _anything_list = []
@@ -36,6 +36,7 @@ def reacts_to_payload(rules: list = []):
                 _payload_map[f].append(r)
             except ValueError:
                 raise ValueError(f"{r} is invalid.  Must be: JSON_PATH=REGEX")
+        return f
 
     return inner
 
@@ -68,6 +69,7 @@ def functions_for(payload):
                 break
         if should_add:
             output.append(f)
+    logging.info(f"Functions to be called for payload: {[f.__name__ for f in output]}")
     return output
 
 
@@ -80,20 +82,24 @@ def worker():
         try:
             event = queue.find_one_and_delete({})
             if event:
+                from event_archive.actions.event import record_event
+
                 logging.info(f"{os.getpid()} Processing: {event}")
                 topic = event["topic"]
                 payload = json.loads(event["payload"])
                 timestamp = event["timestamp"]
-                funcs = functions_for(payload)
-                for f in funcs:
-                    f(topic, payload, timestamp)
+                record_event(topic, payload, timestamp)
+                logging.info(f"{os.getpid()} Stored event: {event}")
+            else:
+                logging.info(f"{os.getpid()} No event found, sleeping for a while")
+                time.sleep(1)
         except Exception as e:
             logging.error(e)
-    logging.info("Worker exited")
 
 
 def run():
     processes = [Process(target=worker, args=()) for _ in range(cpu_count())]
-    logging.info(f"Spawning {len(processes)} processes...")
+
+    print(f"Spawning {len(processes)} processes...")
     for p in processes:
         p.start()

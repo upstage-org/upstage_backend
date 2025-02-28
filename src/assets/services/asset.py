@@ -132,7 +132,8 @@ class AssetService:
                 {
                     **convert_keys_to_camel_case(asset.to_dict()),
                     "stages": [
-                        convert_keys_to_camel_case(item.stage) for item in asset.stages
+                        convert_keys_to_camel_case(item.stage.to_dict())
+                        for item in asset.stages
                     ],
                 }
                 for asset in assets

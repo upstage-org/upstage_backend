@@ -26,7 +26,7 @@ from global_config import (
     SUPPORT_EMAILS,
     ScopedSession,
     ACCEPT_EMAIL_HOST,
-    HOSTNAME
+    HOSTNAME,
 )
 from event_archive.config.mongodb import get_mongo_token_collection
 from upstage_options.db_models.config import ConfigModel
@@ -91,10 +91,7 @@ def call_send_email_external_api(subject, body, recipients, cc, bcc, filenames):
         data={"query": data, "variables": json.dumps(variables)},
         headers=headers,
     )
-    if (
-        result.ok
-        and "errors" not in json.loads(result.text)
-    ):
+    if result.ok and "errors" not in json.loads(result.text):
         return headers["X-Email-Token"]
     else:
         raise Exception(json.loads(result.text))

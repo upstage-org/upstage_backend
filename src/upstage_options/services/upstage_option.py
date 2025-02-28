@@ -27,11 +27,11 @@ class SettingService:
         return session.query(ConfigModel).filter_by(name=name).first()
 
     def upload_limit(self):
-        '''
+        """
         In the future this will be 0 in nginx, and value for
         code will be in the database. The code itself will enforce
         the limit.
-        '''
+        """
         return {"limit": CLIENT_MAX_BODY_SIZE}
 
     def system_info(self):
