@@ -61,6 +61,8 @@ class StageService:
 
         total_count = query.count()
 
+        query =query.order_by(StageModel.name.asc())
+
         if input.sort:
             sort = input.sort
             for sort_option in sort:

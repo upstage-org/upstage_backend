@@ -510,7 +510,7 @@ class AssetService:
     def get_tags(self):
         return [
             convert_keys_to_camel_case(tag.to_dict())
-            for tag in DBSession.query(TagModel).all()
+            for tag in DBSession.query(TagModel).order_by(TagModel.name.asc()).all()
         ]
 
     def get_voices(self):
