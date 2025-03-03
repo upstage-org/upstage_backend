@@ -405,7 +405,7 @@ class StudioService:
     def get_users(self, active: bool):
         return [
             convert_keys_to_camel_case(user.to_dict())
-            for user in DBSession.query(UserModel).filter(UserModel.active == active)
+            for user in DBSession.query(UserModel).filter(UserModel.active == active).order_by(UserModel.created_on.asc()).all()
         ]
 
     def stages(self):
