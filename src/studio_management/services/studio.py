@@ -48,7 +48,6 @@ class StudioService:
         pass
 
     def admin_players(self, params):
-        totalCount = DBSession.query(UserModel).count()
         query = DBSession.query(UserModel)
 
         if "usernameLike" in params:
@@ -72,6 +71,9 @@ class StudioService:
                 elif sort_param == "CREATED_ON_DESC":
                     query = query.order_by(desc(UserModel.created_on))
 
+        total_count = query.count()
+        
+
         if "limit" in params:
             limit = params["limit"] or 10
             page = 0 if "page" not in params else (params["page"] - 1)
@@ -81,7 +83,7 @@ class StudioService:
         results = query.all()
 
         return convert_keys_to_camel_case(
-            {"totalCount": totalCount, "edges": [user.to_dict() for user in results]}
+            {"totalCount": total_count, "edges": [user.to_dict() for user in results]}
         )
 
     def create_users(self, users: List[BatchUserInput]):
