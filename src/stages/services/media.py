@@ -25,7 +25,7 @@ from stages.http.validation import (
     UpdateMediaInput,
     UploadMediaInput,
 )
-from users.db_models.user import UserModel
+from users.db_models.user import ADMIN, SUPER_ADMIN, UserModel
 
 appdir = os.path.abspath(os.path.dirname(__file__))
 absolutePath = os.path.dirname(os.path.abspath(os.path.join(appdir, "..", "..")))
@@ -38,11 +38,15 @@ class MediaService:
         self.asset_license_service = AssetLicenseService()
         self.file_handling = FileHandling()
 
-    def assign_media(self, input: AssignMediaInput):
+    def assign_media(self, input: AssignMediaInput, user: UserModel):
         with ScopedSession() as local_db_session:
             stage = local_db_session.query(StageModel).filter_by(id=input.id).first()
             if not stage or not input.id:
                 raise GraphQLError("Stage not found")
+            
+            if stage.owner_id != user.id and user.role not in [ADMIN, SUPER_ADMIN]:
+                raise GraphQLError("You are not authorized to update this stage")
+            
 
             local_db_session.query(ParentStageModel).filter(
                 ParentStageModel.stage_id == input.id
