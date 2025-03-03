@@ -1,9 +1,13 @@
 This guide will help you set up and run the Upstage application using either Docker prebult images,
-or using Dokcer form the source code.
+or using Docker form the source code.
 
-It is recommended that you run three docker instances, preferably on three separate machines, with three separate subdomains. For example: streaming.myupstage.org, service.myupstage.org, app.myupstage.org
+It is recommended that you run three Debian docker machines with three separate subdomains. 
 
-We do provide scripts to run all containers on one machine, but it is not recommended.
+For example: streaming.myupstage.org, service.myupstage.org, app.myupstage.org
+
+It is possible to install our front end, back end and streaming service all on one instance/machine, but it is not recommended. 
+
+Run everything as root, preferably using ssh keys instead of login/password, for better security.
 
 # Upstage Setup Guide: From Official Docker Images:
 TBD
@@ -11,42 +15,65 @@ TBD
 # Upstage Setup Guide: From Git Repo to Local Docker Images
 
 ## Setup OS-level services in Debian: 
-Run everything as root.
 
-Run ``` apt install git ```
+We recommend doing this right after image spin-up, to protect your instance:
+Run ```sh
+apt install git ufw
+ufw allow 22
+ufw enable
+```
 
 Then git clone this repo.
 
-### Install Docker, Nginx, and Certbot on all three machines:
+## On All Three Machines: Install Docker, Nginx, and Certbot:
 
 ```sh
 ./initial_scripts/setup-os.sh
 ```
 
+## Specific to the Back End, Front End, or Streaming Service:
 This assumes you wish to use Let's Encrypt and will also run the script to configure the service environment and set default passwords:
 ```sh
 ./initial_scripts/setup-your-domain.sh
 ```
-Choose option 1
 
-This will auto-generate passwords for various applications, and will store them in a local config file.
+## On the Back End Server: Your Foundational Services Installed and Configured:
+Choose option 1 to set up the Back End.
 
-It will also start three docker containers, one for MongoDB, one for Postgresql, one for Mosquitto.
+This will auto-generate passwords for various applications, and will store them in a local config file. It will also configure nginx for the specific type of machine you are setting up. Note that nginx, Let's Encrypt and ufw all run on the machine itself, not in the instances.
 
-## Setup Instructions for your application machine: Upstage, Upstage Event Capture, Upstage Email (optional)
+It will start three docker containers: MongoDB, Postgresql, Mosquitto.
+
+## Setup Instructions for your Application Server: Upstage, Upstage Event Capture, Upstage Email (optional)
 
 ```sh
 ./initial_scripts/setup-your-domain.sh
 ```
-Choose option 2
+Choose option 2 to set up the App server, which serves Upstage-specific Back End and Front End code.
 
-This will start three "app" containers: Upstage, Upstage-Event, Upstage-Stats
+This will configure and start three "app" containers: Upstage, Upstage-Event, Upstage-Stats. Note that  this script is interactive, and will prompt you to copy certain things.
 
-## Setup Instructions for inserting Seeding Data
+## Setup Instructions for your Application Server also running the Front End:
 
-### 3. Insert Seeding Data
+The Front End code for Upstage runs on the same server as the application code, and comes from this repository:
 
-### Default Admin User
+```
+https://github.com/upstage-org/upstage_frontend.git
+```
+
+After cloning the Front End code:
+
+```sh
+cd upstage_frontend
+./initial_scripts/generate_environments_script.sh
+./run_front_end.sh
+```
+
+Note that this script is also interactive. 
+
+## Setup Instructions for Initializing Default Data
+
+### Default Admin User, still on Application
 
 Upon initial setup, a default administrator account is created with the following credentials:
 
