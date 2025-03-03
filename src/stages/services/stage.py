@@ -61,8 +61,6 @@ class StageService:
 
         total_count = query.count()
 
-        query =query.order_by(StageModel.name.asc())
-
         if input.sort:
             sort = input.sort
             for sort_option in sort:
@@ -77,6 +75,9 @@ class StageService:
                     query = query.order_by(sort_field.asc())
                 elif direction == "DESC":
                     query = query.order_by(sort_field.desc())
+
+        else:
+            query =query.order_by(StageModel.name.asc())
 
         limit = input.limit if input.limit else 10
         page = input.page if input.page else 1
@@ -227,6 +228,9 @@ class StageService:
             stage = local_db_session.query(StageModel).filter_by(id=input.id).first()
             if not stage or not input.id:
                 raise GraphQLError("Stage not found")
+            
+            if stage.owner_id != user.id and user.role not in [ADMIN, SUPER_ADMIN]:
+                raise GraphQLError("You are not authorized to update this stage")
 
             stage.name = (
                 input.name if hasattr(input, "name") and input.name else stage.name
