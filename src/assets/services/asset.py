@@ -290,7 +290,7 @@ class AssetService:
                 asset.size += size
 
             attributes["multi"] = True if len(urls) > 1 else False
-            attributes["frames"] = attributes["frames"] if len(urls) > 0 else []
+            attributes["frames"] = attributes["frames"] if len(urls) > 1 else []
             attributes["w"] = input.w
             attributes["h"] = input.h
             if asset_type.name == "stream" and "/" not in file_location:
