@@ -62,8 +62,6 @@ class AssetService:
         return [self.resolve_fields(asset, user) for asset in assets]
 
     def search_assets(self, search_assets: MediaTableInput):
-        total_count = DBSession.query(AssetModel).count()
-
         query = (
             DBSession.query(AssetModel)
             .join(UserModel)
@@ -100,6 +98,9 @@ class AssetService:
                     search_assets.createdBetween[0], search_assets.createdBetween[1]
                 )
             )
+
+
+        total_count = query.count()
 
         if search_assets.sort:
             for sort_option in search_assets.sort:
@@ -503,7 +504,7 @@ class AssetService:
     def get_media_types(self):
         return [
             convert_keys_to_camel_case(type.to_dict())
-            for type in DBSession.query(AssetTypeModel).all()
+            for type in DBSession.query(AssetTypeModel).order_by(AssetTypeModel.name.asc()).all()
         ]
 
     def get_tags(self):
