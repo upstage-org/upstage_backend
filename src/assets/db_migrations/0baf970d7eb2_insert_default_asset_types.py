@@ -20,7 +20,7 @@ asset_type_table = table(
 
 # List of default asset types
 default_asset_types = [
-    "stream",
+    "video",
     "backdrop",
     "audio",
     "curtain",

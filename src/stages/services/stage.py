@@ -38,7 +38,6 @@ class StageService:
         pass
 
     def get_all_stages(self, user: UserModel, input: SearchStageInput):
-        count = DBSession.query(StageModel).count()
         query = (
             DBSession.query(StageModel)
             .outerjoin(UserModel)
@@ -59,6 +58,8 @@ class StageService:
                     input.createdBetween[0], input.createdBetween[1]
                 )
             )
+
+        total_count = query.count()
 
         if input.sort:
             sort = input.sort
@@ -96,7 +97,7 @@ class StageService:
                 )
                 for stage in stages
             ],
-            "totalCount": count,
+            "totalCount": total_count,
         }
 
     def get_stage_list(self, info, input: StageStreamInput):
