@@ -378,12 +378,13 @@ type_defs = gql("""
     type Scene {
         id: ID!
         name: String!
+        sceneOrder: Int
+        scenePreview: String
+        payload: String
+        createdOn: Date
+        active: Boolean
         ownerId: ID!
-        description: String!
-        splashScreenText: String
-        splashScreenAnimationUrls: String
-        createdOn: String!
-        expiresOn: String
+        stageId: ID!
     }   
                 
     type ParentStage {
