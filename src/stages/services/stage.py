@@ -535,6 +535,7 @@ class StageService:
         ]
 
     def resolve_permission(self, user_id: int, stage: StageModel):
+        user_id = str(user_id)
         if not user_id:
             return "audience"
         if stage.owner_id == user_id:
