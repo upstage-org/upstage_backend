@@ -43,10 +43,9 @@ class MediaService:
             stage = local_db_session.query(StageModel).filter_by(id=input.id).first()
             if not stage or not input.id:
                 raise GraphQLError("Stage not found")
-            
+
             if stage.owner_id != user.id and user.role not in [ADMIN, SUPER_ADMIN]:
                 raise GraphQLError("You are not authorized to update this stage")
-            
 
             local_db_session.query(ParentStageModel).filter(
                 ParentStageModel.stage_id == input.id

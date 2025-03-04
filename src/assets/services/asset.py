@@ -99,7 +99,6 @@ class AssetService:
                 )
             )
 
-
         total_count = query.count()
 
         if search_assets.sort:
@@ -313,8 +312,8 @@ class AssetService:
             attributes["note"] = input.note
             asset.description = json.dumps(attributes)
             local_db_session.flush()
-        if not  len(input.stageIds):
-             asset.stages.delete()
+        if not len(input.stageIds):
+            asset.stages.delete()
 
         if len(input.stageIds):
             asset.stages.delete()
@@ -507,7 +506,9 @@ class AssetService:
     def get_media_types(self):
         return [
             convert_keys_to_camel_case(type.to_dict())
-            for type in DBSession.query(AssetTypeModel).order_by(AssetTypeModel.name.asc()).all()
+            for type in DBSession.query(AssetTypeModel)
+            .order_by(AssetTypeModel.name.asc())
+            .all()
         ]
 
     def get_tags(self):
