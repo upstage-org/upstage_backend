@@ -313,6 +313,9 @@ class AssetService:
             attributes["note"] = input.note
             asset.description = json.dumps(attributes)
             local_db_session.flush()
+        if not  len(input.stageIds):
+             asset.stages.delete()
+
         if len(input.stageIds):
             asset.stages.delete()
             for id in input.stageIds:
