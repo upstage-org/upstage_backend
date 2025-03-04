@@ -192,6 +192,9 @@ class AuthenticationService:
     def get_session(self, token: str, user_id: int):
         return (
             DBSession.query(UserSessionModel)
-            .filter(UserSessionModel.user_id == user_id, UserSessionModel.access_token == token)
+            .filter(
+                UserSessionModel.user_id == user_id,
+                UserSessionModel.access_token == token,
+            )
             .first()
         )

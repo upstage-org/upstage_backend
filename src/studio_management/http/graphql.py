@@ -336,6 +336,7 @@ type_defs = gql("""
         lastAccess: Date
         createdOn: Date
         attributes:[StageAttribute]
+        performances: [Performance]
     }
                 
                 
@@ -385,6 +386,7 @@ type_defs = gql("""
         active: Boolean
         ownerId: ID!
         stageId: ID!
+        owner: User
     }   
                 
     type ParentStage {
