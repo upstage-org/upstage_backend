@@ -21,7 +21,7 @@ def authenticated(allowed_roles=None):
         @wraps(func)
         def wrapper(*args, **kwargs):
             from authentication.services.auth import AuthenticationService
-            
+
             info = args[1]
             request: Request = info.context["request"]
             authorization: str = request.headers.get("Authorization")

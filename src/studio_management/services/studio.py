@@ -72,7 +72,6 @@ class StudioService:
                     query = query.order_by(desc(UserModel.created_on))
 
         total_count = query.count()
-        
 
         if "limit" in params:
             limit = params["limit"] or 10
@@ -405,7 +404,10 @@ class StudioService:
     def get_users(self, active: bool):
         return [
             convert_keys_to_camel_case(user.to_dict())
-            for user in DBSession.query(UserModel).filter(UserModel.active == active).order_by(UserModel.username.asc()).all()
+            for user in DBSession.query(UserModel)
+            .filter(UserModel.active == active)
+            .order_by(UserModel.username.asc())
+            .all()
         ]
 
     def stages(self):
