@@ -1,11 +1,9 @@
-from base64 import b64decode
 from datetime import datetime, timedelta
 import hashlib
 import json
 from operator import or_
 import os
 from typing import Optional
-import uuid
 import time
 from graphql import GraphQLError
 
@@ -17,7 +15,7 @@ from global_config import (
     STREAM_KEY,
     convert_keys_to_camel_case,
 )
-from assets.db_models.asset import AssetModel, AvatarVoice, Voice
+from assets.db_models.asset import AssetModel, AvatarVoice, Voice, Previlege
 from assets.db_models.asset_license import AssetLicenseModel
 from assets.db_models.asset_type import AssetTypeModel
 from assets.db_models.asset_usage import AssetUsageModel
@@ -61,7 +59,7 @@ class AssetService:
 
         return [self.resolve_fields(asset, user) for asset in assets]
 
-    def search_assets(self, search_assets: MediaTableInput):
+    def search_assets(self, user: UserModel, search_assets: MediaTableInput):
         query = (
             DBSession.query(AssetModel)
             .join(UserModel)
@@ -133,6 +131,7 @@ class AssetService:
             "edges": [
                 {
                     **convert_keys_to_camel_case(asset.to_dict()),
+                    "privilege": self.resolve_privilege(user.id, asset),
                     "stages": [
                         convert_keys_to_camel_case(item.stage.to_dict())
                         for item in asset.stages
@@ -543,3 +542,27 @@ class AssetService:
                                     setattr(av, key, 50)
                         voices.append(Voice(avatar=media, voice=av))
         return [convert_keys_to_camel_case(voice) for voice in voices]
+
+
+    def resolve_privilege(self, user_id: int, asset: AssetModel):
+        if not user_id:
+            return Previlege.NONE.value
+        if asset.owner_id == user_id:
+            return Previlege.OWNER.value
+        if not asset.copyright_level:  # no copyright
+            return Previlege.APPROVED.value
+        if asset.copyright_level == 3:
+            return Previlege.NONE.value
+        usage = (
+            DBSession.query(AssetUsageModel)
+            .filter(AssetUsageModel.asset_id == asset.id)
+            .filter(AssetUsageModel.user_id == user_id)
+            .first()
+        )
+        if usage:
+            if not usage.approved and asset.copyright_level == 2:
+                return Previlege.PENDING_APPROVAL.value
+            else:
+                return Previlege.APPROVED.value
+        else:
+            return Previlege.REQUIRE_APPROVAL.value
