@@ -102,27 +102,26 @@ class AssetService:
         total_count = query.count()
 
         if search_assets.sort:
-            for sort_option in search_assets.sort:
-                field, direction = sort_option.rsplit("_", 1)
-                if field == "ASSET_TYPE_ID":
-                    sort_field = AssetModel.asset_type_id
-                elif field == "OWNER_ID":
-                    sort_field = AssetModel.owner_id
-                elif field == "NAME":
-                    sort_field = AssetModel.name
-                elif field == "CREATED_ON":
-                    sort_field = AssetModel.created_on
-                elif field == "SIZE":
-                    sort_field = AssetModel.size
-                elif field == "COPYRIGHT_LEVEL": 
-                    sort_field = AssetModel.copyright_level
-                else:
-                    continue
+            sort_option = search_assets.sort[-1]
+            field, direction = sort_option.rsplit("_", 1)
+            if field == "ASSET_TYPE_ID":
+                sort_field = AssetModel.asset_type_id
+            elif field == "OWNER_ID":
+                sort_field = AssetModel.owner_id
+            elif field == "NAME":
+                sort_field = AssetModel.name
+            elif field == "CREATED_ON":
+                sort_field = AssetModel.created_on
+            elif field == "SIZE":
+                sort_field = AssetModel.size
+            elif field == "COPYRIGHT_LEVEL": 
+                sort_field = AssetModel.copyright_level
 
-                if direction == "ASC":
-                    query = query.order_by(sort_field.asc())
-                elif direction == "DESC":
-                    query = query.order_by(sort_field.desc())
+            if direction == "ASC":
+                query = query.order_by(sort_field.asc())
+            elif direction == "DESC":
+                query = query.order_by(sort_field.desc())
+            
         if search_assets.page and search_assets.limit:
             query = query.limit(search_assets.limit).offset(
                 (search_assets.page - 1) * search_assets.limit
