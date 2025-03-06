@@ -292,7 +292,7 @@ type_defs = gql("""
         tags: [String]
         copyrightLevel: Int
         permissions: [Permission]
-        privilege: String
+        privilege: Int
         fileLocation: String
     }     
 
