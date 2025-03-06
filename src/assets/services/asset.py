@@ -114,6 +114,8 @@ class AssetService:
                     sort_field = AssetModel.created_on
                 elif field == "SIZE":
                     sort_field = AssetModel.size
+                elif field == "COPYRIGHT_LEVEL": 
+                    sort_field = AssetModel.copyright_level
                 else:
                     continue
 
