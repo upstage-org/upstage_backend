@@ -595,7 +595,10 @@ class StageService:
 
     def get_foyer_stage_list(self):
         return [
-            convert_keys_to_camel_case(stage.to_dict())
+            {
+                **convert_keys_to_camel_case(stage.to_dict()),
+                "cover": stage.cover,
+            }
             for stage in DBSession.query(StageModel)
             .filter(StageModel.attributes.any(name="visibility", description="true"))
             .all()
