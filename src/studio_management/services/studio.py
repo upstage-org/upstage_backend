@@ -317,12 +317,6 @@ class StudioService:
                 )
             local_db_session.add(asset_usage)
             local_db_session.flush()
-            studio_url = f"{HOSTNAME}/stages"
-            await send(
-                [asset.owner.email],
-                f"Permission requested for media {asset.name}",
-                permission_response_for_media(user, asset, note, False, studio_url),
-            )
         return {"success": True}
 
     async def confirm_permission(self, user: UserModel, id: int, approved: bool):
