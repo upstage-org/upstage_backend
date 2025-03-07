@@ -348,7 +348,7 @@ class StudioService:
 
             local_db_session.commit()
             local_db_session.flush()
-            studio_url = f"{UPSTAGE_FRONTEND_URL}/stages"
+            studio_url = f"{HOSTNAME}/stages"
             await send(
                 [asset_usage.user.email],
                 f"Permission approved for media {asset_usage.asset.name}"
