@@ -75,7 +75,7 @@ class UserService:
             send([user.email], f"Welcome to UpStage!", user_registration(user))
         )
         admin_emails = SUPPORT_EMAILS
-        approval_url = f"{HOSTNAME}/admin/player?sortByCreated=true"
+        approval_url = f"https://{HOSTNAME}/admin/player?sortByCreated=true"
         asyncio.create_task(
             send(
                 admin_emails,
