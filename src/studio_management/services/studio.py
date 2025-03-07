@@ -188,8 +188,8 @@ class StudioService:
         if input.displayName:
             user.display_name = input.displayName
         if input.active != user.active:
-            user.active = input.active
             await self._handle_active_status(user, input.active)
+            user.active = input.active
         if input.firebasePushnotId:
             user.firebase_pushnot_id = input.firebasePushnotId
         if input.uploadLimit:
