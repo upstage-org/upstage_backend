@@ -41,7 +41,7 @@ def upgrade() -> None:
 
         if not result:
             op.bulk_insert(
-                asset_type_table, [{"name": asset_type, "file_location": ""}]
+                asset_type_table, [{"name": asset_type, "file_location": asset_type}]
             )
 
 
