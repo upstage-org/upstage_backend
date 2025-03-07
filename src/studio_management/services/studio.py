@@ -1,6 +1,5 @@
 from datetime import datetime
 import os
-import sys
 from typing import List
 
 from sqlalchemy import and_, asc, desc, or_
@@ -8,11 +7,10 @@ from sqlalchemy import and_, asc, desc, or_
 from assets.db_models.asset_usage import AssetUsageModel
 from authentication.db_models.user_session import UserSessionModel
 from global_config import (
-    UPSTAGE_FRONTEND_URL,
+    HOSTNAME,
     DBSession,
     ScopedSession,
     convert_keys_to_camel_case,
-    camel_to_snake,
     decrypt,
     encrypt,
 )
@@ -299,27 +297,27 @@ class StudioService:
 
             if asset.copyright_level == 2:
                 asset_usage.approved = False
-                studio_url = f"{UPSTAGE_FRONTEND_URL}stages"
+                studio_url = f"{HOSTNAME}/stages"
                 await send(
                     [asset.owner.email],
                     f"Pending permission request for media {asset.name}",
                     request_permission_for_media(user, asset, note, studio_url),
                 )
                 await send(
-                    user.email,
+                    [user.email],
                     f"Waiting permission request approval/denial for media {asset.name}",
                     waiting_request_media_approve(user, asset),
                 )
             else:
                 asset_usage.approved = True
                 await send(
-                    user.email,
+                    [user.email],
                     f"{display_user(user)} was approved to use media: {asset.name}",
                     request_permission_acknowledgement(user, asset, note),
                 )
             local_db_session.add(asset_usage)
             local_db_session.flush()
-            studio_url = f"{UPSTAGE_FRONTEND_URL}/stages"
+            studio_url = f"{HOSTNAME}/stages"
             await send(
                 [asset.owner.email],
                 f"Permission requested for media {asset.name}",
