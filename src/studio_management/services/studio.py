@@ -349,8 +349,7 @@ class StudioService:
             else:
                 local_db_session.delete(asset_usage)
 
-            local_db_session.commit()
-            local_db_session.flush()
+
             studio_url = f"{HOSTNAME}/stages"
             asyncio.create_task(
                 send(
@@ -367,6 +366,7 @@ class StudioService:
                     ),
                 )
             )
+            local_db_session.flush()
             permissions = (
                 DBSession.query(AssetUsageModel)
                 .filter(AssetUsageModel.asset_id == asset_usage.asset_id)
