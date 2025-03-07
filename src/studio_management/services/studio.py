@@ -300,7 +300,7 @@ class StudioService:
 
             if asset.copyright_level == 2:
                 asset_usage.approved = False
-                studio_url = f"https://{HOSTNAME}/stages"
+                studio_url = f"https://{HOSTNAME}/media"
                 asyncio.create_task(
                     send(
                         [asset.owner.email],
@@ -350,7 +350,7 @@ class StudioService:
                 local_db_session.delete(asset_usage)
 
 
-            studio_url = f"https://{HOSTNAME}/stages"
+            studio_url = f"https://{HOSTNAME}/media"
             asyncio.create_task(
                 send(
                     [asset_usage.user.email],
