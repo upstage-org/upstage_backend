@@ -21,7 +21,10 @@ async def search_assets(_, info, **kwargs):
 @query.field("media")
 @authenticated(allowed_roles=[SUPER_ADMIN, ADMIN, PLAYER])
 async def search_assets(_, info, **kwargs):
-    return AssetService().search_assets(UserModel(**info.context["request"].state.current_user),MediaTableInput(**kwargs["input"]))
+    return AssetService().search_assets(
+        UserModel(**info.context["request"].state.current_user),
+        MediaTableInput(**kwargs["input"]),
+    )
 
 
 @query.field("mediaTypes")

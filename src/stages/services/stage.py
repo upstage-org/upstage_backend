@@ -576,7 +576,6 @@ class StageService:
                     return "editor"
                 return "audience"
         return "audience"
-        
 
     def resolve_performances(self, stage_id: int):
         return (

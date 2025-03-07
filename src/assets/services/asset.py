@@ -112,14 +112,14 @@ class AssetService:
                 sort_field = AssetModel.created_on
             elif field == "SIZE":
                 sort_field = AssetModel.size
-            elif field == "COPYRIGHT_LEVEL": 
+            elif field == "COPYRIGHT_LEVEL":
                 sort_field = AssetModel.copyright_level
 
             if direction == "ASC":
                 query = query.order_by(sort_field.asc())
             elif direction == "DESC":
                 query = query.order_by(sort_field.desc())
-            
+
         if search_assets.page and search_assets.limit:
             query = query.limit(search_assets.limit).offset(
                 (search_assets.page - 1) * search_assets.limit
@@ -135,6 +135,10 @@ class AssetService:
                     "stages": [
                         convert_keys_to_camel_case(item.stage.to_dict())
                         for item in asset.stages
+                    ],
+                    "permissions": [
+                        convert_keys_to_camel_case(permission.to_dict())
+                        for permission in self.resolve_permissions(asset.id)
                     ],
                 }
                 for asset in assets
@@ -471,7 +475,7 @@ class AssetService:
         timestamp = int(time.mktime(asset.updated_on.timetuple()))
         return asset.file_location + "?t=" + str(timestamp)
 
-    def resolve_permissions(self, user_id: int, asset: AssetModel):
+    def resolve_permission(self, user_id: int, asset: AssetModel):
         if not user_id:
             return "none"
         if asset.owner_id == user_id:
@@ -495,7 +499,7 @@ class AssetService:
         src = self.resolve_src(asset)
         sign = self.resolve_sign(asset.owner, asset)
         user_id = user.id if user else asset.owner_id
-        permission = self.resolve_permissions(user_id, asset)
+        permission = self.resolve_permission(user_id, asset)
         return {
             **convert_keys_to_camel_case(asset.to_dict()),
             "src": src,
@@ -543,7 +547,6 @@ class AssetService:
                         voices.append(Voice(avatar=media, voice=av))
         return [convert_keys_to_camel_case(voice) for voice in voices]
 
-
     def resolve_privilege(self, user_id: int, asset: AssetModel):
         if not user_id:
             return Previlege.NONE.value
@@ -566,3 +569,11 @@ class AssetService:
                 return Previlege.APPROVED.value
         else:
             return Previlege.REQUIRE_APPROVAL.value
+
+    def resolve_permissions(self, asset_id: int):
+        return (
+            DBSession.query(AssetUsageModel)
+            .filter(AssetUsageModel.asset_id == asset_id)
+            .order_by(AssetUsageModel.created_on.desc())
+            .all()
+        )
