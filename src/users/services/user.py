@@ -137,7 +137,7 @@ class UserService:
             local_db_session.add(OneTimeTOTPModel(user_id=user.id, code=otp))
             local_db_session.flush()
             await send(
-                [email],
+                [user.email],
                 f"Password reset for account {user.username}",
                 password_reset(user, otp),
             )
