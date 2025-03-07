@@ -1,3 +1,4 @@
+import asyncio
 from datetime import datetime
 import os
 from typing import List
@@ -199,10 +200,12 @@ class StudioService:
 
     async def _handle_active_status(self, user: UserModel, value):
         if value and not user.active and not user.deactivated_on:
-            await send(
-                [user.email],
-                f"Registration approved for user {user.username}",
-                user_approved(user),
+            asyncio.create_task(
+                send(
+                    [user.email],
+                    f"Registration approved for user {user.username}",
+                    user_approved(user),
+                )
             )
         if not value and user.active:
             user.deactivated_on = datetime.now()
@@ -298,22 +301,28 @@ class StudioService:
             if asset.copyright_level == 2:
                 asset_usage.approved = False
                 studio_url = f"{HOSTNAME}/stages"
-                await send(
-                    [asset.owner.email],
-                    f"Pending permission request for media {asset.name}",
-                    request_permission_for_media(user, asset, note, studio_url),
+                asyncio.create_task(
+                    send(
+                        [asset.owner.email],
+                        f"Pending permission request for media {asset.name}",
+                        request_permission_for_media(user, asset, note, studio_url),
+                    )
                 )
-                await send(
-                    [user.email],
-                    f"Waiting permission request approval/denial for media {asset.name}",
-                    waiting_request_media_approve(user, asset),
+                asyncio.create_task(
+                    send(
+                        [user.email],
+                        f"Waiting permission request approval/denial for media {asset.name}",
+                        waiting_request_media_approve(user, asset),
+                    )
                 )
             else:
                 asset_usage.approved = True
-                await send(
-                    [user.email],
-                    f"{display_user(user)} was approved to use media: {asset.name}",
-                    request_permission_acknowledgement(user, asset, note),
+                asyncio.create_task(
+                    send(
+                        [user.email],
+                        f"{display_user(user)} was approved to use media: {asset.name}",
+                        request_permission_acknowledgement(user, asset, note),
+                    )
                 )
             local_db_session.add(asset_usage)
             local_db_session.flush()
@@ -343,18 +352,20 @@ class StudioService:
             local_db_session.commit()
             local_db_session.flush()
             studio_url = f"{HOSTNAME}/stages"
-            await send(
-                [asset_usage.user.email],
-                f"Permission approved for media {asset_usage.asset.name}"
-                if approved
-                else f"Permission rejected for media {asset_usage.asset.name}",
-                permission_response_for_media(
-                    asset_usage.user,
-                    asset_usage.asset,
-                    asset_usage.note,
-                    approved,
-                    studio_url,
-                ),
+            asyncio.create_task(
+                send(
+                    [asset_usage.user.email],
+                    f"Permission approved for media {asset_usage.asset.name}"
+                    if approved
+                    else f"Permission rejected for media {asset_usage.asset.name}",
+                    permission_response_for_media(
+                        asset_usage.user,
+                        asset_usage.asset,
+                        asset_usage.note,
+                        approved,
+                        studio_url,
+                    ),
+                )
             )
             permissions = (
                 DBSession.query(AssetUsageModel)
@@ -364,7 +375,10 @@ class StudioService:
 
             return convert_keys_to_camel_case(
                 {
-                    "permissions": [permission.to_dict() for permission in permissions],
+                    "permissions": [
+                        convert_keys_to_camel_case(permission.to_dict())
+                        for permission in permissions
+                    ],
                     "success": True,
                 },
             )
