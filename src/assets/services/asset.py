@@ -505,6 +505,10 @@ class AssetService:
             "src": src,
             "sign": sign,
             "permission": permission,
+            "permissions": [
+                convert_keys_to_camel_case(permission.to_dict())
+                for permission in self.resolve_permissions(asset.id)
+            ],
         }
 
     def get_media_types(self):
