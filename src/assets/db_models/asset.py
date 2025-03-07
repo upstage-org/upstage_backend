@@ -13,6 +13,7 @@ from sqlalchemy import (
 from sqlalchemy.orm import relationship
 from global_config import BaseModel
 
+
 class Previlege(Enum):
     NONE = 0
     OWNER = 1
