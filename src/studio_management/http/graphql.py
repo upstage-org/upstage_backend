@@ -431,6 +431,7 @@ type_defs = gql("""
     type ConfirmPermissionResponse {
         success: Boolean
         permissions: [Permission]
+        message: String
     }
                 
     type Size {
