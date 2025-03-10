@@ -8,7 +8,7 @@ class VoiceInput(BaseModel):
     voice: Optional[str] = None
     variant: str
     pitch: conint(ge=0, le=100)
-    speed: conint(ge=0, le=300)
+    speed: confloat(ge=0)
     amplitude: conint(ge=0, le=100)
 
 
