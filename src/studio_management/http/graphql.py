@@ -603,7 +603,7 @@ type_defs = gql("""
         calcSizes: Size
         confirmPermission(id: ID!, approved: Boolean): ConfirmPermissionResponse
         requestPermission(assetId: ID!, note: String): ConfirmPermissionResponse
-        quickAssignMutation(stageId: ID!, assetId: ID!): CommonResponse,
+        quickAssignMutation(stageIds: [ID]!, assetId: ID!): CommonResponse,
         
         createUser(inbound: CreateUserInput!): CreateUserPayload
         requestPasswordReset(email: String!): CommonResponse

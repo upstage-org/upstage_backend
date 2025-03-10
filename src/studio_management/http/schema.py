@@ -103,9 +103,9 @@ async def confirm_permission(_, info, id: int, approved: Optional[bool] = False)
 
 @mutation.field("quickAssignMutation")
 @authenticated()
-def quick_assign_mutation(_, info, stageId: int, assetId: int):
+def quick_assign_mutation(_, info, stageIds: list[int], assetId: int):
     return StudioService().quick_assign_mutation(
-        UserModel(**info.context["request"].state.current_user), stageId, assetId
+        UserModel(**info.context["request"].state.current_user), stageIds, assetId
     )
 
 
