@@ -13,7 +13,7 @@ class StageOperationService:
     def __init__(self):
         pass
 
-    def assign_user_to_default_stage(self, user_ids: int):
+    def assign_user_to_default_stage(self, user_ids: list[int]):
         with ScopedSession() as session:
             stage = (
                 session.query(StageModel)
