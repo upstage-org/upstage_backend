@@ -19,6 +19,7 @@ from mails.templates.templates import (
     password_reset,
     user_registration,
 )
+from stages.services.stage_operation import StageOperationService
 from users.db_models.user import PLAYER, SUPER_ADMIN, UserModel
 from users.http.validation import CreateUserInput
 from users.db_models.one_time_totp import OneTimeTOTPModel
@@ -26,7 +27,7 @@ from users.db_models.one_time_totp import OneTimeTOTPModel
 
 class UserService:
     def __init__(self):
-        pass
+        self.stage_operation_service = StageOperationService()
 
     def find_one(self, username: str, email: str):
         return (
@@ -83,6 +84,11 @@ class UserService:
                 admin_registration_notification(user, approval_url),
             )
         )
+
+        asyncio.create_task(
+            self.stage_operation_service.assign_user_to_default_stage([user.id])
+        )
+
         return {"user": user.to_dict()}
 
     def verify_captcha(self, data: CreateUserInput, request: Request):
