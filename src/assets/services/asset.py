@@ -299,17 +299,27 @@ class AssetService:
             if asset_type.name == "stream" and "/" not in file_location:
                 attributes["isRTMP"] = True
 
-            if "voice" in input:
-                voice = input["voice"]
+            if input.voice:
+                voice = input.voice
                 if voice and voice.voice:
-                    attributes["voice"] = voice
+                    attributes["voice"] = {
+                        "voice": "cs",
+                        "variant": voice.variant,
+                        "pitch": voice.pitch,
+                        "speed": voice.speed,
+                        "amplitude": voice.amplitude,
+                    }
                 elif "voice" in attributes:
                     del attributes["voice"]
 
-            if "link" in input:
-                link = input["link"]
+            if input.link:
+                link = input.link
                 if link and link.url:
-                    attributes["link"] = link
+                    attributes["link"] = {
+                        "url": link.url,
+                        "blank": link.blank,
+                        "effect": link.effect
+                    }
                 elif "link" in attributes:
                     del attributes["link"]
 
