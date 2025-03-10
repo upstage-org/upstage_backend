@@ -303,7 +303,7 @@ class AssetService:
                 voice = input.voice
                 if voice and voice.voice:
                     attributes["voice"] = {
-                        "voice": "cs",
+                        "voice": voice.voice,
                         "variant": voice.variant,
                         "pitch": voice.pitch,
                         "speed": voice.speed,
