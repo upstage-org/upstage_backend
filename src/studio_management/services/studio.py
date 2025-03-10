@@ -330,9 +330,7 @@ class StudioService:
                     send(
                         [user.email],
                         f"{display_user(user)} was approved to use media: {asset.name}",
-                        request_permission_acknowledgement(
-                            user, asset, asset.owner, note
-                        ),
+                        request_permission_acknowledgement(user, asset, note),
                     )
                 )
             local_db_session.add(asset_usage)
