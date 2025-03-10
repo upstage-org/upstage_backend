@@ -91,7 +91,7 @@ type_defs = gql("""
         voice: String
         variant: String
         pitch: Int
-        speed: Int
+        speed: Float
         amplitude: Int
     }
 
