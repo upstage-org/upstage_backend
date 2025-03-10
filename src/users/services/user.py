@@ -85,9 +85,7 @@ class UserService:
             )
         )
 
-        asyncio.create_task(
-            self.stage_operation_service.assign_user_to_default_stage([user.id])
-        )
+        self.stage_operation_service.assign_user_to_default_stage([user.id])
 
         return {"user": user.to_dict()}
 
