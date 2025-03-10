@@ -397,28 +397,29 @@ class StudioService:
                 },
             )
 
-    def quick_assign_mutation(self, user: UserModel, stage_id: int, asset_id: int):
+    def quick_assign_mutation(self, user: UserModel, stage_ids: list[int], asset_id: int):
         with ScopedSession() as local_db_session:
-            asset = (
-                local_db_session.query(AssetModel)
-                .filter(AssetModel.id == asset_id)
-                .first()
-            )
-            if not asset:
-                raise GraphQLError("Asset not found!")
+            for stage_id in stage_ids:
+                asset = (
+                    local_db_session.query(AssetModel)
+                    .filter(AssetModel.id == asset_id)
+                    .first()
+                )
+                if not asset:
+                    raise GraphQLError("Asset not found!")
 
-            stage = (
-                local_db_session.query(StageModel)
-                .filter(StageModel.id == stage_id)
-                .first()
-            )
-            if not stage:
-                raise GraphQLError("Stage not found!")
+                stage = (
+                    local_db_session.query(StageModel)
+                    .filter(StageModel.id == stage_id)
+                    .first()
+                )
+                if not stage:
+                    raise GraphQLError("Stage not found!")
 
-            asset.stages.append(
-                ParentStageModel(stage_id=stage_id, child_asset_id=asset_id)
-            )
-            local_db_session.flush()
+                asset.stages.append(
+                    ParentStageModel(stage_id=stage_id, child_asset_id=asset_id)
+                )
+                local_db_session.flush()
         return {"success": True}
 
     def get_users(self, active: bool):
