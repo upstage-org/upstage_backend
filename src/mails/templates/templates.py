@@ -131,8 +131,8 @@ Hi <b>{display_user(media.owner)}</b>,
 <br>
 <br>
 Additional notes: {note}
-Please acknowledge that this video was made by {display_user(owner)}.
 <br>
+Please acknowledge that this video was made by {display_user(owner)}.
 <br>
 {footer}    
 """
