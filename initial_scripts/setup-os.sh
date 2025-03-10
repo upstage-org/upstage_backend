@@ -10,7 +10,7 @@ yes | ufw allow ssh
 yes | ufw enable
 
 # Add Docker's official GPG key and other tools:
-apt -y install ca-certificates curl logrotate
+apt -y install ca-certificates curl logrotate wget unzip
 
 cp initial_scripts/logrotate_for_docker.commands /etc/logrotate.d/docker
 logrotate -d /etc/logrotate.d/docker
