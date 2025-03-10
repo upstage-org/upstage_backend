@@ -99,7 +99,10 @@ def duplicate_stage(_, info, id: int, name: str):
 @mutation.field("assignMedia")
 @authenticated(allowed_roles=[SUPER_ADMIN, ADMIN, PLAYER])
 def assign_media(_, info, input: AssignMediaInput):
-    return MediaService().assign_media(AssignMediaInput(**input))
+    return MediaService().assign_media(
+        AssignMediaInput(**input),
+        UserModel(**info.context["request"].state.current_user),
+    )
 
 
 @mutation.field("uploadMedia")
