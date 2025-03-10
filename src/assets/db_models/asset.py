@@ -50,11 +50,11 @@ class AssetModel(BaseModel):
 
 
 class AvatarVoice:
-    voice: String
-    variant: String
-    pitch: Integer
-    speed: Integer
-    amplitude: Integer
+    voice: str
+    variant: str
+    pitch: int
+    speed: float
+    amplitude: int
 
 
 class Voice:
