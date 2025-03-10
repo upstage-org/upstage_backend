@@ -29,7 +29,7 @@ class StageOperationService:
 
             for uid in user_ids:
                 if uid not in desc[0]:
-                    desc[0].append(uid)
+                    desc[0].append(str(uid))
 
                 # Save the updated list back as a JSON string
             playerAccess.description = json.dumps(desc)
