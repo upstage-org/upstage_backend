@@ -25,6 +25,7 @@ from mails.templates.templates import (
     waiting_request_media_approve,
 )
 from performance_config.db_models.performance import PerformanceModel
+from stages.services.stage_operation import StageOperationService
 from stages.db_models.parent_stage import ParentStageModel
 from stages.db_models.stage import StageModel
 from assets.db_models.asset import AssetModel
@@ -44,6 +45,7 @@ storagePath = "../../uploads"
 
 class StudioService:
     def __init__(self):
+        self.stage_operation_service = StageOperationService()
         pass
 
     def admin_players(self, params):
@@ -103,6 +105,13 @@ class StudioService:
             .filter(UserModel.email.in_([user["email"] for user in users]))
             .all()
         )
+
+        asyncio.create_task(
+            self.stage_operation_service.assign_user_to_default_stage(
+                [user.id for user in users]
+            )
+        )
+
         return convert_keys_to_camel_case({"users": [user.to_dict() for user in users]})
 
     def validate_user_information(self, users: List[BatchUserInput], session):
@@ -321,7 +330,9 @@ class StudioService:
                     send(
                         [user.email],
                         f"{display_user(user)} was approved to use media: {asset.name}",
-                        request_permission_acknowledgement(user, asset, note),
+                        request_permission_acknowledgement(
+                            user, asset, asset.owner, note
+                        ),
                     )
                 )
             local_db_session.add(asset_usage)
@@ -348,7 +359,6 @@ class StudioService:
                 asset_usage.seen = True
             else:
                 local_db_session.delete(asset_usage)
-
 
             studio_url = f"https://{HOSTNAME}/media"
             asyncio.create_task(
