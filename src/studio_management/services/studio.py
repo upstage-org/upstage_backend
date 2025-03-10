@@ -63,14 +63,22 @@ class StudioService:
 
         if "sort" in params:
             for sort_param in params["sort"]:
-                if sort_param == "USERNAME_ASC":
-                    query = query.order_by(asc(UserModel.username))
-                elif sort_param == "USERNAME_DESC":
-                    query = query.order_by(desc(UserModel.username))
-                elif sort_param == "CREATED_ON_ASC":
-                    query = query.order_by(asc(UserModel.created_on))
-                elif sort_param == "CREATED_ON_DESC":
-                    query = query.order_by(desc(UserModel.created_on))
+                field, direction = sort_param.rsplit("_", 1)
+                if field == "USERNAME":
+                    sort_field = UserModel.username
+                elif field == "ROLE":
+                    sort_field = UserModel.role
+                elif field == "CREATED_ON":
+                    sort_field = UserModel.created_on
+                elif field == "EMAIL":
+                    sort_field = UserModel.email
+                elif field == "LAST_LOGIN":
+                    sort_field = UserModel.last_login
+    
+                if direction == "ASC":
+                    query = query.order_by(sort_field.asc())
+                elif direction == "DESC":
+                    query = query.order_by(sort_field.desc())
 
         total_count = query.count()
 
