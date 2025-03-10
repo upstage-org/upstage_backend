@@ -1,5 +1,8 @@
 #!/bin/bash
 
+# This file is generated. Do not change the generated copy. It will be
+# overwritten.
+
 set -a
 
 export POSTGRES_PASSWORD=REPLACE_POSTGRES_PASSWORD
