@@ -75,7 +75,7 @@ class UserService:
             send([user.email], f"Welcome to UpStage!", user_registration(user))
         )
         admin_emails = SUPPORT_EMAILS
-        approval_url = f"{HOSTNAME}/admin/player?sortByCreated=true"
+        approval_url = f"https://{HOSTNAME}/admin/player?sortByCreated=true"
         asyncio.create_task(
             send(
                 admin_emails,
@@ -136,10 +136,13 @@ class UserService:
             local_db_session.flush()
             local_db_session.add(OneTimeTOTPModel(user_id=user.id, code=otp))
             local_db_session.flush()
-            await send(
-                [email],
-                f"Password reset for account {user.username}",
-                password_reset(user, otp),
+
+            asyncio.create_task(
+                send(
+                    [user.email],
+                    f"Password reset for account {user.username}",
+                    password_reset(user, otp),
+                )
             )
 
             return {

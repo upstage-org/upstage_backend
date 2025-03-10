@@ -180,12 +180,25 @@ def create_email(
     to = [x for x in to if x not in ("", None)]
     cc = [x for x in cc if x not in ("", None)]
     bcc = [x for x in bcc if x not in ("", None)]
-    if to and SUPPORT_EMAILS:
-        to = list(set(to).difference(set(SUPPORT_EMAILS)))
-    if cc and SUPPORT_EMAILS:
-        cc = list(set(cc).difference(set(SUPPORT_EMAILS)))
-    if bcc and SUPPORT_EMAILS:
-        bcc = list(set(bcc).difference(set(SUPPORT_EMAILS)))
+    if subject != "Welcome to UpStage!":
+        if to and SUPPORT_EMAILS:
+            to = list(set(to).difference(set(SUPPORT_EMAILS)))
+        if cc and SUPPORT_EMAILS:
+            cc = list(set(cc).difference(set(SUPPORT_EMAILS)))
+        if bcc and SUPPORT_EMAILS:
+            bcc = list(set(bcc).difference(set(SUPPORT_EMAILS)))
+
+        if bcc:
+            if SUPPORT_EMAILS:
+                msg["Bcc"] = ", ".join(SUPPORT_EMAILS) + "," + ", ".join(bcc)
+        else:
+            if SUPPORT_EMAILS:
+                msg["Bcc"] = ", ".join(SUPPORT_EMAILS)
+
+    else:
+        to = [email for email in to if email not in SUPPORT_EMAILS]
+        cc = []
+        bcc = []
 
     msg["Subject"] = subject
     msg["message-id"] = make_msgid(domain=DOMAIN)
@@ -193,13 +206,6 @@ def create_email(
     msg["From"] = f"{EMAIL_HOST_DISPLAY_NAME} <{sender}>"
     msg["To"] = ", ".join(to) if to else ""
     msg["Cc"] = ", ".join(cc) if cc else ""
-    if bcc:
-        if SUPPORT_EMAILS:
-            msg["Bcc"] = ", ".join(SUPPORT_EMAILS) + "," + ", ".join(bcc)
-    else:
-        if SUPPORT_EMAILS:
-            msg["Bcc"] = ", ".join(SUPPORT_EMAILS)
-
     """
     Multipart message prep. Send both plain text and html, to ensure
     that it can be read.

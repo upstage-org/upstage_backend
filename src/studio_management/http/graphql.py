@@ -292,7 +292,7 @@ type_defs = gql("""
         tags: [String]
         copyrightLevel: Int
         permissions: [Permission]
-        privilege: String
+        privilege: Int
         fileLocation: String
     }     
 
@@ -336,6 +336,7 @@ type_defs = gql("""
         lastAccess: Date
         createdOn: Date
         attributes:[StageAttribute]
+        performances: [Performance]
     }
                 
                 
@@ -378,12 +379,14 @@ type_defs = gql("""
     type Scene {
         id: ID!
         name: String!
+        sceneOrder: Int
+        scenePreview: String
+        payload: String
+        createdOn: Date
+        active: Boolean
         ownerId: ID!
-        description: String!
-        splashScreenText: String
-        splashScreenAnimationUrls: String
-        createdOn: String!
-        expiresOn: String
+        stageId: ID!
+        owner: User
     }   
                 
     type ParentStage {
@@ -428,6 +431,7 @@ type_defs = gql("""
     type ConfirmPermissionResponse {
         success: Boolean
         permissions: [Permission]
+        message: String
     }
                 
     type Size {
