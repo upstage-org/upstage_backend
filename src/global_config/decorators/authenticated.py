@@ -20,6 +20,8 @@ def authenticated(allowed_roles=None):
     def decorator(func):
         @wraps(func)
         def wrapper(*args, **kwargs):
+            from authentication.services.auth import AuthenticationService
+
             info = args[1]
             request: Request = info.context["request"]
             authorization: str = request.headers.get("Authorization")
@@ -29,7 +31,14 @@ def authenticated(allowed_roles=None):
             token = authorization.split(" ")[1]
             try:
                 payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
-                current_user = UserService().find_by_id(payload.get("user_id"))
+                user_id = payload.get("user_id")
+                session = AuthenticationService().get_session(token, user_id)
+
+                if not session:
+                    raise GraphQLError("Authenticated Failed")
+
+                current_user = UserService().find_by_id(user_id)
+
                 if not current_user:
                     raise GraphQLError("Authenticated Failed")
 

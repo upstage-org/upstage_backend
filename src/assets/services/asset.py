@@ -1,11 +1,9 @@
-from base64 import b64decode
 from datetime import datetime, timedelta
 import hashlib
 import json
 from operator import or_
 import os
 from typing import Optional
-import uuid
 import time
 from graphql import GraphQLError
 
@@ -17,7 +15,7 @@ from global_config import (
     STREAM_KEY,
     convert_keys_to_camel_case,
 )
-from assets.db_models.asset import AssetModel, AvatarVoice, Voice
+from assets.db_models.asset import AssetModel, AvatarVoice, Voice, Previlege
 from assets.db_models.asset_license import AssetLicenseModel
 from assets.db_models.asset_type import AssetTypeModel
 from assets.db_models.asset_usage import AssetUsageModel
@@ -46,6 +44,7 @@ class AssetService:
             .join(AssetTypeModel)
             .join(UserModel)
             .outerjoin(AssetLicenseModel)
+            .filter(AssetModel.dormant.is_not(True))
         )
 
         if user.role not in [SUPER_ADMIN, ADMIN]:
@@ -61,9 +60,7 @@ class AssetService:
 
         return [self.resolve_fields(asset, user) for asset in assets]
 
-    def search_assets(self, search_assets: MediaTableInput):
-        total_count = DBSession.query(AssetModel).count()
-
+    def search_assets(self, user: UserModel, search_assets: MediaTableInput):
         query = (
             DBSession.query(AssetModel)
             .join(UserModel)
@@ -75,6 +72,10 @@ class AssetService:
             .outerjoin(StageModel, ParentStageModel.stage_id == AssetModel.id)
             .group_by(AssetModel.id)
         )
+
+        if user.role not in [SUPER_ADMIN, ADMIN]:
+            query = query.filter(AssetModel.dormant.is_not(True))
+
         if search_assets.name:
             query = query.filter(AssetModel.name.like(f"%{search_assets.name}%"))
         if search_assets.mediaTypes:
@@ -101,26 +102,29 @@ class AssetService:
                 )
             )
 
-        if search_assets.sort:
-            for sort_option in search_assets.sort:
-                field, direction = sort_option.rsplit("_", 1)
-                if field == "ASSET_TYPE_ID":
-                    sort_field = AssetModel.asset_type_id
-                elif field == "OWNER_ID":
-                    sort_field = AssetModel.owner_id
-                elif field == "NAME":
-                    sort_field = AssetModel.name
-                elif field == "CREATED_ON":
-                    sort_field = AssetModel.created_on
-                elif field == "SIZE":
-                    sort_field = AssetModel.size
-                else:
-                    continue
+        total_count = query.count()
 
-                if direction == "ASC":
-                    query = query.order_by(sort_field.asc())
-                elif direction == "DESC":
-                    query = query.order_by(sort_field.desc())
+        if search_assets.sort:
+            sort_option = search_assets.sort[-1]
+            field, direction = sort_option.rsplit("_", 1)
+            if field == "ASSET_TYPE_ID":
+                sort_field = AssetModel.asset_type_id
+            elif field == "OWNER_ID":
+                sort_field = AssetModel.owner_id
+            elif field == "NAME":
+                sort_field = AssetModel.name
+            elif field == "CREATED_ON":
+                sort_field = AssetModel.created_on
+            elif field == "SIZE":
+                sort_field = AssetModel.size
+            elif field == "COPYRIGHT_LEVEL":
+                sort_field = AssetModel.copyright_level
+
+            if direction == "ASC":
+                query = query.order_by(sort_field.asc())
+            elif direction == "DESC":
+                query = query.order_by(sort_field.desc())
+
         if search_assets.page and search_assets.limit:
             query = query.limit(search_assets.limit).offset(
                 (search_assets.page - 1) * search_assets.limit
@@ -132,9 +136,14 @@ class AssetService:
             "edges": [
                 {
                     **convert_keys_to_camel_case(asset.to_dict()),
+                    "privilege": self.resolve_privilege(user.id, asset),
                     "stages": [
                         convert_keys_to_camel_case(item.stage.to_dict())
                         for item in asset.stages
+                    ],
+                    "permissions": [
+                        convert_keys_to_camel_case(permission.to_dict())
+                        for permission in self.resolve_permissions(asset.id)
                     ],
                 }
                 for asset in assets
@@ -289,29 +298,42 @@ class AssetService:
                 asset.size += size
 
             attributes["multi"] = True if len(urls) > 1 else False
-            attributes["frames"] = attributes["frames"] if len(urls) > 0 else []
+            attributes["frames"] = attributes["frames"] if len(urls) > 1 else []
             attributes["w"] = input.w
             attributes["h"] = input.h
             if asset_type.name == "stream" and "/" not in file_location:
                 attributes["isRTMP"] = True
 
-            if "voice" in input:
-                voice = input["voice"]
+            if input.voice:
+                voice = input.voice
                 if voice and voice.voice:
-                    attributes["voice"] = voice
+                    attributes["voice"] = {
+                        "voice": voice.voice,
+                        "variant": voice.variant,
+                        "pitch": voice.pitch,
+                        "speed": voice.speed,
+                        "amplitude": voice.amplitude,
+                    }
                 elif "voice" in attributes:
                     del attributes["voice"]
 
-            if "link" in input:
-                link = input["link"]
+            if input.link:
+                link = input.link
                 if link and link.url:
-                    attributes["link"] = link
+                    attributes["link"] = {
+                        "url": link.url,
+                        "blank": link.blank,
+                        "effect": link.effect
+                    }
                 elif "link" in attributes:
                     del attributes["link"]
 
             attributes["note"] = input.note
             asset.description = json.dumps(attributes)
             local_db_session.flush()
+        if not len(input.stageIds):
+            asset.stages.delete()
+
         if len(input.stageIds):
             asset.stages.delete()
             for id in input.stageIds:
@@ -468,7 +490,7 @@ class AssetService:
         timestamp = int(time.mktime(asset.updated_on.timetuple()))
         return asset.file_location + "?t=" + str(timestamp)
 
-    def resolve_permissions(self, user_id: int, asset: AssetModel):
+    def resolve_permission(self, user_id: int, asset: AssetModel):
         if not user_id:
             return "none"
         if asset.owner_id == user_id:
@@ -492,24 +514,30 @@ class AssetService:
         src = self.resolve_src(asset)
         sign = self.resolve_sign(asset.owner, asset)
         user_id = user.id if user else asset.owner_id
-        permission = self.resolve_permissions(user_id, asset)
+        permission = self.resolve_permission(user_id, asset)
         return {
             **convert_keys_to_camel_case(asset.to_dict()),
             "src": src,
             "sign": sign,
             "permission": permission,
+            "permissions": [
+                convert_keys_to_camel_case(permission.to_dict())
+                for permission in self.resolve_permissions(asset.id)
+            ],
         }
 
     def get_media_types(self):
         return [
             convert_keys_to_camel_case(type.to_dict())
-            for type in DBSession.query(AssetTypeModel).all()
+            for type in DBSession.query(AssetTypeModel)
+            .order_by(AssetTypeModel.name.asc())
+            .all()
         ]
 
     def get_tags(self):
         return [
             convert_keys_to_camel_case(tag.to_dict())
-            for tag in DBSession.query(TagModel).all()
+            for tag in DBSession.query(TagModel).order_by(TagModel.name.asc()).all()
         ]
 
     def get_voices(self):
@@ -537,3 +565,34 @@ class AssetService:
                                     setattr(av, key, 50)
                         voices.append(Voice(avatar=media, voice=av))
         return [convert_keys_to_camel_case(voice) for voice in voices]
+
+    def resolve_privilege(self, user_id: int, asset: AssetModel):
+        if not user_id:
+            return Previlege.NONE.value
+        if asset.owner_id == user_id:
+            return Previlege.OWNER.value
+        if not asset.copyright_level:  # no copyright
+            return Previlege.APPROVED.value
+        if asset.copyright_level == 3:
+            return Previlege.NONE.value
+        usage = (
+            DBSession.query(AssetUsageModel)
+            .filter(AssetUsageModel.asset_id == asset.id)
+            .filter(AssetUsageModel.user_id == user_id)
+            .first()
+        )
+        if usage:
+            if not usage.approved and asset.copyright_level == 2:
+                return Previlege.PENDING_APPROVAL.value
+            else:
+                return Previlege.APPROVED.value
+        else:
+            return Previlege.REQUIRE_APPROVAL.value
+
+    def resolve_permissions(self, asset_id: int):
+        return (
+            DBSession.query(AssetUsageModel)
+            .filter(AssetUsageModel.asset_id == asset_id)
+            .order_by(AssetUsageModel.created_on.desc())
+            .all()
+        )

@@ -1,10 +1,12 @@
-# #!/bin/bash 
+#!/bin/bash 
 # Make sure the setup-os.sh has been executed before this script.
 export DEBIAN_FRONTEND=noninteractive
 
 # Running from the root dir...
 # Make sure this setting matches the setting in ./initial_scripts/environments/generate_environments_script.sh
+# load_env.py is generated on the svc machine and copied manually to the app machine.
 output_file="/app_code/src/global_config/load_env.py"
+jitsi_env_file="/streaming_files/config/envfile"
 
 read -p "
 Enter the domain name, including subdomain. Ex: streaming.myupstage.org: " dname
@@ -108,7 +110,7 @@ Note that on Digital Ocean, the third IP in the 'hostname -I' command: ${arr[2]}
 
            read -p "
 Please log into your service machine in another shell, and copy your load_env.py file generated on your service machine (most likely here: /root/upstage_backend/src/global_config ) to /app_code/src/global_config on this machine. Once this is done, press enter to continue: " ready
-           chmod 755 /app_code/src/global_config/load_env.py
+           chmod 755 $output_file
            sed -i "s/{APP_HOST}/$dname/g" $output_file
 
            read -p "
@@ -118,6 +120,17 @@ Run the contents of this script over on the service machine:
            cd ./app_containers && ./run_docker_compose.sh 
                 ;;
         3) sed "s/YOUR_DOMAIN_NAME/$dname/g" ./initial_scripts/nginx_templates/nginx_template_for_streaming_machines.conf >/etc/nginx/sites-available/$dname.conf
+           mkdir -p /streaming_files/config
+           mkdir -p /streaming_files/jitsi-meet-cfg/{web,transcripts,prosody/config,prosody/prosody-plugins-custom,jicofo,jvb,jigasi,jibri}
+	   export PUBLIC_URL=$dname/jitsi
+	   cd /streaming_files
+	   wget $(curl -s https://api.github.com/repos/jitsi/docker-jitsi-meet/releases/latest | grep 'zip' | cut -d\" -f4) -O latest_jitsi.zip
+	   unzip ./latest_jitsi.zip
+           cd $currdir
+	   cp ./initial_scripts/environments/jitsi_env_file_template.txt $jitsi_env_file
+	   ./initial_scripts/environments/generate_jitsi_passwords.sh $jitsi_env_file
+           cd ./streaming_containers && ./run_docker_compose.sh 
+
                 ;;
         *) echo "No match for machine type $machinetype, exiting."
                 ;;

@@ -14,6 +14,7 @@ from global_config import (
 )
 
 from assets.db_models.asset_usage import AssetUsageModel, NotificationType
+from stages.services.stage_operation import StageOperationService
 from users.db_models.user import ADMIN, SUPER_ADMIN
 from stages.http.validation import (
     DuplicateStageInput,
@@ -35,10 +36,9 @@ from assets.db_models.asset import AssetModel
 
 class StageService:
     def __init__(self):
-        pass
+        self.stage_operation_service = StageOperationService()
 
     def get_all_stages(self, user: UserModel, input: SearchStageInput):
-        count = DBSession.query(StageModel).count()
         query = (
             DBSession.query(StageModel)
             .outerjoin(UserModel)
@@ -60,6 +60,8 @@ class StageService:
                 )
             )
 
+        total_count = query.count()
+
         if input.sort:
             sort = input.sort
             for sort_option in sort:
@@ -74,6 +76,9 @@ class StageService:
                     query = query.order_by(sort_field.asc())
                 elif direction == "DESC":
                     query = query.order_by(sort_field.desc())
+
+        else:
+            query = query.order_by(StageModel.name.asc())
 
         limit = input.limit if input.limit else 10
         page = input.page if input.page else 1
@@ -91,12 +96,14 @@ class StageService:
                         "assets": [
                             asset.child_asset.to_dict() for asset in stage.assets
                         ],
-                        "permission": self.resolve_permission(user.id, stage),
+                        "permission": self.stage_operation_service.resolve_permission(
+                            user.id, stage
+                        ),
                     }
                 )
                 for stage in stages
             ],
-            "totalCount": count,
+            "totalCount": total_count,
         }
 
     def get_stage_list(self, info, input: StageStreamInput):
@@ -107,7 +114,6 @@ class StageService:
 
         if token:
             payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
-            print("payload", payload)
             current_user_id = payload.get("user_id")
 
         query = (
@@ -130,39 +136,32 @@ class StageService:
                 {
                     **stage.to_dict(),
                     "assets": [asset.child_asset.to_dict() for asset in stage.assets],
-                    "scenes": self.get_scene_list(input, stage.id),
-                    "events": self.get_event_list(input, stage),
+                    "scenes": self.stage_operation_service.get_scene_list(
+                        input, stage.id
+                    ),
+                    "events": self.stage_operation_service.get_event_list(input, stage),
                     "cover": stage.cover,
                     "visibility": stage.visibility,
                     "status": stage.status,
-                    "permission": self.resolve_permission(current_user_id, stage),
+                    "permission": self.stage_operation_service.resolve_permission(
+                        current_user_id, stage
+                    ),
+                    "performances": [
+                        convert_keys_to_camel_case(pf.to_dict())
+                        for pf in self.stage_operation_service.resolve_performances(
+                            stage.id
+                        )
+                    ],
+                    "chats": [
+                        convert_keys_to_camel_case(chat.to_dict())
+                        for chat in self.stage_operation_service.resolve_chats(
+                            stage.file_location
+                        )
+                    ],
                 }
             )
             for stage in stages
         ]
-
-    def get_event_list(self, input: StageStreamInput, stage: StageModel):
-        cursor = input.cursor if input.cursor else 0
-        events = (
-            DBSession.query(EventModel)
-            .filter(EventModel.performance_id == input.performanceId)
-            .filter(EventModel.topic.like("%/{}/%".format(stage.file_location)))
-            .filter(EventModel.id > cursor)
-            .order_by(EventModel.mqtt_timestamp.asc())
-            .all()
-        )
-        return [convert_keys_to_camel_case(event.to_dict()) for event in events]
-
-    def get_scene_list(self, input: StageStreamInput, stage_id: int):
-        query = (
-            DBSession.query(SceneModel)
-            .filter(SceneModel.stage_id == stage_id)
-            .order_by(SceneModel.scene_order.asc())
-        )
-        if not input.performanceId:  # Only fetch disabled scene in performance replay
-            query = query.filter(SceneModel.active == True)
-        scenes = query.all()
-        return [convert_keys_to_camel_case(scene.to_dict()) for scene in scenes]
 
     def get_stage_by_id(self, user: UserModel, id: int):
         stage = (
@@ -179,14 +178,31 @@ class StageService:
 
         if not stage:
             raise GraphQLError("Stage not found")
+        if stage.owner_id != user.id and user.role not in [ADMIN, SUPER_ADMIN]:
+            raise GraphQLError("You are not authorized to update this stage")
 
         return convert_keys_to_camel_case(
             {
                 **stage.to_dict(),
                 "assets": [asset.child_asset.to_dict() for asset in stage.assets],
-                "permission": self.resolve_permission(user.id, stage),
+                "cover": stage.cover,
                 "visibility": stage.visibility,
                 "status": stage.status,
+                "permission": self.stage_operation_service.resolve_permission(
+                    user.id, stage
+                ),
+                "performances": [
+                    convert_keys_to_camel_case(pf.to_dict())
+                    for pf in self.stage_operation_service.resolve_performances(
+                        stage.id
+                    )
+                ],
+                "chats": [
+                    convert_keys_to_camel_case(chat.to_dict())
+                    for chat in self.stage_operation_service.resolve_chats(
+                        stage.file_location
+                    )
+                ],
             }
         )
 
@@ -224,6 +240,9 @@ class StageService:
             stage = local_db_session.query(StageModel).filter_by(id=input.id).first()
             if not stage or not input.id:
                 raise GraphQLError("Stage not found")
+
+            if stage.owner_id != user.id and user.role not in [ADMIN, SUPER_ADMIN]:
+                raise GraphQLError("You are not authorized to update this stage")
 
             stage.name = (
                 input.name if hasattr(input, "name") and input.name else stage.name
@@ -487,7 +506,9 @@ class StageService:
             )
 
             if attribute is not None:
-                attribute.description = "true" if attribute.description != "true"  else "false"
+                attribute.description = (
+                    "true" if attribute.description != "true" else "false"
+                )
             else:
                 attribute = StageAttributeModel(
                     stage_id=id, name="visibility", description="true"
@@ -527,50 +548,18 @@ class StageService:
             for stage in DBSession.query(ParentStageModel).all()
         ]
 
-    def resolve_permission(self, user_id: int, stage: StageModel):
-        if not user_id:
-            return "audience"
-        if stage.owner_id == user_id:
-            return "owner"
-        player_access = stage.attributes.filter(
-            StageAttributeModel.name == "playerAccess"
-        ).first()
-
-        if player_access:
-            accesses = json.loads(player_access.description)
-            if len(accesses) == 2:
-                if user_id in accesses[0]:
-                    return "player"
-                elif user_id in accesses[1]:
-                    return "editor"
-                return "audience"
-
     def get_foyer_stage_list(self):
         return [
-            convert_keys_to_camel_case(stage.to_dict())
+            {
+                **convert_keys_to_camel_case(stage.to_dict()),
+                "cover": stage.cover,
+            }
             for stage in DBSession.query(StageModel)
             .filter(StageModel.attributes.any(name="visibility", description="true"))
             .all()
         ]
 
     def get_notifications(self, user: UserModel):
-        print("user", user.id)
-
-        print(
-            [
-                convert_keys_to_camel_case(
-                    {
-                        "type": NotificationType.MEDIA_USAGE.value,
-                        "mediaUsage": x.to_dict(),
-                    }
-                )
-                for x in DBSession.query(AssetUsageModel)
-                .filter(AssetUsageModel.approved.is_(False))
-                .filter(AssetUsageModel.asset.has(owner_id=user.id))
-                .all()
-            ]
-        )
-
         return [
             convert_keys_to_camel_case(
                 {"type": NotificationType.MEDIA_USAGE.value, "mediaUsage": x.to_dict()}

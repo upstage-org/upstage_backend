@@ -17,7 +17,7 @@ TBD
 ## Setup OS-level services in Debian: 
 
 We recommend doing this right after image spin-up, to protect your instance:
-Run ```sh
+```sh
 apt install git ufw
 ufw allow 22
 ufw enable

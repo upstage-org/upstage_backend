@@ -19,6 +19,7 @@ from mails.templates.templates import (
     password_reset,
     user_registration,
 )
+from stages.services.stage_operation import StageOperationService
 from users.db_models.user import PLAYER, SUPER_ADMIN, UserModel
 from users.http.validation import CreateUserInput
 from users.db_models.one_time_totp import OneTimeTOTPModel
@@ -26,7 +27,7 @@ from users.db_models.one_time_totp import OneTimeTOTPModel
 
 class UserService:
     def __init__(self):
-        pass
+        self.stage_operation_service = StageOperationService()
 
     def find_one(self, username: str, email: str):
         return (
@@ -75,7 +76,7 @@ class UserService:
             send([user.email], f"Welcome to UpStage!", user_registration(user))
         )
         admin_emails = SUPPORT_EMAILS
-        approval_url = f"{HOSTNAME}/admin/player?sortByCreated=true"
+        approval_url = f"https://{HOSTNAME}/admin/player?sortByCreated=true"
         asyncio.create_task(
             send(
                 admin_emails,
@@ -83,6 +84,9 @@ class UserService:
                 admin_registration_notification(user, approval_url),
             )
         )
+
+        self.stage_operation_service.assign_user_to_default_stage([user.id])
+
         return {"user": user.to_dict()}
 
     def verify_captcha(self, data: CreateUserInput, request: Request):
@@ -136,10 +140,13 @@ class UserService:
             local_db_session.flush()
             local_db_session.add(OneTimeTOTPModel(user_id=user.id, code=otp))
             local_db_session.flush()
-            await send(
-                [email],
-                f"Password reset for account {user.username}",
-                password_reset(user, otp),
+
+            asyncio.create_task(
+                send(
+                    [user.email],
+                    f"Password reset for account {user.username}",
+                    password_reset(user, otp),
+                )
             )
 
             return {
