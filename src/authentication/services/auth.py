@@ -57,6 +57,9 @@ class AuthenticationService:
         user.last_login = datetime.now()
 
         with ScopedSession() as local_db_session:
+            local_db_session.query(UserSessionModel).filter(
+                UserSessionModel.user_id == user.id
+            ).delete()
             local_db_session.add(user_session)
             local_db_session.flush()
         self.user_service.update(user)
@@ -185,3 +188,13 @@ class AuthenticationService:
         self.user_service.update(user)
 
         return {"access_token": access_token, "refresh_token": refresh_token}
+
+    def get_session(self, token: str, user_id: int):
+        return (
+            DBSession.query(UserSessionModel)
+            .filter(
+                UserSessionModel.user_id == user_id,
+                UserSessionModel.access_token == token,
+            )
+            .first()
+        )

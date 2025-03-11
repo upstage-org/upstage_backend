@@ -121,17 +121,18 @@ Your permission request to use media <b>{media.name}</b> has been sent to the ow
 """
 
 
-def request_permission_acknowledgement(user, media, note):
+def request_permission_acknowledgement(user, media, note=""):
     return f"""
 <p>
-Hi <b>{display_user(media.owner)}</b>,
+Hi <b>{display_user(user)}</b>,
 <br>
 <br>
-{display_user(user)} has been granted permission to use your media <b>{media.name}</b>.
+{display_user(media.owner)} has granted you permission to use their media <b>{media.name}</b>.
 <br>
 <br>
 Additional notes: {note}
 <br>
+Please acknowledge that this video was made by {display_user(media.owner)}.
 <br>
 {footer}    
 """

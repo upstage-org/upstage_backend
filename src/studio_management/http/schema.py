@@ -1,4 +1,4 @@
-from typing import List
+from typing import List, Optional
 from ariadne import MutationType, QueryType, make_executable_schema
 from global_config import authenticated, convert_keys_to_camel_case
 from ariadne.asgi import GraphQL
@@ -87,7 +87,7 @@ def calc_sizes(_, __):
 
 @mutation.field("requestPermission")
 @authenticated()
-def request_permission(_, info, assetId: int, note: str):
+def request_permission(_, info, assetId: int, note: Optional[str] = None):
     return StudioService().request_permission(
         UserModel(**info.context["request"].state.current_user), assetId, note
     )
@@ -95,7 +95,7 @@ def request_permission(_, info, assetId: int, note: str):
 
 @mutation.field("confirmPermission")
 @authenticated()
-async def confirm_permission(_, info, id: int, approved: bool):
+async def confirm_permission(_, info, id: int, approved: Optional[bool] = False):
     return await StudioService().confirm_permission(
         UserModel(**info.context["request"].state.current_user), id, approved
     )
@@ -103,9 +103,9 @@ async def confirm_permission(_, info, id: int, approved: bool):
 
 @mutation.field("quickAssignMutation")
 @authenticated()
-def quick_assign_mutation(_, info, stageId: int, assetId: int):
+def quick_assign_mutation(_, info, stageIds: list[int], assetId: int):
     return StudioService().quick_assign_mutation(
-        UserModel(**info.context["request"].state.current_user), stageId, assetId
+        UserModel(**info.context["request"].state.current_user), stageIds, assetId
     )
 
 

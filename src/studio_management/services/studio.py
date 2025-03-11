@@ -1,18 +1,17 @@
+import asyncio
 from datetime import datetime
 import os
-import sys
 from typing import List
 
-from sqlalchemy import and_, asc, desc, or_
+from sqlalchemy import and_, or_
 
 from assets.db_models.asset_usage import AssetUsageModel
 from authentication.db_models.user_session import UserSessionModel
 from global_config import (
-    UPSTAGE_FRONTEND_URL,
+    HOSTNAME,
     DBSession,
     ScopedSession,
     convert_keys_to_camel_case,
-    camel_to_snake,
     decrypt,
     encrypt,
 )
@@ -26,6 +25,7 @@ from mails.templates.templates import (
     waiting_request_media_approve,
 )
 from performance_config.db_models.performance import PerformanceModel
+from stages.services.stage_operation import StageOperationService
 from stages.db_models.parent_stage import ParentStageModel
 from stages.db_models.stage import StageModel
 from assets.db_models.asset import AssetModel
@@ -35,7 +35,7 @@ from studio_management.http.validation import (
     ChangePasswordInput,
     UpdateUserInput,
 )
-from users.db_models.user import ADMIN, GUEST, SUPER_ADMIN, UserModel
+from users.db_models.user import ADMIN, GUEST, PLAYER, SUPER_ADMIN, UserModel
 from graphql import GraphQLError
 
 appdir = os.path.abspath(os.path.dirname(__file__))
@@ -45,10 +45,10 @@ storagePath = "../../uploads"
 
 class StudioService:
     def __init__(self):
+        self.stage_operation_service = StageOperationService()
         pass
 
     def admin_players(self, params):
-        totalCount = DBSession.query(UserModel).count()
         query = DBSession.query(UserModel)
 
         if "usernameLike" in params:
@@ -63,14 +63,24 @@ class StudioService:
 
         if "sort" in params:
             for sort_param in params["sort"]:
-                if sort_param == "USERNAME_ASC":
-                    query = query.order_by(asc(UserModel.username))
-                elif sort_param == "USERNAME_DESC":
-                    query = query.order_by(desc(UserModel.username))
-                elif sort_param == "CREATED_ON_ASC":
-                    query = query.order_by(asc(UserModel.created_on))
-                elif sort_param == "CREATED_ON_DESC":
-                    query = query.order_by(desc(UserModel.created_on))
+                field, direction = sort_param.rsplit("_", 1)
+                if field == "USERNAME":
+                    sort_field = UserModel.username
+                elif field == "ROLE":
+                    sort_field = UserModel.role
+                elif field == "CREATED_ON":
+                    sort_field = UserModel.created_on
+                elif field == "EMAIL":
+                    sort_field = UserModel.email
+                elif field == "LAST_LOGIN":
+                    sort_field = UserModel.last_login
+    
+                if direction == "ASC":
+                    query = query.order_by(sort_field.asc())
+                elif direction == "DESC":
+                    query = query.order_by(sort_field.desc())
+
+        total_count = query.count()
 
         if "limit" in params:
             limit = params["limit"] or 10
@@ -81,7 +91,7 @@ class StudioService:
         results = query.all()
 
         return convert_keys_to_camel_case(
-            {"totalCount": totalCount, "edges": [user.to_dict() for user in results]}
+            {"totalCount": total_count, "edges": [user.to_dict() for user in results]}
         )
 
     def create_users(self, users: List[BatchUserInput]):
@@ -93,7 +103,7 @@ class StudioService:
                     username=user["username"],
                     email=user["email"],
                     active=True,
-                    role=GUEST,
+                    role=PLAYER,
                     password=encrypt(user["password"]),
                 )
                 session.add(user)
@@ -103,6 +113,11 @@ class StudioService:
             .filter(UserModel.email.in_([user["email"] for user in users]))
             .all()
         )
+
+        self.stage_operation_service.assign_user_to_default_stage(
+            [user.id for user in users]
+        )
+
         return convert_keys_to_camel_case({"users": [user.to_dict() for user in users]})
 
     def validate_user_information(self, users: List[BatchUserInput], session):
@@ -189,8 +204,8 @@ class StudioService:
         if input.displayName:
             user.display_name = input.displayName
         if input.active != user.active:
-            user.active = input.active
             await self._handle_active_status(user, input.active)
+            user.active = input.active
         if input.firebasePushnotId:
             user.firebase_pushnot_id = input.firebasePushnotId
         if input.uploadLimit:
@@ -200,10 +215,12 @@ class StudioService:
 
     async def _handle_active_status(self, user: UserModel, value):
         if value and not user.active and not user.deactivated_on:
-            await send(
-                [user.email],
-                f"Registration approved for user {user.username}",
-                user_approved(user),
+            asyncio.create_task(
+                send(
+                    [user.email],
+                    f"Registration approved for user {user.username}",
+                    user_approved(user),
+                )
             )
         if not value and user.active:
             user.deactivated_on = datetime.now()
@@ -298,32 +315,32 @@ class StudioService:
 
             if asset.copyright_level == 2:
                 asset_usage.approved = False
-                studio_url = f"{UPSTAGE_FRONTEND_URL}stages"
-                await send(
-                    [asset.owner.email],
-                    f"Pending permission request for media {asset.name}",
-                    request_permission_for_media(user, asset, note, studio_url),
+                studio_url = f"https://{HOSTNAME}/media"
+                asyncio.create_task(
+                    send(
+                        [asset.owner.email],
+                        f"Pending permission request for media {asset.name}",
+                        request_permission_for_media(user, asset, note, studio_url),
+                    )
                 )
-                await send(
-                    user.email,
-                    f"Waiting permission request approval/denial for media {asset.name}",
-                    waiting_request_media_approve(user, asset),
+                asyncio.create_task(
+                    send(
+                        [user.email],
+                        f"Waiting permission request approval/denial for media {asset.name}",
+                        waiting_request_media_approve(user, asset),
+                    )
                 )
             else:
                 asset_usage.approved = True
-                await send(
-                    user.email,
-                    f"{display_user(user)} was approved to use media: {asset.name}",
-                    request_permission_acknowledgement(user, asset, note),
+                asyncio.create_task(
+                    send(
+                        [user.email],
+                        f"{display_user(user)} was approved to use media: {asset.name}",
+                        request_permission_acknowledgement(user, asset, note),
+                    )
                 )
             local_db_session.add(asset_usage)
             local_db_session.flush()
-            studio_url = f"{UPSTAGE_FRONTEND_URL}/stages"
-            await send(
-                [asset.owner.email],
-                f"Permission requested for media {asset.name}",
-                permission_response_for_media(user, asset, note, False, studio_url),
-            )
         return {"success": True}
 
     async def confirm_permission(self, user: UserModel, id: int, approved: bool):
@@ -347,22 +364,23 @@ class StudioService:
             else:
                 local_db_session.delete(asset_usage)
 
-            local_db_session.commit()
-            local_db_session.flush()
-            studio_url = f"{UPSTAGE_FRONTEND_URL}/stages"
-            await send(
-                [asset_usage.user.email],
-                f"Permission approved for media {asset_usage.asset.name}"
-                if approved
-                else f"Permission rejected for media {asset_usage.asset.name}",
-                permission_response_for_media(
-                    asset_usage.user,
-                    asset_usage.asset,
-                    asset_usage.note,
-                    approved,
-                    studio_url,
-                ),
+            studio_url = f"https://{HOSTNAME}/media"
+            asyncio.create_task(
+                send(
+                    [asset_usage.user.email],
+                    f"Permission approved for media {asset_usage.asset.name}"
+                    if approved
+                    else f"Permission rejected for media {asset_usage.asset.name}",
+                    permission_response_for_media(
+                        asset_usage.user,
+                        asset_usage.asset,
+                        asset_usage.note,
+                        approved,
+                        studio_url,
+                    ),
+                )
             )
+            local_db_session.flush()
             permissions = (
                 DBSession.query(AssetUsageModel)
                 .filter(AssetUsageModel.asset_id == asset_usage.asset_id)
@@ -371,39 +389,51 @@ class StudioService:
 
             return convert_keys_to_camel_case(
                 {
-                    "permissions": [permission.to_dict() for permission in permissions],
+                    "permissions": [
+                        convert_keys_to_camel_case(permission.to_dict())
+                        for permission in permissions
+                    ],
                     "success": True,
                 },
             )
 
-    def quick_assign_mutation(self, user: UserModel, stage_id: int, asset_id: int):
+    def quick_assign_mutation(self, user: UserModel, stage_ids: list[int], asset_id: int):
         with ScopedSession() as local_db_session:
-            asset = (
-                local_db_session.query(AssetModel)
-                .filter(AssetModel.id == asset_id)
-                .first()
-            )
-            if not asset:
-                raise GraphQLError("Asset not found!")
-
-            stage = (
-                local_db_session.query(StageModel)
-                .filter(StageModel.id == stage_id)
-                .first()
-            )
-            if not stage:
-                raise GraphQLError("Stage not found!")
-
-            asset.stages.append(
-                ParentStageModel(stage_id=stage_id, child_asset_id=asset_id)
-            )
+            local_db_session.query(ParentStageModel).filter(
+                ParentStageModel.child_asset_id == asset_id
+            ).delete()
             local_db_session.flush()
+
+            for stage_id in stage_ids:
+                asset = (
+                    local_db_session.query(AssetModel)
+                    .filter(AssetModel.id == asset_id)
+                    .first()
+                )
+                if not asset:
+                    raise GraphQLError("Asset not found!")
+
+                stage = (
+                    local_db_session.query(StageModel)
+                    .filter(StageModel.id == stage_id)
+                    .first()
+                )
+                if not stage:
+                    raise GraphQLError("Stage not found!")
+
+                asset.stages.append(
+                    ParentStageModel(stage_id=stage_id, child_asset_id=asset_id)
+                )
+                local_db_session.flush()
         return {"success": True}
 
     def get_users(self, active: bool):
         return [
             convert_keys_to_camel_case(user.to_dict())
-            for user in DBSession.query(UserModel).filter(UserModel.active == active)
+            for user in DBSession.query(UserModel)
+            .filter(UserModel.active == active)
+            .order_by(UserModel.username.asc())
+            .all()
         ]
 
     def stages(self):

@@ -1,4 +1,5 @@
 from datetime import datetime
+from enum import Enum
 from sqlalchemy import (
     TIMESTAMP,
     BigInteger,
@@ -11,6 +12,14 @@ from sqlalchemy import (
 )
 from sqlalchemy.orm import relationship
 from global_config import BaseModel
+
+
+class Previlege(Enum):
+    NONE = 0
+    OWNER = 1
+    APPROVED = 2
+    PENDING_APPROVAL = 3
+    REQUIRE_APPROVAL = 4
 
 
 class AssetModel(BaseModel):
@@ -41,11 +50,11 @@ class AssetModel(BaseModel):
 
 
 class AvatarVoice:
-    voice: String
-    variant: String
-    pitch: Integer
-    speed: Integer
-    amplitude: Integer
+    voice: str
+    variant: str
+    pitch: int
+    speed: float
+    amplitude: int
 
 
 class Voice:
