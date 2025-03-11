@@ -3,7 +3,7 @@ from datetime import datetime
 import os
 from typing import List
 
-from sqlalchemy import and_, asc, desc, or_
+from sqlalchemy import and_, or_
 
 from assets.db_models.asset_usage import AssetUsageModel
 from authentication.db_models.user_session import UserSessionModel
@@ -35,7 +35,7 @@ from studio_management.http.validation import (
     ChangePasswordInput,
     UpdateUserInput,
 )
-from users.db_models.user import ADMIN, GUEST, SUPER_ADMIN, UserModel
+from users.db_models.user import ADMIN, GUEST, PLAYER, SUPER_ADMIN, UserModel
 from graphql import GraphQLError
 
 appdir = os.path.abspath(os.path.dirname(__file__))
@@ -103,7 +103,7 @@ class StudioService:
                     username=user["username"],
                     email=user["email"],
                     active=True,
-                    role=GUEST,
+                    role=PLAYER,
                     password=encrypt(user["password"]),
                 )
                 session.add(user)
@@ -399,6 +399,11 @@ class StudioService:
 
     def quick_assign_mutation(self, user: UserModel, stage_ids: list[int], asset_id: int):
         with ScopedSession() as local_db_session:
+            local_db_session.query(ParentStageModel).filter(
+                ParentStageModel.child_asset_id == asset_id
+            ).delete()
+            local_db_session.flush()
+
             for stage_id in stage_ids:
                 asset = (
                     local_db_session.query(AssetModel)
