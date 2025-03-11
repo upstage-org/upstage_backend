@@ -44,6 +44,7 @@ class AssetService:
             .join(AssetTypeModel)
             .join(UserModel)
             .outerjoin(AssetLicenseModel)
+            .filter(AssetModel.dormant.is_not(True))
         )
 
         if user.role not in [SUPER_ADMIN, ADMIN]:
