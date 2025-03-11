@@ -72,6 +72,10 @@ class AssetService:
             .outerjoin(StageModel, ParentStageModel.stage_id == AssetModel.id)
             .group_by(AssetModel.id)
         )
+
+        if user.role not in [SUPER_ADMIN, ADMIN]:
+            query = query.filter(AssetModel.dormant.is_not(True))
+
         if search_assets.name:
             query = query.filter(AssetModel.name.like(f"%{search_assets.name}%"))
         if search_assets.mediaTypes:
