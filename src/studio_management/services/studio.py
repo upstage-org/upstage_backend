@@ -21,6 +21,7 @@ from sqlalchemy import and_, or_
 from assets.db_models.asset_usage import AssetUsageModel
 from authentication.db_models.user_session import UserSessionModel
 from global_config import (
+    UPLOAD_USER_CONTENT_FOLDER,
     HOSTNAME,
     DBSession,
     ScopedSession,
@@ -52,9 +53,7 @@ from studio_management.http.validation import (
 from users.db_models.user import ADMIN, GUEST, PLAYER, SUPER_ADMIN, UserModel
 from graphql import GraphQLError
 
-absolutePath = os.path.dirname(appdir)
-storagePath = "../../uploads"
-
+storagePath = UPLOAD_USER_CONTENT_FOLDER
 
 class StudioService:
     def __init__(self):
@@ -297,7 +296,7 @@ class StudioService:
             for media in local_db_session.query(AssetModel).all():
                 if not media.size:
                     full_path = os.path.join(
-                        absolutePath, storagePath, media.file_location
+                        storagePath, media.file_location
                     )
                     try:
                         size = os.path.getsize(full_path)

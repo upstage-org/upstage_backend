@@ -100,7 +100,7 @@ else:
     HOSTNAME = socket.gethostname().replace(".", "_").replace("-", "_")
     print("Loading local settings from %s.py" % HOSTNAME)
 
-UPLOAD_USER_CONTENT_FOLDER = "./uploads"
+UPLOAD_USER_CONTENT_FOLDER = "/usr/app/uploads" #This is mounted here by docker-compose file.
 DEMO_MEDIA_FOLDER = "./dashboard/demo"
 
 UPSTAGE_FRONTEND_URL = os.getenv("UPSTAGE_FRONTEND_URL", "http://localhost:3000")
