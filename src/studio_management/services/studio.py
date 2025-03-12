@@ -1,5 +1,6 @@
 import asyncio
 from datetime import datetime
+import json
 import os
 from typing import List
 
@@ -18,6 +19,7 @@ from global_config import (
 from mails.helpers.mail import send
 from mails.templates.templates import (
     display_user,
+    notify_owner_of_media_request,
     permission_response_for_media,
     request_permission_acknowledgement,
     request_permission_for_media,
@@ -326,17 +328,28 @@ class StudioService:
                 asyncio.create_task(
                     send(
                         [user.email],
-                        f"Waiting permission request approval/denial for media {asset.name}",
+                        "UpStage: Your permission request is waiting for approval by the media item's owner",
                         waiting_request_media_approve(user, asset),
                     )
                 )
             else:
                 asset_usage.approved = True
+
+                description = json.loads(asset.description)
+
                 asyncio.create_task(
                     send(
                         [user.email],
                         f"{display_user(user)} was approved to use media: {asset.name}",
-                        request_permission_acknowledgement(user, asset, note),
+                        request_permission_acknowledgement(user, asset, note, description.get("note", "")),
+                    )
+                )
+
+                asyncio.create_task(
+                    send(
+                        [asset.owner.email],
+                        f"UpStage: {display_user(user)} is using your media {asset.name}",
+                        notify_owner_of_media_request(user, asset),
                     )
                 )
             local_db_session.add(asset_usage)
