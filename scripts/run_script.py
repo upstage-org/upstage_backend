@@ -1,3 +1,4 @@
+#!/usr/bin/env python
 from os import listdir
 import sys
 import devtools.wipe_dev

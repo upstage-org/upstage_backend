@@ -1,13 +1,15 @@
+#!/usr/bin/env python
+# -*- coding: iso8859-15 -*-
 import os
 import sys
 
 appdir = os.path.abspath(os.path.dirname(__file__))
-projdir = os.path.abspath(os.path.join(appdir, ".."))
+projdir = os.path.abspath(os.path.join(appdir, "../src"))
 if projdir not in sys.path:
     sys.path.append(appdir)
     sys.path.append(projdir)
 
-from src.global_config import MQTT_ADMIN_USER, MQTT_ADMIN_PASSWORD, MQTT_BROKER, MQTT_ADMIN_PORT
+from global_config import MQTT_ADMIN_USER, MQTT_ADMIN_PASSWORD, MQTT_BROKER, MQTT_ADMIN_PORT
 from src.event_archive.systems.system import run
 from src.event_archive.messages.mqtt import build_client
 

@@ -8,5 +8,5 @@ if projdir not in sys.path:
     sys.path.append(appdir)
     sys.path.append(projdir)
 
-from global_config import *
-from main import app
+from src import global_config
+#from src.main import app
