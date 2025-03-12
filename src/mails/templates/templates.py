@@ -127,7 +127,7 @@ def request_permission_acknowledgement(user, media, note="", description=""):
 Hi <b>{display_user(user)}</b>,
 <br>
 <br>
-{display_user(media.owner)} has granted you permission to use their media <b>{media.name}</b>.
+You have agreed to acknowledge use of <b>{media.name}</b>.
 <br>
 <br>
 Additional notes: {note}
@@ -154,5 +154,12 @@ Your permission request for <b>{media.name}</b> with purpose \"{note}\" has been
 
 def notify_owner_of_media_request(user, media):
     return f"""
+<p>
+Hi <b>{display_user(media.owner)}</b>,
+<br>
+<br>
 {display_user(user)} is using your media {media.name} and has agreed to acknowledge it as you require.
+<br>
+<br>
+{footer}
 """
