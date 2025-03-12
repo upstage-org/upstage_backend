@@ -321,14 +321,16 @@ class StudioService:
                 asyncio.create_task(
                     send(
                         [asset.owner.email],
-                        f"Pending permission request for media {asset.name}",
-                        request_permission_for_media(user, asset, note, studio_url),
+                        f"{display_user(user)} wants to use your media {asset.name}",
+                        request_permission_for_media(
+                            user, asset, note if note else "", studio_url
+                        ),
                     )
                 )
                 asyncio.create_task(
                     send(
                         [user.email],
-                        "UpStage: Your permission request is waiting for approval by the media item's owner",
+                        "Your permission request is waiting for approval",
                         waiting_request_media_approve(user, asset),
                     )
                 )
@@ -340,15 +342,20 @@ class StudioService:
                 asyncio.create_task(
                     send(
                         [user.email],
-                        f"{display_user(user)} was approved to use media: {asset.name}",
-                        request_permission_acknowledgement(user, asset, note, description.get("note", "")),
+                        f"Media acknowledgement",
+                        request_permission_acknowledgement(
+                            user,
+                            asset,
+                            note if note else "",
+                            description.get("note", ""),
+                        ),
                     )
                 )
 
                 asyncio.create_task(
                     send(
                         [asset.owner.email],
-                        f"UpStage: {display_user(user)} is using your media {asset.name}",
+                        f"{display_user(user)} is using your media {asset.name}",
                         notify_owner_of_media_request(user, asset),
                     )
                 )
@@ -383,7 +390,7 @@ class StudioService:
                     [asset_usage.user.email],
                     f"Permission approved for media {asset_usage.asset.name}"
                     if approved
-                    else f"Permission rejected for media {asset_usage.asset.name}",
+                    else f"Permission denied for media {asset_usage.asset.name}",
                     permission_response_for_media(
                         asset_usage.user,
                         asset_usage.asset,
