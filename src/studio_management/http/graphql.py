@@ -202,7 +202,8 @@ type_defs = gql("""
                 
     input ConfigInput {
         name: String!
-        value: String!  
+        value: String
+        enabled: Boolean
     }
 
 
@@ -514,10 +515,17 @@ type_defs = gql("""
         recording: Boolean
     }
                 
-        type Config{
+    type Config{
         id: Int!
         name: String!
         value: String
+        createdOn: Date
+    }
+                
+    type BooleanConfig{
+        id: Int!
+        name: String!
+        value: Boolean
         createdOn: Date
     }
                 
@@ -525,14 +533,14 @@ type_defs = gql("""
         termsOfService: Config
         manual: Config
         esp: Config
-        enableDonate: Config    
+        enableDonate: BooleanConfig    
     }
                 
     type FoyerConfig {
         title: Config
         description: Config
         menu: Config
-        showRegistration: Config
+        showRegistration: BooleanConfig
     }
 
     scalar Date
