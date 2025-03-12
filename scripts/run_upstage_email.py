@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: iso8859-15 -*-
-import os, sys
+import os
+import sys
 
 appdir = os.path.abspath(os.path.dirname(__file__))
 projdir = os.path.abspath(os.path.join(appdir, ".."))

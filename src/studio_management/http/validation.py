@@ -1,3 +1,4 @@
+# -*- coding: iso8859-15 -*-
 from typing import Optional
 from pydantic import BaseModel, EmailStr, Field, constr
 
