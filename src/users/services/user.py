@@ -91,7 +91,6 @@ class UserService:
         return {"user": user.to_dict()}
 
     def verify_captcha(self, token: str, request: Request):
-
         if not CLOUDFLARE_CAPTCHA_SECRETKEY:
             return
 
