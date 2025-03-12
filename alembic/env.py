@@ -1,15 +1,21 @@
+# -*- coding: iso8859-15 -*-
 import os
 import sys
+
+appdir = os.path.abspath(os.path.dirname(__file__))
+projdir = os.path.abspath(os.path.join(appdir, ".."))
+projdir2 = os.path.abspath(os.path.join(appdir, "../.."))
+if projdir not in sys.path:
+    sys.path.append(appdir)
+    sys.path.append(projdir)
+    sys.path.append(projdir2)
+
 from logging.config import fileConfig
 from dotenv import dotenv_values
 from sqlalchemy import engine_from_config, pool, text
 from src.global_config import DATABASE_URL
 
 from alembic import context
-
-appdir = os.path.join(os.path.abspath(os.path.dirname(__file__)), '../src')
-if appdir not in sys.path:
-  sys.path.append(appdir)
 
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.

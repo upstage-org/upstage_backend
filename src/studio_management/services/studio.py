@@ -1,3 +1,15 @@
+# -*- coding: iso8859-15 -*-
+import os
+import sys
+
+appdir = os.path.abspath(os.path.dirname(__file__))
+projdir = os.path.abspath(os.path.join(appdir, ".."))
+projdir2 = os.path.abspath(os.path.join(appdir, "../.."))
+if projdir not in sys.path:
+    sys.path.append(appdir)
+    sys.path.append(projdir)
+    sys.path.append(projdir2)
+
 import asyncio
 from datetime import datetime
 import json
@@ -40,7 +52,6 @@ from studio_management.http.validation import (
 from users.db_models.user import ADMIN, GUEST, PLAYER, SUPER_ADMIN, UserModel
 from graphql import GraphQLError
 
-appdir = os.path.abspath(os.path.dirname(__file__))
 absolutePath = os.path.dirname(appdir)
 storagePath = "../../uploads"
 

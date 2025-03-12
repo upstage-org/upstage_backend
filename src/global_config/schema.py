@@ -1,15 +1,16 @@
+# -*- coding: iso8859-15 -*-
 import os
 import sys
 
-# Always on top
-app_dir = os.path.abspath(os.path.dirname(__file__))
-prodder = os.path.abspath(os.path.join(app_dir, ".."))
-sys.path.append(app_dir)
-sys.path.append(prodder)
+appdir = os.path.abspath(os.path.dirname(__file__))
+projdir = os.path.abspath(os.path.join(appdir, ".."))
+if projdir not in sys.path:
+    sys.path.append(appdir)
+    sys.path.append(projdir)
+
 from ariadne import MutationType, QueryType, make_executable_schema
 from fastapi import FastAPI
 from ariadne.asgi import GraphQL
-
 
 def config_graphql_endpoints(app: FastAPI):
     from assets.http.schema import query as asset_query, mutation as asset_mutation

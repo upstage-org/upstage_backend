@@ -1,14 +1,18 @@
+# -*- coding: iso8859-15 -*-
 import os
 import sys
-import shutil
-from graphql_server import json_encode
-from PIL import Image
 
 appdir = os.path.abspath(os.path.dirname(__file__))
-projdir = os.path.abspath(os.path.join(appdir, "../.."))
+projdir = os.path.abspath(os.path.join(appdir, ".."))
+projdir2 = os.path.abspath(os.path.join(appdir, "../.."))
 if projdir not in sys.path:
     sys.path.append(appdir)
     sys.path.append(projdir)
+    sys.path.append(projdir2)
+
+import shutil
+from graphql_server import json_encode
+from PIL import Image
 
 from assets.db_models.asset_type import AssetTypeModel
 from assets.db_models.asset import AssetModel

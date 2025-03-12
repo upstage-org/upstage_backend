@@ -1,4 +1,15 @@
+# -*- coding: iso8859-15 -*-
 import os
+import sys
+
+appdir = os.path.abspath(os.path.dirname(__file__))
+projdir = os.path.abspath(os.path.join(appdir, ".."))
+projdir2 = os.path.abspath(os.path.join(appdir, "../.."))
+if projdir not in sys.path:
+    sys.path.append(appdir)
+    sys.path.append(projdir)
+    sys.path.append(projdir2)
+
 from global_config import (
     CLIENT_MAX_BODY_SIZE,
     DBSession,
@@ -17,9 +28,6 @@ FOYER_TITLE = "FOYER_TITLE"
 FOYER_DESCRIPTION = "FOYER_DESCRIPTION"
 FOYER_MENU = "FOYER_MENU"
 SHOW_REGISTRATION = "SHOW_REGISTRATION"
-
-app_dir = os.path.abspath(os.path.dirname(__file__))
-prodder = os.path.abspath(os.path.join(app_dir, "../.."))
 
 
 class SettingService:

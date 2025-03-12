@@ -1,3 +1,15 @@
+# -*- coding: iso8859-15 -*-
+import os
+import sys
+
+appdir = os.path.abspath(os.path.dirname(__file__))
+projdir = os.path.abspath(os.path.join(appdir, ".."))
+projdir2 = os.path.abspath(os.path.join(appdir, "../.."))
+if projdir not in sys.path:
+    sys.path.append(appdir)
+    sys.path.append(projdir)
+    sys.path.append(projdir2)
+
 import random
 from faker import Faker
 import pytest
@@ -9,7 +21,7 @@ from stages.tests.test_stage import TestStageController
 from studio_management.http.schema import studio_graphql_app
 from users.db_models.user import GUEST, PLAYER, SUPER_ADMIN, UserModel
 from global_config import DBSession, ScopedSession
-from src.main import app
+from main import app
 
 test_AuthenticationController = TestAuthenticationController()
 test_StageController = TestStageController()

@@ -1,10 +1,22 @@
+# -*- coding: iso8859-15 -*-
+import os
+import sys
+
+appdir = os.path.abspath(os.path.dirname(__file__))
+projdir = os.path.abspath(os.path.join(appdir, ".."))
+projdir2 = os.path.abspath(os.path.join(appdir, "../.."))
+if projdir not in sys.path:
+    sys.path.append(appdir)
+    sys.path.append(projdir)
+    sys.path.append(projdir2)
+
 import pytest
 
 from authentication.tests.auth_test import TestAuthenticationController
 from event_archive.db_models.event import EventModel
 from global_config.database import ScopedSession
 from assets.db_models.asset import AssetModel
-from src.main import app
+from main import app
 from global_config import JWT_HEADER_NAME, DBSession
 from stages.db_models.parent_stage import ParentStageModel
 from stages.db_models.stage_attribute import StageAttributeModel

@@ -1,3 +1,15 @@
+# -*- coding: iso8859-15 -*-
+import os
+import sys
+
+appdir = os.path.abspath(os.path.dirname(__file__))
+projdir = os.path.abspath(os.path.join(appdir, ".."))
+projdir2 = os.path.abspath(os.path.join(appdir, "../.."))
+if projdir not in sys.path:
+    sys.path.append(appdir)
+    sys.path.append(projdir)
+    sys.path.append(projdir2)
+
 from base64 import b64decode
 import json
 import os
@@ -27,7 +39,6 @@ from stages.http.validation import (
 )
 from users.db_models.user import ADMIN, SUPER_ADMIN, UserModel
 
-appdir = os.path.abspath(os.path.dirname(__file__))
 absolutePath = os.path.dirname(os.path.abspath(os.path.join(appdir, "..", "..")))
 storagePath = "uploads"
 

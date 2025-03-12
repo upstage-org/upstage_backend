@@ -1,17 +1,18 @@
-import logging
+# -*- coding: iso8859-15 -*-
+import os
 import sys
+
+appdir = os.path.abspath(os.path.dirname(__file__))
+projdir = os.path.abspath(os.path.join(appdir, ".."))
+if projdir not in sys.path:
+    sys.path.append(appdir)
+    sys.path.append(projdir)
+
+import logging
 from sqlalchemy import create_engine, MetaData
 from databases import Database
 
-import os
-
-# Always on top
-sys.path.append("..")
-sys.path.append(".")
-app_dir = os.path.abspath(os.path.dirname(__file__))
-projdir = os.path.abspath(os.path.join(app_dir, "../"))
-
-from .env import DATABASE_URL
+from env import DATABASE_URL
 from sqlalchemy.orm import sessionmaker, scoped_session
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.pool import NullPool

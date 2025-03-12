@@ -1,3 +1,4 @@
+# -*- coding: iso8859-15 -*-
 from datetime import date
 from typing import List, Optional
 from pydantic import BaseModel, Field, conint

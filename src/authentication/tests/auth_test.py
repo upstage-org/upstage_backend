@@ -1,5 +1,17 @@
+# -*- coding: iso8859-15 -*-
+import os
+import sys
+
+appdir = os.path.abspath(os.path.dirname(__file__))
+projdir = os.path.abspath(os.path.join(appdir, ".."))
+projdir2 = os.path.abspath(os.path.join(appdir, "../.."))
+if projdir not in sys.path:
+    sys.path.append(appdir)
+    sys.path.append(projdir)
+    sys.path.append(projdir2)
+
 import random
-from src.main import app
+from main import app
 from global_config import global_session, JWT_HEADER_NAME
 import pytest
 from authentication.http.schema import auth_graphql_app

@@ -1,13 +1,14 @@
+# -*- coding: iso8859-15 -*-
 import os
 import sys
 
-# Always on top
-app_dir = os.path.abspath(os.path.dirname(__file__))
-prodder = os.path.abspath(os.path.join(app_dir, "../.."))
-
-# if app_dir not in sys.path:
-sys.path.append(app_dir)
-sys.path.append(prodder)
+appdir = os.path.abspath(os.path.dirname(__file__))
+projdir = os.path.abspath(os.path.join(appdir, ".."))
+projdir2 = os.path.abspath(os.path.join(appdir, "../.."))
+if projdir not in sys.path:
+    sys.path.append(appdir)
+    sys.path.append(projdir)
+    sys.path.append(projdir2)
 
 from global_config import global_session, encrypt
 from users.db_models.user import SUPER_ADMIN, UserModel

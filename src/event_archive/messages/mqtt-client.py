@@ -1,17 +1,22 @@
+# -*- coding: iso8859-15 -*-
+import os
+import sys
+
+appdir = os.path.abspath(os.path.dirname(__file__))
+projdir = os.path.abspath(os.path.join(appdir, ".."))
+projdir2 = os.path.abspath(os.path.join(appdir, "../.."))
+if projdir not in sys.path:
+    sys.path.append(appdir)
+    sys.path.append(projdir)
+    sys.path.append(projdir2)
+
 import arrow
 import json
 import logging
 from paho.mqtt import client as mqtt
 import pprint
-import os, sys
 import time
 import uuid
-
-appdir = os.path.abspath(os.path.dirname(__file__))
-projdir = os.path.abspath(os.path.join(appdir, "../.."))
-if projdir not in sys.path:
-    sys.path.append(appdir)
-    sys.path.append(projdir)
 
 logging.basicConfig(filename="mqtt_client.log", level=logging.DEBUG)
 global_topic = "performance/{}"

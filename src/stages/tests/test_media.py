@@ -1,10 +1,22 @@
+# -*- coding: iso8859-15 -*-
+import os
+import sys
+
+appdir = os.path.abspath(os.path.dirname(__file__))
+projdir = os.path.abspath(os.path.join(appdir, ".."))
+projdir2 = os.path.abspath(os.path.join(appdir, "../.."))
+if projdir not in sys.path:
+    sys.path.append(appdir)
+    sys.path.append(projdir)
+    sys.path.append(projdir2)
+
 import pytest
 from assets.db_models.asset import AssetModel
 from authentication.tests.auth_test import TestAuthenticationController
 from global_config import DBSession
 from stages.tests.test_stage import TestStageController
 from assets.tests.asset_test import TestAssetController, load_base64_from_image
-from src.main import app
+from main import app
 from stages.http.schema import stage_graphql_app
 from users.db_models.user import SUPER_ADMIN
 import random
