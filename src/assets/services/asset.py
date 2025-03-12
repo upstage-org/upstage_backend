@@ -323,7 +323,7 @@ class AssetService:
                     attributes["link"] = {
                         "url": link.url,
                         "blank": link.blank,
-                        "effect": link.effect
+                        "effect": link.effect,
                     }
                 elif "link" in attributes:
                     del attributes["link"]
