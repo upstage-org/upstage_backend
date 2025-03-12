@@ -8,6 +8,6 @@ if projdir not in sys.path:
     sys.path.append(appdir)
     sys.path.append(projdir)
 
-from src.global_config.db_models.base import BaseModel
+from global_config.db_models.base import BaseModel
 
 __all__ = ["BaseModel"]

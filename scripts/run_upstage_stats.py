@@ -5,9 +5,11 @@ import sys
 
 appdir = os.path.abspath(os.path.dirname(__file__))
 projdir = os.path.abspath(os.path.join(appdir, "../src"))
-if projdir not in sys.path:
+projdir2 = os.path.abspath(os.path.join(appdir, "../src/global_stats"))
+if projdir2 not in sys.path:
     sys.path.append(appdir)
     sys.path.append(projdir)
+    sys.path.append(projdir2)
 
 from global_config import MQTT_BROKER, MQTT_ADMIN_PORT, MQTT_ADMIN_USER, MQTT_ADMIN_PASSWORD
 from src.upstage_stats.mqtt import build_client
