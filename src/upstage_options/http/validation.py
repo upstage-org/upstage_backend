@@ -4,7 +4,10 @@ from pydantic import BaseModel, Field
 
 class ConfigInput(BaseModel):
     name: str = Field(..., description="The name of the configuration")
-    value: str = Field(..., description="The value of the configuration")
+    value: Optional[str] = Field(None, description="The value of the configuration")
+    enabled: Optional[bool] = Field(
+        None, description="Whether the configuration is enabled"
+    )
 
 
 class SystemEmailInput(BaseModel):

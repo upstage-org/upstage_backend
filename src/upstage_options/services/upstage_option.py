@@ -35,22 +35,32 @@ class SettingService:
         return {"limit": CLIENT_MAX_BODY_SIZE}
 
     def system_info(self):
+        enable_donate = self.get_config(ENABLE_DONATE)
+
         return convert_keys_to_camel_case(
             {
                 "termsOfService": self.get_config(TERMS_OF_SERVICE),
                 "manual": self.get_config(MANUAL),
                 "esp": self.get_config(EMAIL_SUBJECT_PREFIX),
-                "enableDonate": self.get_config(ENABLE_DONATE),
+                "enableDonate": {
+                    **enable_donate.to_dict(),
+                    "value": enable_donate.value == "true",
+                },
             }
         )
 
     def foyer_info(self):
+        show_registration = self.get_config(SHOW_REGISTRATION)
+
         return convert_keys_to_camel_case(
             {
                 "title": self.get_config(FOYER_TITLE),
                 "description": self.get_config(FOYER_DESCRIPTION),
                 "menu": self.get_config(FOYER_MENU),
-                "showRegistration": self.get_config(SHOW_REGISTRATION),
+                "showRegistration": {
+                    **show_registration.to_dict(),
+                    "value": show_registration.value == "true",
+                },
             }
         )
 
@@ -73,7 +83,10 @@ class SettingService:
                 config = ConfigModel(name=input.name, value=input.value)
                 local_db_session.add(config)
             else:
-                config.value = input.value
+                if input.name == ENABLE_DONATE or input.name == SHOW_REGISTRATION:
+                    config.value = "true" if input.enabled else "false"
+                else:
+                    config.value = input.value
 
             local_db_session.flush()
 

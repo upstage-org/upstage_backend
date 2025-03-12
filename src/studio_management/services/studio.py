@@ -74,7 +74,7 @@ class StudioService:
                     sort_field = UserModel.email
                 elif field == "LAST_LOGIN":
                     sort_field = UserModel.last_login
-    
+
                 if direction == "ASC":
                     query = query.order_by(sort_field.asc())
                 elif direction == "DESC":
@@ -397,7 +397,9 @@ class StudioService:
                 },
             )
 
-    def quick_assign_mutation(self, user: UserModel, stage_ids: list[int], asset_id: int):
+    def quick_assign_mutation(
+        self, user: UserModel, stage_ids: list[int], asset_id: int
+    ):
         with ScopedSession() as local_db_session:
             local_db_session.query(ParentStageModel).filter(
                 ParentStageModel.child_asset_id == asset_id
