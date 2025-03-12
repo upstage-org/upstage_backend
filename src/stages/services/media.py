@@ -27,6 +27,7 @@ from global_config import (
     DBSession,
     ScopedSession,
     convert_keys_to_camel_case,
+    UPLOAD_USER_CONTENT_FOLDER,
 )
 from files.file_handling import FileHandling
 from stages.db_models.parent_stage import ParentStageModel
@@ -39,9 +40,7 @@ from stages.http.validation import (
 )
 from users.db_models.user import ADMIN, SUPER_ADMIN, UserModel
 
-absolutePath = os.path.dirname(os.path.abspath(os.path.join(appdir, "..", "..")))
-storagePath = "uploads"
-
+storagePath = UPLOAD_USER_CONTENT_FOLDER
 
 class MediaService:
     def __init__(self):
@@ -76,7 +75,7 @@ class MediaService:
             file_location = self.file_handling.upload_file(
                 base64=input.base64,
                 file_name=input.filename,
-                absolute_path=absolutePath,
+                absolute_path=None,
                 storage_path=storagePath,
                 sub_path=asset_type.file_location,
             )
@@ -110,7 +109,7 @@ class MediaService:
             if input.base64:
                 self.file_handling.write_file(
                     base64=input.base64,
-                    path=os.path.join(absolutePath, storagePath, asset.file_location),
+                    path=os.path.join(storagePath, asset.file_location),
                 )
 
             self.asset_license_service.create(
@@ -164,7 +163,7 @@ class MediaService:
                 frame_location = self.file_handling.upload_file(
                     base64=frame,
                     file_name=filename,
-                    absolute_path=absolutePath,
+                    absolute_path=None,
                     storage_path=storagePath,
                     sub_path=asset_type.file_location,
                 )
@@ -224,11 +223,11 @@ class MediaService:
             )
             if not frame_asset:
                 self.file_handling.delete_file(
-                    os.path.join(absolutePath, storagePath, frame)
+                    os.path.join(storagePath, frame)
                 )
 
     def _get_physical_path(self, file_location):
-        return os.path.join(absolutePath, storagePath, file_location)
+        return os.path.join(storagePath, file_location)
 
     def cleanup_related_entities(self, id: int, local_db_session):
         local_db_session.query(ParentStageModel).filter(

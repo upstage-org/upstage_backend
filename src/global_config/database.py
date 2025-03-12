@@ -12,7 +12,7 @@ import logging
 from sqlalchemy import create_engine, MetaData
 from databases import Database
 
-from env import DATABASE_URL
+from global_config.env import DATABASE_URL
 from sqlalchemy.orm import sessionmaker, scoped_session
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.pool import NullPool

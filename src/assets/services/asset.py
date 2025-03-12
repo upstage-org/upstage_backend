@@ -23,6 +23,7 @@ from graphql import GraphQLError
 from global_config import (
     ScopedSession,
     DBSession,
+    UPLOAD_USER_CONTENT_FOLDER,
     STREAM_EXPIRY_DAYS,
     STREAM_KEY,
     convert_keys_to_camel_case,
@@ -39,10 +40,7 @@ from stages.db_models.parent_stage import ParentStageModel
 from users.db_models.user import ADMIN, SUPER_ADMIN, UserModel
 from files.file_handling import FileHandling
 
-
-appdir = os.path.abspath(os.path.dirname(__file__))
-absolutePath = os.path.dirname(appdir)
-storagePath = "../../uploads"
+storagePath = UPLOAD_USER_CONTENT_FOLDER
 
 
 class AssetService:
@@ -164,7 +162,7 @@ class AssetService:
 
     def upload_file(self, base64: str, filename: str):
         file_location = self.file_handing.upload_file(
-            base64, filename, absolutePath, storagePath, "media"
+            base64, filename, None, storagePath, "media"
         )
         return {"url": file_location}
 
@@ -302,7 +300,7 @@ class AssetService:
             asset.size = 0
             for url in urls:
                 attributes["frames"].append(url)
-                full_path = os.path.join(absolutePath, storagePath, url)
+                full_path = os.path.join(storagePath, url)
                 try:
                     size = os.path.getsize(full_path)
                 except:
@@ -453,10 +451,10 @@ class AssetService:
                     )
                     if not frame_asset:
                         self.file_handing.delete_file(
-                            os.path.join(absolutePath, storagePath, frame)
+                            os.path.join(storagePath, frame)
                         )
 
-        physical_path = os.path.join(absolutePath, storagePath, asset.file_location)
+        physical_path = os.path.join(storagePath, asset.file_location)
         local_db_session.query(ParentStageModel).filter(
             ParentStageModel.child_asset_id == asset.id
         ).delete(synchronize_session=False)

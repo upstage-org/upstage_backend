@@ -4,16 +4,18 @@ import sys
 
 appdir = os.path.abspath(os.path.dirname(__file__))
 projdir = os.path.abspath(os.path.join(appdir, ".."))
-if projdir not in sys.path:
+projdir2 = os.path.abspath(os.path.join(appdir, "../.."))
+if projdir2 not in sys.path:
     sys.path.append(appdir)
     sys.path.append(projdir)
+    sys.path.append(projdir2)
 
-from database import db, ScopedSession, DBSession, global_session
-from env import *
-from schema import config_graphql_endpoints
-from db_models.base import BaseModel
-from decorators.authenticated import authenticated
-from helpers import (
+from global_config.database import db, ScopedSession, DBSession, global_session
+from global_config.env import *
+from global_config.schema import config_graphql_endpoints
+from global_config.db_models.base import BaseModel
+from global_config.decorators.authenticated import authenticated
+from global_config.helpers import (
     encrypt,
     decrypt,
     snake_to_camel,

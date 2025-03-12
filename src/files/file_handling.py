@@ -62,7 +62,11 @@ class FileHandling:
     ) -> str:
         filename, file_extension = os.path.splitext(file_name)
         unique_filename = uuid.uuid4().hex + filename + file_extension
-        media_directory = os.path.join(absolute_path, storage_path, sub_path)
+        if absolute_path:
+            media_directory = os.path.join(absolute_path, storage_path, sub_path)
+        else:
+            media_directory = os.path.join(storage_path, sub_path)
+
         if not os.path.exists(media_directory):
             os.makedirs(media_directory)
         file_data = b64decode(base64.split(",")[1])
