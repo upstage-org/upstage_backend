@@ -25,6 +25,8 @@ class AuthenticationService:
         self.user_service = UserService()
 
     async def login(self, dto: LoginInput, request: Request):
+        self.user_service.verify_captcha(dto.token, request)
+
         user: UserModel = None
         username, password = dto.username, dto.password
 

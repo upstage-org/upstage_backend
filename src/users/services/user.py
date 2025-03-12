@@ -44,7 +44,8 @@ class UserService:
         )
 
     async def create(self, data: CreateUserInput, request: Request):
-        self.verify_captcha(data, request)
+        self.verify_captcha(data["token"], request)
+        del data["token"]
 
         existing_user = self.find_one(data["username"], data.get("email", ""))
         if existing_user:
@@ -89,19 +90,20 @@ class UserService:
 
         return {"user": user.to_dict()}
 
-    def verify_captcha(self, data: CreateUserInput, request: Request):
+    def verify_captcha(self, token: str, request: Request):
+
+        if not CLOUDFLARE_CAPTCHA_SECRETKEY:
+            return
+
         ip = request.headers.get("X-Forwarded-For", request.client.host)
         """
         Allow CloudFlare to be turned off for testing.
         """
         formData = {
             "secret": CLOUDFLARE_CAPTCHA_SECRETKEY,
-            "response": data["token"] if "token" in data else None,
+            "response": token,
             "remoteip": ip,
         }
-
-        if not CLOUDFLARE_CAPTCHA_SECRETKEY:
-            return
 
         result = requests.post(CLOUDFLARE_CAPTCHA_VERIFY_ENDPOINT, data=formData)
         outcome = result.json()
@@ -110,8 +112,6 @@ class UserService:
             raise GraphQLError(
                 "We think you are not a human! " + ", ".join(outcome["error-codes"])
             )
-        else:
-            del data["token"]
 
     def update(self, user: UserModel):
         DBSession.query(UserModel).filter(UserModel.id == user.id).update(
