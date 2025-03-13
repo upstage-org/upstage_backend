@@ -55,6 +55,7 @@ from graphql import GraphQLError
 
 storagePath = UPLOAD_USER_CONTENT_FOLDER
 
+
 class StudioService:
     def __init__(self):
         self.stage_operation_service = StageOperationService()
@@ -65,11 +66,13 @@ class StudioService:
 
         if "usernameLike" in params:
             query = query.filter(
-                UserModel.username.ilike(f"%{params['usernameLike']}%"),
-                UserModel.display_name.ilike(f"%{params['usernameLike']}%"),
-                UserModel.last_name.ilike(f"%{params['usernameLike']}%"),
-                UserModel.first_name.ilike(f"%{params['usernameLike']}%"),
-                UserModel.bin_name.ilike(f"%{params['usernameLike']}%"),   
+                or_(
+                    UserModel.username.ilike(f"%{params['usernameLike']}%"),
+                    UserModel.display_name.ilike(f"%{params['usernameLike']}%"),
+                    UserModel.last_name.ilike(f"%{params['usernameLike']}%"),
+                    UserModel.first_name.ilike(f"%{params['usernameLike']}%"),
+                    UserModel.bin_name.ilike(f"%{params['usernameLike']}%"),
+                )
             )
 
         if "createdBetween" in params:
@@ -299,9 +302,7 @@ class StudioService:
             size = 0
             for media in local_db_session.query(AssetModel).all():
                 if not media.size:
-                    full_path = os.path.join(
-                        storagePath, media.file_location
-                    )
+                    full_path = os.path.join(storagePath, media.file_location)
                     try:
                         size = os.path.getsize(full_path)
                     except:
