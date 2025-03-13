@@ -53,6 +53,7 @@ type_defs = gql("""
     }
                 
     input LoginInput {
+        token: String
         username: String!
         password: String!
     }
