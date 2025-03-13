@@ -11,11 +11,14 @@ if projdir not in sys.path:
     sys.path.append(projdir2)
 
 from datetime import datetime
+from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import class_mapper, ColumnProperty, RelationshipProperty
-from global_config import db
+#from global_config import Base
 
+global Base
+Base = declarative_base()
 
-class BaseModel(db):
+class BaseModel(Base):
     __abstract__ = True
 
     def to_dict(self, visited=None):
