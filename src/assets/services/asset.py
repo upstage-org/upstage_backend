@@ -253,6 +253,12 @@ class AssetService:
     def update_asset_permissions(
         self, input: SaveMediaInput, local_db_session, asset: AssetModel
     ):
+        
+        if not(len(input.userIds)):
+            asset.permissions.delete()
+            local_db_session.flush()
+            return
+
         if input.userIds:
             user_ids = input.userIds
             granted_permissions = asset.permissions.all()
