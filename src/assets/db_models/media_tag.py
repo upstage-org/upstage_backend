@@ -13,6 +13,7 @@ if projdir not in sys.path:
 from sqlalchemy import Column, Integer, BigInteger, ForeignKey
 from sqlalchemy.orm import relationship
 from global_config import BaseModel
+from assets.db_models.tag import TagModel
 
 
 class MediaTagModel(BaseModel):
