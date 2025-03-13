@@ -412,7 +412,7 @@ class StudioService:
             )
             local_db_session.flush()
             permissions = (
-                DBSession.query(AssetUsageModel)
+                local_db_session.query(AssetUsageModel)
                 .filter(AssetUsageModel.asset_id == asset_usage.asset_id)
                 .all()
             )
