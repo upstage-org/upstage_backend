@@ -191,7 +191,7 @@ class AssetService:
             asset.copyright_level = input.copyrightLevel
             file_location = self.process_file_location(input, local_db_session, asset)
 
-            self.change_owner(owner, local_db_session, asset)
+            # self.change_owner(owner, local_db_session, asset)
 
             self.process_urls(input, local_db_session, asset_type, asset, file_location)
 
