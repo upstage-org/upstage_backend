@@ -12,10 +12,8 @@ if projdir not in sys.path:
 
 from sqlalchemy import Column, Integer, BigInteger, ForeignKey
 from sqlalchemy.orm import relationship
-from assets.db_models.asset import AssetModel
 from global_config import BaseModel
-from stages.db_models.stage import StageModel
-
+from assets.db_models.asset import AssetModel
 
 class ParentStageModel(BaseModel):
     """
@@ -27,11 +25,11 @@ class ParentStageModel(BaseModel):
 
     __tablename__ = "parent_stage"
     id = Column(BigInteger, primary_key=True)
-    stage_id = Column(Integer, ForeignKey(StageModel.id), nullable=False, default=0)
+    stage_id = Column(Integer, ForeignKey("stage.id"), nullable=False, default=0)
     child_asset_id = Column(
-        Integer, ForeignKey(AssetModel.id), nullable=False, default=0
+        Integer, ForeignKey("asset.id"), nullable=False, default=0
     )
-    stage = relationship(StageModel, foreign_keys=[stage_id], back_populates="assets")
+    stage = relationship("StageModel", foreign_keys=[stage_id], back_populates="assets")
     child_asset = relationship(
-        AssetModel, foreign_keys=[child_asset_id], back_populates="stages"
+        "AssetModel", foreign_keys=[child_asset_id], back_populates="stages"
     )
