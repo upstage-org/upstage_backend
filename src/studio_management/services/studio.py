@@ -65,7 +65,11 @@ class StudioService:
 
         if "usernameLike" in params:
             query = query.filter(
-                UserModel.username.ilike(f"%{params['usernameLike']}%")
+                UserModel.username.ilike(f"%{params['usernameLike']}%"),
+                UserModel.display_name.ilike(f"%{params['usernameLike']}%"),
+                UserModel.last_name.ilike(f"%{params['usernameLike']}%"),
+                UserModel.first_name.ilike(f"%{params['usernameLike']}%"),
+                UserModel.bin_name.ilike(f"%{params['usernameLike']}%"),   
             )
 
         if "createdBetween" in params:
