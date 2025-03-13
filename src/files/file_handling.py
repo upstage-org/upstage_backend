@@ -86,4 +86,4 @@ class FileHandling:
             os.remove(path)
 
     def get_file_size(self, base64: str) -> int:
-        return b64decode(base64.split(",")[1])
+        return len(b64decode(base64.split(",")[1]))
