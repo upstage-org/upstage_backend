@@ -13,7 +13,7 @@ if projdir not in sys.path:
 import pytest
 
 from payments.http.validation import OneTimePurchaseInput
-from payments.services.payments import PaymentService
+from payments.services.payment import PaymentService
 
 @pytest.mark.anyio
 class TestPaymentController:
