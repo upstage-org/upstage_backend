@@ -9,7 +9,7 @@ if projdir not in sys.path:
     sys.path.append(appdir)
     sys.path.append(projdir)
 
-from global_config import MQTT_ADMIN_USER, MQTT_ADMIN_PASSWORD, MQTT_BROKER, MQTT_ADMIN_PORT
+from src.global_config import MQTT_ADMIN_USER, MQTT_ADMIN_PASSWORD, MQTT_BROKER, MQTT_ADMIN_PORT
 from src.event_archive.systems.system import run
 from src.event_archive.messages.mqtt import build_client
 
