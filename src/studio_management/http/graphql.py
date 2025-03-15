@@ -120,6 +120,7 @@ type_defs = gql("""
     input PaymentIntentInput {
         amount: Int!
         currency: String
+    }
 
     input CreateSubscriptionInput {
         cardNumber: String!
@@ -632,6 +633,7 @@ type_defs = gql("""
                 
         sendEmailExternal(emailInfo: EmailInput!): EmailResponse!
                 
+        paymentSecret(input: PaymentIntentInput!): CommonResponse
         oneTimePurchase(input: OneTimePurchaseInput!): CommonResponse
         createSubscription(input: CreateSubscriptionInput!): CommonResponse
         cancelSubscription(subscription_id: String!): CommonResponse
