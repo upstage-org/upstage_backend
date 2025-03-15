@@ -10,6 +10,7 @@ if projdir not in sys.path:
     sys.path.append(projdir)
     sys.path.append(projdir2)
 
+import asyncio
 import pytest
 
 from payments.http.validation import OneTimePurchaseInput
@@ -20,14 +21,13 @@ class TestPaymentController:
     async def test_01_one_time_payment(self):
         otpi = OneTimePurchaseInput(
             cardNumber="4242424242424242",
-            expYear=2025,
-            expMonth=12,
-            cvc=123,
+            expYear="2025",
+            expMonth="12",
+            cvc="123",
             amount=100,
             )
-
         ps = PaymentService()
-        result = ps.one_time_purchase(otpi)
+        result = await ps.one_time_purchase(otpi)
         assert result['success'] == True
 
     '''
@@ -65,4 +65,4 @@ class TestPaymentController:
     '''
 
 if __name__ == "__main__":
-    sys.exit(TestPaymentController().test_01_one_time_payment())
+    asyncio.run(TestPaymentController().test_01_one_time_payment())

@@ -10,15 +10,22 @@ if projdir not in sys.path:
     sys.path.append(projdir)
     sys.path.append(projdir2)
 
+from flask import jsonify
 from ariadne import MutationType, QueryType, make_executable_schema
-from studio_management.http.graphql import type_defs
 from ariadne.asgi import GraphQL
+from global_config import app
+from studio_management.http.graphql import type_defs
 from payments.services.payment import PaymentService
-from payments.http.validation import OneTimePurchaseInput, CreateSubscriptionInput
+from payments.http.validation import (PaymentIntentInput,
+    OneTimePurchaseInput, CreateSubscriptionInput)
 
 query = QueryType()
 mutation = MutationType()
 
+@mutation.field("paymentSecret")
+async def paymentSecret(_, info, input: PaymentIntentInput):
+    intent = PaymentService().create_payment_intent(PaymentIntentInput(**input))
+    return await jsonify(client_secret=intent.client_secret)
 
 @mutation.field("oneTimePurchase")
 async def one_time_purchase(_, info, input: OneTimePurchaseInput):

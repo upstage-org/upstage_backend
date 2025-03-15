@@ -117,6 +117,10 @@ type_defs = gql("""
         filenames: [String!]
     }
                 
+    input PaymentIntentInput {
+        amount: Int!
+        currency: String
+
     input CreateSubscriptionInput {
         cardNumber: String!
         expYear: String!
