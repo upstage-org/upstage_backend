@@ -14,7 +14,6 @@ import stripe
 from global_config import STRIPE_KEY, STRIPE_PRODUCT_ID, convert_keys_to_camel_case
 from payments.http.validation import OneTimePurchaseInput, CreateSubscriptionInput
 
-
 stripe.api_key = STRIPE_KEY
 
 ACCEPT_TYPE = ["card"]
@@ -22,6 +21,15 @@ ACCEPT_CURRENCIES = ["usd"]
 
 
 class PaymentService:
+
+    def create_payment_intent(self,amount:int,currency:str):
+        intent = stripe.PaymentIntent.create(
+            amount=amount,
+            currency=currency,
+            automatic_payment_methods={"enabled": True},
+            )
+        return intent.client_secret
+
     def generate_card_token(self, card_number, exp_month, exp_year, cvc):
         """Generate card token"""
         data = stripe.Token.create(
