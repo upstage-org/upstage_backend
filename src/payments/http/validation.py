@@ -3,8 +3,8 @@ from pydantic import BaseModel, Field
 
 
 class PaymentIntentInput(BaseModel):
-    amount: int: = Field(...)
-    currency: str: = Field(default='nzd')
+    amount: int = Field(...)
+    currency: str = Field(default='nzd')
 
 class OneTimePurchaseInput(BaseModel):
     cardNumber: str = Field(...)
