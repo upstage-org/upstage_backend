@@ -58,7 +58,7 @@ PUBLIC_URL=https://${dname}:${HTTPS_PORT}
 #
 
 # Enable Let's Encrypt certificate generation
-ENABLE_LETSENCRYPT=1
+ENABLE_LETSENCRYPT=0
 
 # Domain for which to generate the certificate
 LETSENCRYPT_DOMAIN=${dname}

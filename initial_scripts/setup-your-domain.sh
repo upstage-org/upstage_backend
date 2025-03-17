@@ -126,10 +126,13 @@ Run the contents of this script over on the service machine:
 	   cd /streaming_files
 	   wget $(curl -s https://api.github.com/repos/jitsi/docker-jitsi-meet/releases/latest | grep 'zip' | cut -d\" -f4) -O latest_jitsi.zip
 	   unzip ./latest_jitsi.zip
+	   cd ./jitsi-docker-jitsi-meet-*
+	   sed -i '\@volumes@a\'$'\n'"            - \/etc\/letsencrypt\/live\/$dname\/cert.pem:\/config\/keys\/cert.crt" ./docker-compose.yml
+	   sed -i '\@volumes@a\'$'\n'"            - \/etc\/letsencrypt\/live\/$dname\/privkey.pem:\/config\/keys\/cert.key" ./docker-compose.yml
            cd $currdir
-	   cp ./initial_scripts/environments/jitsi_env_file_template.txt $jitsi_env_file
+	   cp ./initial_scripts/environments/jitsi_env_template.txt $jitsi_env_file
 	   ./initial_scripts/environments/generate_jitsi_passwords.sh $jitsi_env_file
-           cd ./streaming_containers && ./run_docker_compose.sh 
+           ./streaming_containers/run_docker_compose.sh
 
                 ;;
         *) echo "No match for machine type $machinetype, exiting."
