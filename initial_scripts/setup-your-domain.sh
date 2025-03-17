@@ -127,8 +127,8 @@ Run the contents of this script over on the service machine:
 	   wget $(curl -s https://api.github.com/repos/jitsi/docker-jitsi-meet/releases/latest | grep 'zip' | cut -d\" -f4) -O latest_jitsi.zip
 	   unzip ./latest_jitsi.zip
 	   cd ./jitsi-docker-jitsi-meet-*
-	   sed -i '\@volumes@a\'$'\n'"            - \/etc\/letsencrypt\/live\/$dname\/cert.pem:\/config\/keys\/cert.crt" ./docker-compose.yml
-	   sed -i '\@volumes@a\'$'\n'"            - \/etc\/letsencrypt\/live\/$dname\/privkey.pem:\/config\/keys\/cert.key" ./docker-compose.yml
+	   sed -i '\@volumes@a\'$'\n'"            - \/etc\/letsencrypt\/live\/$dname\/cert.pem:\/streaming_config\/jitsi-meet-cfg\/web\/keys\/cert.crt" ./docker-compose.yml
+	   sed -i '\@volumes@a\'$'\n'"            - \/etc\/letsencrypt\/live\/$dname\/privkey.pem:\/streaming_config\/jitsi-meet-cfg\/web\/keys\/cert.key" ./docker-compose.yml
            cd $currdir
 	   cp ./initial_scripts/environments/jitsi_env_template.txt $jitsi_env_file
 	   ./initial_scripts/environments/generate_jitsi_passwords.sh $jitsi_env_file
