@@ -116,23 +116,43 @@ Please log into your service machine in another shell, and copy your load_env.py
            read -p "
 Run the contents of this script over on the service machine:
            `cat $run_these_ufw_commands` 
-           Hit enter when finished: " ready
+           Press enter when finished: " ready
            cd ./app_containers && ./run_docker_compose.sh 
                 ;;
         3) sed "s/YOUR_DOMAIN_NAME/$dname/g" ./initial_scripts/nginx_templates/nginx_template_for_streaming_machines.conf >/etc/nginx/sites-available/$dname.conf
-           mkdir -p /streaming_files/config
-           mkdir -p /streaming_files/jitsi-meet-cfg/{web,transcripts,prosody/config,prosody/prosody-plugins-custom,jicofo,jvb,jigasi,jibri}
-	   export PUBLIC_URL=$dname/jitsi
-	   cd /streaming_files
-	   wget $(curl -s https://api.github.com/repos/jitsi/docker-jitsi-meet/releases/latest | grep 'zip' | cut -d\" -f4) -O latest_jitsi.zip
-	   unzip ./latest_jitsi.zip
-	   cd ./jitsi-docker-jitsi-meet-*
-	   sed -i '\@volumes@a\'$'\n'"            - \/etc\/letsencrypt\/live\/$dname\/cert.pem:\/streaming_config\/jitsi-meet-cfg\/web\/keys\/cert.crt" ./docker-compose.yml
-	   sed -i '\@volumes@a\'$'\n'"            - \/etc\/letsencrypt\/live\/$dname\/privkey.pem:\/streaming_config\/jitsi-meet-cfg\/web\/keys\/cert.key" ./docker-compose.yml
-           cd $currdir
-	   cp ./initial_scripts/environments/jitsi_env_template.txt $jitsi_env_file
-	   ./initial_scripts/environments/generate_jitsi_passwords.sh $jitsi_env_file
-           ./streaming_containers/run_docker_compose.sh
+           DIST="$(lsb_release -sc)"
+           mkdir -p /streaming_files/keys
+
+           wget https://prosody.im/files/prosody-debian-packages.key -O- | apt-key add -
+           curl -sL https://download.jitsi.org/jitsi-key.gpg.key | sh -c 'gpg --dearmor > /usr/share/keyrings/jitsi-keyring.gpg'
+
+           echo "deb [signed-by=/usr/share/keyrings/jitsi-keyring.gpg] https://download.jitsi.org stable/" > /etc/apt/sources.list.d/jitsi-stable.list
+           echo "deb https://packages.prosody.im/debian $DIST main" > /etc/apt/sources.list.d/prosody.list
+
+           apt update -y
+           apt upgrade -y
+           read -p "Jitsi will prompt you for the location of the existing SSL keys. These are the responses:
+
+/etc/letsencrypt/live/$dname/fullchain.pem
+/etc/letsencrypt/live/$dname/privkey.pem
+
+Once you've copy-pasted these to another screen, press enter to continue:" resp
+
+           apt -y install lua5.3 luarocks prosody libunbound-dev liblua5.3-dev
+           luarocks install luaunbound
+           mkdir -p /var/lib/prosody/
+           cp /etc/letsencrypt/live/$dname/fullchain.pem /var/lib/prosody/$dname.crt
+           cp /etc/letsencrypt/live/$dname/fullchain.pem /var/lib/prosody/auth.$dname.crt
+           cp /etc/letsencrypt/live/$dname/privkey.pem /var/lib/prosody/$dname.key
+           cp /etc/letsencrypt/live/$dname/privkey.pem /var/lib/prosody/auth.$dname.key
+
+           apt -y install prosody jitsi-meet
+	   sed "s/YOUR_DOMAIN_NAME/$dname/g" ./post_install/jitsi-cert-cron-script.sh >/root/jitsi-cert-cron-script.sh
+	   chmod 755 /root/jitsi-cert-cron-script.sh
+	   echo "0 1 * * * /root/jitsi-cert-cron-script.sh" >/tmp/pcron
+           crontab /tmp/pcron
+	   rm /tmp/pcron
+	   crontab -l
 
                 ;;
         *) echo "No match for machine type $machinetype, exiting."
