@@ -50,6 +50,8 @@ server {
 cd /etc/nginx/sites-enabled
 rm -rf default
 ln -s ../sites-available/${dname}.conf .
+> /var/www/html/index.nginx-debian.html
+> /usr/share/nginx/html/index.html
 
 nginx -t
 systemctl restart nginx
@@ -121,44 +123,36 @@ Run the contents of this script over on the service machine:
                 ;;
         3) sed "s/YOUR_DOMAIN_NAME/$dname/g" ./initial_scripts/nginx_templates/nginx_template_for_streaming_machines.conf >/etc/nginx/sites-available/$dname.conf
            DIST="$(lsb_release -sc)"
-           mkdir -p /streaming_files/keys
 
-           wget https://prosody.im/files/prosody-debian-packages.key -O- | apt-key add -
-           curl -sL https://download.jitsi.org/jitsi-key.gpg.key | sh -c 'gpg --dearmor > /usr/share/keyrings/jitsi-keyring.gpg'
-
-           echo "deb [signed-by=/usr/share/keyrings/jitsi-keyring.gpg] https://download.jitsi.org stable/" > /etc/apt/sources.list.d/jitsi-stable.list
-           echo "deb https://packages.prosody.im/debian $DIST main" > /etc/apt/sources.list.d/prosody.list
+           curl https://download.jitsi.org/jitsi-key.gpg.key | sudo sh -c 'gpg --dearmor > /usr/share/keyrings/jitsi-keyring.gpg'
+           echo 'deb [signed-by=/usr/share/keyrings/jitsi-keyring.gpg] https://download.jitsi.org stable/' > /etc/apt/sources.list.d/jitsi-stable.list
 
            apt update -y
            apt upgrade -y
-           read -p "Jitsi will prompt you for the location of the existing SSL keys. These are the responses:
+           read -p "In the next prompt, pick 'Use my own SSL keys'. 
+Jitsi will prompt you for the location of the existing SSL keys. These are the responses:
 
 /etc/letsencrypt/live/$dname/fullchain.pem
 /etc/letsencrypt/live/$dname/privkey.pem
 
 Once you've copy-pasted these to another screen, press enter to continue:" resp
 
-           apt -y install lua5.3 luarocks prosody libunbound-dev liblua5.3-dev
-           luarocks install luaunbound
-           mkdir -p /var/lib/prosody/
            cp /etc/letsencrypt/live/$dname/fullchain.pem /var/lib/prosody/$dname.crt
            cp /etc/letsencrypt/live/$dname/fullchain.pem /var/lib/prosody/auth.$dname.crt
            cp /etc/letsencrypt/live/$dname/privkey.pem /var/lib/prosody/$dname.key
            cp /etc/letsencrypt/live/$dname/privkey.pem /var/lib/prosody/auth.$dname.key
 
-           apt -y install prosody
            apt -y install jitsi-meet
-	   sed "s/YOUR_DOMAIN_NAME/$dname/g" ./initial_scripts/post_install/jitsi-cert-cron-script.sh >/root/jitsi-cert-cron-script.sh
-	   chmod 755 /root/jitsi-cert-cron-script.sh
-	   echo "0 1 * * * /root/jitsi-cert-cron-script.sh" >/tmp/pcron
+           sed "s/YOUR_DOMAIN_NAME/$dname/g" ./initial_scripts/post_install/jitsi-cert-cron-script.sh >/root/jitsi-cert-cron-script.sh
+           chmod 755 /root/jitsi-cert-cron-script.sh
+           echo "0 1 * * * /root/jitsi-cert-cron-script.sh" >/tmp/pcron
            crontab /tmp/pcron
-	   rm /tmp/pcron
-	   crontab -l
+           rm /tmp/pcron
+           crontab -l
 
                 ;;
         *) echo "No match for machine type $machinetype, exiting."
                 ;;
-
-        systemctl restart nginx
-
 esac
+
+systemctl restart nginx
