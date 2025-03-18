@@ -158,4 +158,7 @@ Once you've copy-pasted these to another screen, press enter to continue:" resp
                 ;;
         *) echo "No match for machine type $machinetype, exiting."
                 ;;
+
+        systemctl restart nginx
+
 esac
