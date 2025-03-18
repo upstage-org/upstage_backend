@@ -146,8 +146,9 @@ Once you've copy-pasted these to another screen, press enter to continue:" resp
            cp /etc/letsencrypt/live/$dname/privkey.pem /var/lib/prosody/$dname.key
            cp /etc/letsencrypt/live/$dname/privkey.pem /var/lib/prosody/auth.$dname.key
 
-           apt -y install prosody jitsi-meet
-	   sed "s/YOUR_DOMAIN_NAME/$dname/g" ./post_install/jitsi-cert-cron-script.sh >/root/jitsi-cert-cron-script.sh
+           apt -y install prosody
+           apt -y install jitsi-meet
+	   sed "s/YOUR_DOMAIN_NAME/$dname/g" ./initial_scripts/post_install/jitsi-cert-cron-script.sh >/root/jitsi-cert-cron-script.sh
 	   chmod 755 /root/jitsi-cert-cron-script.sh
 	   echo "0 1 * * * /root/jitsi-cert-cron-script.sh" >/tmp/pcron
            crontab /tmp/pcron
