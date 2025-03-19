@@ -21,7 +21,7 @@ query = QueryType()
 mutation = MutationType()
 
 @mutation.field("paymentSecret")
-async def paymentSecret(_, info, input: PaymentIntentInput):
+async def get_payment_secret(_, info, input: PaymentIntentInput):
     intent = PaymentService().create_payment_intent(PaymentIntentInput(**input))
     return await {'success':True,'message':intent.client_secret}
 
