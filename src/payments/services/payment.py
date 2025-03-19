@@ -163,3 +163,9 @@ class PaymentService:
         payment = self.create_payment_charge(card_token, amount)
 
         return {"success": True}
+
+
+if __name__ == '__main__':
+    pi=PaymentService()
+    result = pi.create_payment_intent(amount=100,currency='usd')
+    print(result)
