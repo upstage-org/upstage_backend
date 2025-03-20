@@ -22,8 +22,9 @@ mutation = MutationType()
 
 @mutation.field("paymentSecret")
 async def get_payment_secret(_, info, input: PaymentIntentInput):
-    intent = PaymentService().create_payment_intent(PaymentIntentInput(**input))
-    return await {'success':True,'message':intent.client_secret}
+    secret = PaymentService().create_payment_intent(input.amount,input.currency)
+    print(f'Secret is {secret}')
+    return secret or 'Stripe failed'
 
 @mutation.field("oneTimePurchase")
 async def one_time_purchase(_, info, input: OneTimePurchaseInput):

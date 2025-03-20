@@ -633,7 +633,7 @@ type_defs = gql("""
                 
         sendEmailExternal(emailInfo: EmailInput!): EmailResponse!
                 
-        paymentSecret(input: PaymentIntentInput!): CommonResponse
+        paymentSecret(input: PaymentIntentInput!): String!
         oneTimePurchase(input: OneTimePurchaseInput!): CommonResponse
         createSubscription(input: CreateSubscriptionInput!): CommonResponse
         cancelSubscription(subscription_id: String!): CommonResponse
