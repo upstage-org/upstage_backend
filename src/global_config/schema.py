@@ -12,6 +12,7 @@ from ariadne import MutationType, QueryType, make_executable_schema
 from fastapi import FastAPI
 from ariadne.asgi import GraphQL
 
+
 def config_graphql_endpoints(app: FastAPI):
     from assets.http.schema import query as asset_query, mutation as asset_mutation
     from studio_management.http.schema import (
@@ -49,6 +50,10 @@ def config_graphql_endpoints(app: FastAPI):
 
     combined_mutation.set_field(
         "sendEmailExternal", mail_mutation._resolvers["sendEmailExternal"]
+    )
+
+    combined_mutation.set_field(
+        "paymentSecret", payment_mutation._resolvers["paymentSecret"]
     )
 
     combined_mutation.set_field(
