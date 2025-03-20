@@ -17,7 +17,7 @@ from payments.http.validation import OneTimePurchaseInput, CreateSubscriptionInp
 stripe.api_key = STRIPE_KEY
 
 ACCEPT_TYPE = ["card"]
-ACCEPT_CURRENCIES = ["usd"]
+ACCEPT_CURRENCIES = ["usd","nzd"]
 
 
 class PaymentService:
