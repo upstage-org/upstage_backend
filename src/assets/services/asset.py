@@ -254,8 +254,7 @@ class AssetService:
     def update_asset_permissions(
         self, input: SaveMediaInput, local_db_session, asset: AssetModel
     ):
-        
-        if not(len(input.userIds)):
+        if not (len(input.userIds)):
             asset.permissions.delete()
             local_db_session.flush()
             return
@@ -457,9 +456,7 @@ class AssetService:
                         .first()
                     )
                     if not frame_asset:
-                        self.file_handing.delete_file(
-                            os.path.join(storagePath, frame)
-                        )
+                        self.file_handing.delete_file(os.path.join(storagePath, frame))
 
         physical_path = os.path.join(storagePath, asset.file_location)
         local_db_session.query(ParentStageModel).filter(

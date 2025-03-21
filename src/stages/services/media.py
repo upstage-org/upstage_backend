@@ -42,6 +42,7 @@ from users.db_models.user import ADMIN, SUPER_ADMIN, UserModel
 
 storagePath = UPLOAD_USER_CONTENT_FOLDER
 
+
 class MediaService:
     def __init__(self):
         self.asset_service = AssetService()
@@ -222,9 +223,7 @@ class MediaService:
                 .first()
             )
             if not frame_asset:
-                self.file_handling.delete_file(
-                    os.path.join(storagePath, frame)
-                )
+                self.file_handling.delete_file(os.path.join(storagePath, frame))
 
     def _get_physical_path(self, file_location):
         return os.path.join(storagePath, file_location)

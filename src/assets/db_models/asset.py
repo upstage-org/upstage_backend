@@ -29,6 +29,7 @@ from assets.db_models.asset_license import AssetLicenseModel
 from assets.db_models.media_tag import MediaTagModel
 from assets.db_models.asset_usage import AssetUsageModel
 
+
 class Previlege(Enum):
     NONE = 0
     OWNER = 1

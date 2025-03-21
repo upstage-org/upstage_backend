@@ -17,17 +17,16 @@ from payments.http.validation import OneTimePurchaseInput, CreateSubscriptionInp
 stripe.api_key = STRIPE_KEY
 
 ACCEPT_TYPE = ["card"]
-ACCEPT_CURRENCIES = ["usd","nzd"]
+ACCEPT_CURRENCIES = ["usd", "nzd"]
 
 
 class PaymentService:
-
-    def create_payment_intent(self,amount:int,currency:str):
+    def create_payment_intent(self, amount: int, currency: str):
         intent = stripe.PaymentIntent.create(
             amount=amount,
             currency=currency,
             automatic_payment_methods={"enabled": True},
-            )
+        )
         return intent.client_secret
 
     def generate_card_token(self, card_number, exp_month, exp_year, cvc):
@@ -165,7 +164,7 @@ class PaymentService:
         return {"success": True}
 
 
-if __name__ == '__main__':
-    pi=PaymentService()
-    result = pi.create_payment_intent(amount=100,currency='usd')
+if __name__ == "__main__":
+    pi = PaymentService()
+    result = pi.create_payment_intent(amount=100, currency="usd")
     print(result)
