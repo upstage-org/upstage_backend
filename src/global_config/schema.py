@@ -167,6 +167,9 @@ def config_graphql_endpoints(app: FastAPI):
     )
     combined_mutation.set_field("uploadFile", asset_mutation._resolvers["uploadFile"])
     combined_mutation.set_field("saveMedia", asset_mutation._resolvers["saveMedia"])
+    combined_mutation.set_field(
+        "updateMediaStatus", asset_mutation._resolvers["updateMediaStatus"]
+    )
     combined_mutation.set_field("deleteMedia", asset_mutation._resolvers["deleteMedia"])
     combined_mutation.set_field("updateUser", studio_mutation._resolvers["updateUser"])
     combined_mutation.set_field("deleteUser", studio_mutation._resolvers["deleteUser"])

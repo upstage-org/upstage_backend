@@ -116,9 +116,7 @@ class AuthenticationService:
             if decrypt(user.password) != enter_password:
                 raise GraphQLError("Incorrect username or password. Please try again.")
         except:
-            raise GraphQLError(
-                "Incorrect username or password. Please try again."
-            )
+            raise GraphQLError("Incorrect username or password. Please try again.")
         if not user.active:
             raise GraphQLError(
                 "Your account has been successfully created but not approved yet.<br/>Please wait for approval or contact UpStage Admin for support!"

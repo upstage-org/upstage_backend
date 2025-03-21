@@ -2266,3 +2266,30 @@ Example Response:
   }
 }
 ```
+
+
+**UpdateMediaStatus
+Example Query:
+```
+mutation {
+  updateMediaStatus(input: {
+    id: 64,
+    status: MediaStatusEnum  // it can be Active/Dormant/Remove
+  }) {
+    message
+    success
+  }
+}
+
+```
+Example Response:
+```
+{
+  "data": {
+    "updateMediaStatus": {
+      "message": "Media status updated successfully.",
+      "success": true
+    }
+  }
+}
+```

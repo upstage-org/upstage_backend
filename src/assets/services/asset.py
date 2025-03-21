@@ -34,7 +34,12 @@ from assets.db_models.asset_type import AssetTypeModel
 from assets.db_models.asset_usage import AssetUsageModel
 from assets.db_models.media_tag import MediaTagModel
 from assets.db_models.tag import TagModel
-from assets.http.validation import MediaTableInput, SaveMediaInput
+from assets.http.validation import (
+    MediaTableInput,
+    SaveMediaInput,
+    UpdateMediaStatusInput,
+    MediaStatusEnum,
+)
 from stages.db_models.stage import StageModel
 from stages.db_models.parent_stage import ParentStageModel
 from users.db_models.user import ADMIN, SUPER_ADMIN, UserModel
@@ -427,18 +432,38 @@ class AssetService:
                     "message": "Only media owner or admin can delete this media!",
                 }
 
-            if len(list(asset.to_dict()["stages"])):
-                asset.dormant = True
-                local_db_session.flush()
-            else:
-                self.cleanup_assets(local_db_session, asset)
-                local_db_session.delete(asset)
-                local_db_session.flush()
+            self.cleanup_assets(local_db_session, asset)
+            local_db_session.delete(asset)
+            local_db_session.flush()
 
         return {
             "success": True,
             "message": "Media deleted successfully!",
         }
+
+    def update_status(self, owner: UserModel, input: UpdateMediaStatusInput):
+        if (input.status.value == MediaStatusEnum.ACTIVE.value) or (
+            input.status.value == MediaStatusEnum.DORMANT.value
+        ):
+            with ScopedSession() as local_db_session:
+                asset = (
+                    local_db_session.query(AssetModel)
+                    .outerjoin(ParentStageModel)
+                    .filter(AssetModel.id == id)
+                    .first()
+                )
+
+                if not asset:
+                    raise GraphQLError("Media not found")
+
+                asset.dormant = input.status.value == MediaStatusEnum.DORMANT.value
+                local_db_session.flush()
+
+            return {
+                "success": True,
+                "message": "Media updated successfully!",
+            }
+        return self.delete_media(owner, input.id)
 
     def cleanup_assets(self, local_db_session, asset: AssetModel):
         if asset.description:

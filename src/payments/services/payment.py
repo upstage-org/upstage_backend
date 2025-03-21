@@ -21,7 +21,7 @@ ACCEPT_CURRENCIES = ["usd", "nzd"]
 
 
 class PaymentService:
-    def create_payment_intent(self,amount:int,currency:str='usd'):
+    def create_payment_intent(self, amount: int, currency: str = "usd"):
         intent = stripe.PaymentIntent.create(
             amount=amount,
             currency=currency,

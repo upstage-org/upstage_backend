@@ -12,7 +12,11 @@ if projdir not in sys.path:
 
 from ariadne import MutationType, QueryType, make_executable_schema
 from ariadne.asgi import GraphQL
-from assets.http.validation import MediaTableInput, SaveMediaInput
+from assets.http.validation import (
+    MediaTableInput,
+    SaveMediaInput,
+    UpdateMediaStatusInput,
+)
 from global_config import authenticated
 from studio_management.http.graphql import type_defs
 from assets.services.asset import AssetService
@@ -77,6 +81,15 @@ async def save_media(_, info, input: SaveMediaInput):
 async def delete_media(_, info, id: int):
     return AssetService().delete_media(
         UserModel(**info.context["request"].state.current_user), id
+    )
+
+
+@mutation.field("updateMediaStatus")
+@authenticated(allowed_roles=[SUPER_ADMIN, ADMIN, PLAYER])
+async def update_status(_, info, input: UpdateMediaStatusInput):
+    return AssetService().update_status(
+        UserModel(**info.context["request"].state.current_user),
+        UpdateMediaStatusInput(**input),
     )
 
 
