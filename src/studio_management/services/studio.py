@@ -268,14 +268,13 @@ class StudioService:
                 PerformanceModel.stage.has(StageModel.owner_id == id)
             ).delete(synchronize_session="fetch")
 
-            local_db_session.query(StageModel).filter(
-                StageModel.owner_id == id
-            ).delete()
-
             local_db_session.query(SceneModel).filter(
                 SceneModel.stage.has(StageModel.owner_id == id)
             ).delete(synchronize_session="fetch")
 
+            local_db_session.query(StageModel).filter(
+                StageModel.owner_id == id
+            ).delete()
             local_db_session.query(AssetModel).filter(AssetModel.owner_id == id).update(
                 {AssetModel.owner_id: current_user.id}
             )
