@@ -18,6 +18,7 @@ from global_config import BaseModel
 from stages.db_models.stage_attribute import StageAttributeModel
 from stages.db_models.parent_stage import ParentStageModel
 
+
 class StageModel(BaseModel):
     """
     Stage is yet another asset type, with its own attributes,

@@ -13,10 +13,11 @@ if projdir not in sys.path:
 from datetime import datetime
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import class_mapper, ColumnProperty, RelationshipProperty
-#from global_config import Base
+# from global_config import Base
 
 global Base
 Base = declarative_base()
+
 
 class BaseModel(Base):
     __abstract__ = True

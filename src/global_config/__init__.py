@@ -39,5 +39,4 @@ __all__ = [
     "authenticated",
 ]
 
-__all__ += [name for name in dir(global_config.env) if not name.startswith('__')]
-
+__all__ += [name for name in dir(global_config.env) if not name.startswith("__")]

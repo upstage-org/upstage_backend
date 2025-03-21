@@ -14,17 +14,22 @@ from ariadne import MutationType, QueryType, make_executable_schema
 from ariadne.asgi import GraphQL
 from studio_management.http.graphql import type_defs
 from payments.services.payment import PaymentService
-from payments.http.validation import (PaymentIntentInput,
-    OneTimePurchaseInput, CreateSubscriptionInput)
+from payments.http.validation import (
+    PaymentIntentInput,
+    OneTimePurchaseInput,
+    CreateSubscriptionInput,
+)
 
 query = QueryType()
 mutation = MutationType()
 
+
 @mutation.field("paymentSecret")
 async def get_payment_secret(_, info, input: PaymentIntentInput):
-    secret = PaymentService().create_payment_intent(input.amount,input.currency)
-    print(f'Secret is {secret}')
-    return secret or 'Stripe failed'
+    secret = PaymentService().create_payment_intent(input.amount, input.currency)
+    print(f"Secret is {secret}")
+    return secret or "Stripe failed"
+
 
 @mutation.field("oneTimePurchase")
 async def one_time_purchase(_, info, input: OneTimePurchaseInput):

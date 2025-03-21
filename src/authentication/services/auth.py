@@ -45,7 +45,7 @@ class AuthenticationService:
         email = self.validate_login_payload(username)
         user = self.user_service.find_one(username, email)
         if not user:
-            return GraphQLError("Incorrect username or password")
+            return GraphQLError("Incorrect username or password. Please try again.")
 
         self.validate_password(password, user)
         access_token = self.create_token(
@@ -114,10 +114,10 @@ class AuthenticationService:
     def validate_password(self, enter_password: str, user: UserModel):
         try:
             if decrypt(user.password) != enter_password:
-                raise GraphQLError("Incorrect username or password")
+                raise GraphQLError("Incorrect username or password. Please try again.")
         except:
             raise GraphQLError(
-                "Signature did not match digest. Please contact admin to make sure that cipher key is correctly set up."
+                "Incorrect username or password. Please try again."
             )
         if not user.active:
             raise GraphQLError(
