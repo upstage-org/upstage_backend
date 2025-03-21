@@ -45,6 +45,8 @@ from stages.db_models.parent_stage import ParentStageModel
 from stages.db_models.stage import StageModel
 from assets.db_models.asset import AssetModel
 from stages.db_models.stage_attribute import StageAttributeModel
+from performance_config.db_models.scene import SceneModel
+
 from studio_management.http.validation import (
     BatchUserInput,
     ChangePasswordInput,
@@ -269,6 +271,11 @@ class StudioService:
             local_db_session.query(StageModel).filter(
                 StageModel.owner_id == id
             ).delete()
+
+            local_db_session.query(SceneModel).filter(
+                SceneModel.stage.has(StageModel.owner_id == id)
+            ).delete(synchronize_session="fetch")
+
             local_db_session.query(AssetModel).filter(AssetModel.owner_id == id).update(
                 {AssetModel.owner_id: current_user.id}
             )
