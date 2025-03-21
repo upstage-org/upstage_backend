@@ -4,7 +4,7 @@ from pydantic import BaseModel, Field
 
 class PaymentIntentInput(BaseModel):
     amount: int = Field(...)
-    currency: str = Field(default="nzd")
+    currency: str = Field(default='usd')
 
 
 class OneTimePurchaseInput(BaseModel):
