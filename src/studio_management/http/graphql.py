@@ -231,6 +231,11 @@ type_defs = gql("""
         cursor: Int
     }
                 
+    input UpdateMediaStatusInput {
+        id: ID!
+        status: MediaStatusEnum!    
+    }
+                
    type StagesResponse {
         totalCount: Int
         edges: [Stage]
@@ -548,6 +553,7 @@ type_defs = gql("""
         menu: Config
         showRegistration: BooleanConfig
     }
+            
 
     scalar Date
     scalar JSONString
@@ -588,6 +594,12 @@ type_defs = gql("""
         EMAIL_DESC
     }
                 
+    enum MediaStatusEnum {
+        Active
+        Remove
+        Dormant
+    }
+                
     enum StageSortEnum {
         ID_ASC
         ID_DESC
@@ -611,6 +623,7 @@ type_defs = gql("""
         deleteUser(id: ID!): CommonResponse
         uploadFile(base64: String!, filename: String!): File!
         saveMedia(input: SaveMediaInput!): SaveMediaPayload!
+        updateMediaStatus(input: UpdateMediaStatusInput): CommonResponse
         deleteMedia(id: ID!): DeleteMediaPayload!
         sendEmail(input: SendEmailInput!): CommonResponse
         changePassword(input: ChangePasswordInput!): CommonResponse

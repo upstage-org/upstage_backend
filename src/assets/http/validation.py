@@ -79,3 +79,14 @@ class AssetSortEnum(Enum):
     NAME_DESC = "NAME_DESC"
     CREATED_ON_ASC = "CREATED_ON_ASC"
     CREATED_ON_DESC = "CREATED_ON_DESC"
+
+
+class MediaStatusEnum(Enum):
+    ACTIVE = "Active"
+    DORMANT = "Dormant"
+    REMOVE = "Remove"
+
+
+class UpdateMediaStatusInput(BaseModel):
+    id: int
+    status: MediaStatusEnum
