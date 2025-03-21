@@ -26,8 +26,7 @@ mutation = MutationType()
 
 @mutation.field("paymentSecret")
 async def get_payment_secret(_, info, input: PaymentIntentInput):
-    secret = PaymentService().create_payment_intent(input.amount, input.currency)
-    print(f"Secret is {secret}")
+    secret = PaymentService().create_payment_intent(**input)
     return secret or "Stripe failed"
 
 
