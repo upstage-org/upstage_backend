@@ -256,25 +256,13 @@ class StudioService:
                 UserSessionModel.user_id == id
             ).delete()
 
-            local_db_session.query(StageAttributeModel).filter(
-                StageAttributeModel.stage.has(StageModel.owner_id == id)
-            ).delete(synchronize_session="fetch")
+            local_db_session.query(SceneModel).filter(SceneModel.owner_id == id).update(
+                {SceneModel.owner_id: current_user.id}
+            )
 
-            local_db_session.query(ParentStageModel).filter(
-                ParentStageModel.stage.has(StageModel.owner_id == id)
-            ).delete(synchronize_session="fetch")
-
-            local_db_session.query(PerformanceModel).filter(
-                PerformanceModel.stage.has(StageModel.owner_id == id)
-            ).delete(synchronize_session="fetch")
-
-            local_db_session.query(SceneModel).filter(
-                SceneModel.stage.has(StageModel.owner_id == id)
-            ).delete(synchronize_session="fetch")
-
-            local_db_session.query(StageModel).filter(
-                StageModel.owner_id == id
-            ).delete()
+            local_db_session.query(StageModel).filter(StageModel.owner_id == id).update(
+                {StageModel.owner_id: current_user.id}
+            )
             local_db_session.query(AssetModel).filter(AssetModel.owner_id == id).update(
                 {AssetModel.owner_id: current_user.id}
             )
