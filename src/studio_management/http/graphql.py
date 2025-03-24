@@ -49,6 +49,7 @@ type_defs = gql("""
         owners: [String]
         stages: [ID]
         tags: [String]
+        dormant: Boolean
         createdBetween: [Date]
     }
                 

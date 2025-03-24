@@ -65,6 +65,7 @@ class MediaTableInput(BaseModel):
     owners: Optional[List[str]] = Field(None, description="List of owners")
     stages: Optional[List[int]] = Field(None, description="List of stage IDs")
     tags: Optional[List[str]] = Field(None, description="List of tags")
+    dormant: Optional[bool] = Field(None, description="Filter by dormant")
     createdBetween: Optional[List[date]] = Field(
         None, description="List of two dates representing the created date range"
     )
