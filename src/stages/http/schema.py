@@ -221,11 +221,8 @@ def update_visibility(_, info, id: int):
 
 
 @mutation.field("updateLastAccess")
-@authenticated(allowed_roles=[SUPER_ADMIN, ADMIN, PLAYER])
-def update_last_access(_, info, id: int):
-    return StageService().update_last_access(
-        UserModel(**info.context["request"].state.current_user), id
-    )
+def update_last_access(_, id: int):
+    return StageService().update_last_access(id)
 
 
 schema = make_executable_schema(type_defs, query, mutation)
