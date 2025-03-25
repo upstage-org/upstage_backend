@@ -89,9 +89,7 @@ class AssetService:
         if user.role not in [SUPER_ADMIN, ADMIN]:
             query = query.filter(AssetModel.dormant.is_not(True))
         elif search_assets.dormant is not None:
-            query = query.filter(
-                AssetModel.dormant.is_(search_assets.dormant)
-            )
+            query = query.filter(AssetModel.dormant.is_(search_assets.dormant))
 
         if search_assets.name:
             query = query.filter(AssetModel.name.like(f"%{search_assets.name}%"))

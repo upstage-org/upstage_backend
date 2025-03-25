@@ -84,6 +84,9 @@ class StageService:
                     sort_field = StageModel.name
                 elif field == "CREATED_ON":
                     sort_field = StageModel.created_on
+                elif field == "LAST_ACCESS":
+                    sort_field = StageModel.last_access
+    
                 if direction == "ASC":
                     query = query.order_by(sort_field.asc())
                 elif direction == "DESC":
@@ -539,16 +542,13 @@ class StageService:
 
         return {"result": attribute.description}
 
-    def update_last_access(self, user: UserModel, id: int):
+    def update_last_access(self, id: int):
         with ScopedSession() as local_db_session:
             stage = (
                 local_db_session.query(StageModel).filter(StageModel.id == id).first()
             )
             if not stage:
                 raise GraphQLError("Stage not found")
-
-            if stage.owner_id != user.id and user.role not in [ADMIN, SUPER_ADMIN]:
-                raise GraphQLError("You are not authorized to update this stage")
 
             stage.last_access = datetime.now()
             local_db_session.commit()
