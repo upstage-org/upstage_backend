@@ -36,7 +36,6 @@ default_asset_types = [
     "curtain",
     "prop",
     "avatar",
-    "image",
 ]
 
 
