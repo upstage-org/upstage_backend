@@ -13,7 +13,7 @@ import os
 import uuid
 from graphql import GraphQLError
 
-from global_config import OTHER_MAX_SIZE, VIDEO_MAX_SIZE
+from global_config import OTHER_MEDIA_MAX_SIZE, VIDEO_MAX_SIZE
 
 
 class FileHandling:
@@ -25,9 +25,9 @@ class FileHandling:
 
     def validate_file_size(self, file_extension: str, file_size: int) -> bool:
         if file_extension.lower() in [".svg", ".jpg", ".jpeg", ".png", ".gif"]:
-            if file_size > OTHER_MAX_SIZE:
+            if file_size > OTHER_MEDIA_MAX_SIZE:
                 raise GraphQLError(
-                    f"Image files must be under {self.convert_KB_to_MB(OTHER_MAX_SIZE)}MB."
+                    f"Image files must be under {self.convert_KB_to_MB(OTHER_MEDIA_MAX_SIZE)}MB."
                 )
         elif file_extension.lower() in [
             ".wav",
@@ -40,9 +40,9 @@ class FileHandling:
             ".flac",
             ".m4a",
         ]:
-            if file_size > OTHER_MAX_SIZE:
+            if file_size > OTHER_MEDIA_MAX_SIZE:
                 raise GraphQLError(
-                    f"Audio files must be under {self.convert_KB_to_MB(OTHER_MAX_SIZE)}MB."
+                    f"Audio files must be under {self.convert_KB_to_MB(OTHER_MEDIA_MAX_SIZE)}MB."
                 )
         elif file_extension.lower() in [".mp4", ".webm", ".opgg", ".3gp", ".flv"]:
             if file_size > VIDEO_MAX_SIZE:
