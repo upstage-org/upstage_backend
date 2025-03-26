@@ -175,3 +175,16 @@ Hi <b>{display_user(media.owner)}</b>,
 <br>
 {footer}
 """
+
+
+def notify_mark_media_active(media):
+    return f"""
+<p>
+Hi <b>{display_user(media.owner)}</b>,
+<br>
+<br>
+Your dormant media item  {media.name} has been reactivated. You will find it in your Media list and can now edit and assign it to stages
+<br>
+<br>
+{footer}
+"""
