@@ -165,7 +165,14 @@ class AssetService:
             ],
         }
 
-    def upload_file(self, base64: str, filename: str):
+    def upload_file(self, user: UserModel, base64: str, filename: str):
+        file_size = self.file_handing.get_file_size(base64)
+
+        if file_size > user.upload_limit:
+            raise GraphQLError(
+                f"File size must be under {self.file_handing.convert_KB_to_MB(user.upload_limit)}MB."
+            )
+
         file_location = self.file_handing.upload_file(
             base64, filename, None, storagePath, "media"
         )

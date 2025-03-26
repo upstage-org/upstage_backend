@@ -63,8 +63,10 @@ async def get_voices(_, __):
 
 @mutation.field("uploadFile")
 @authenticated(allowed_roles=[SUPER_ADMIN, ADMIN, PLAYER])
-async def upload_file(_, __, base64: str, filename: str):
-    return AssetService().upload_file(base64, filename)
+async def upload_file(_, info, base64: str, filename: str):
+    return AssetService().upload_file(
+        UserModel(**info.context["request"].state.current_user), base64, filename
+    )
 
 
 @mutation.field("saveMedia")
