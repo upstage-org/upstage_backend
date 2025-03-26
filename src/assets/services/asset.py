@@ -1,4 +1,5 @@
 # -*- coding: iso8859-15 -*-
+import asyncio
 import os
 import sys
 
@@ -44,6 +45,10 @@ from stages.db_models.stage import StageModel
 from stages.db_models.parent_stage import ParentStageModel
 from users.db_models.user import ADMIN, SUPER_ADMIN, UserModel
 from files.file_handling import FileHandling
+from mails.helpers.mail import send
+from mails.templates.templates import notify_mark_media_active
+
+
 
 storagePath = UPLOAD_USER_CONTENT_FOLDER
 
@@ -464,6 +469,15 @@ class AssetService:
 
                 asset.dormant = input.status.value == MediaStatusEnum.DORMANT.value
                 local_db_session.flush()
+
+            if (input.status.value == MediaStatusEnum.ACTIVE.value):
+                asyncio.create_task(
+                    send(
+                        [asset.owner.email],
+                        "Your dormant media item has been reactivated",
+                        notify_mark_media_active(asset),
+                    )
+                )
 
             return {
                 "success": True,
