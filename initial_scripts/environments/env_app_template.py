@@ -39,7 +39,7 @@ MQTT_PORT = 9002
 CLOUDFLARE_CAPTCHA_SECRETKEY = "{REPLACE_CLOUDFLARE_CAPTCHA_SECRETKEY}"
 CLOUDFLARE_CAPTCHA_VERIFY_ENDPOINT = "https://challenges.cloudflare.com/turnstile/v0/siteverify"
 
-CLIENT_MAX_BODY_SIZE=300 * 1024 * 1024
+CLIENT_MAX_BODY_SIZE=500 * 1024 * 1024
 
 UPLOAD_USER_CONTENT_FOLDER="/usr/app/uploads" # Mounted this way in docker-compose
 DEMO_MEDIA_FOLDER="./dashboard/demo"

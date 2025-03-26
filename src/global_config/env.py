@@ -109,8 +109,8 @@ UPSTAGE_FRONTEND_URL = os.getenv("UPSTAGE_FRONTEND_URL", "http://localhost:3000"
 ENV_TYPE = os.getenv("ENV_TYPE", "development")
 hstr = "from .load_env import *"
 
-VIDEO_MAX_SIZE = 300 * 1024 * 1024  # KB
-OTHER_MAX_SIZE = 1 * 1024 * 1024  # KB
+VIDEO_MAX_SIZE = 500 * 1024 * 1024  # KB
+OTHER_MEDIA_MAX_SIZE = 500 * 1024 * 1024  # KB
 
 print(hstr)
 
