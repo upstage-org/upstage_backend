@@ -465,18 +465,19 @@ class AssetService:
 
                 if not asset:
                     raise GraphQLError("Media not found")
+                
 
                 asset.dormant = input.status.value == MediaStatusEnum.DORMANT.value
                 local_db_session.flush()
 
-            if input.status.value == MediaStatusEnum.ACTIVE.value:
-                asyncio.create_task(
-                    send(
-                        [asset.owner.email],
-                        "Your dormant media item has been reactivated",
-                        notify_mark_media_active(asset),
+                if input.status.value == MediaStatusEnum.ACTIVE.value:
+                    asyncio.create_task(
+                        send(
+                            [asset.owner.email],
+                            "Your dormant media item has been reactivated",
+                            notify_mark_media_active(asset),
+                        )
                     )
-                )
 
             return {
                 "success": True,
