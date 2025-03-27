@@ -49,7 +49,6 @@ from mails.helpers.mail import send
 from mails.templates.templates import notify_mark_media_active
 
 
-
 storagePath = UPLOAD_USER_CONTENT_FOLDER
 
 
@@ -460,7 +459,7 @@ class AssetService:
                 asset = (
                     local_db_session.query(AssetModel)
                     .outerjoin(ParentStageModel)
-                    .filter(AssetModel.id == id)
+                    .filter(AssetModel.id == input.id)
                     .first()
                 )
 
@@ -470,7 +469,7 @@ class AssetService:
                 asset.dormant = input.status.value == MediaStatusEnum.DORMANT.value
                 local_db_session.flush()
 
-            if (input.status.value == MediaStatusEnum.ACTIVE.value):
+            if input.status.value == MediaStatusEnum.ACTIVE.value:
                 asyncio.create_task(
                     send(
                         [asset.owner.email],
