@@ -78,7 +78,7 @@ class StageService:
             for sort_option in sort:
                 field, direction = sort_option.rsplit("_", 1)
 
-                if (field == "ACCESS"):
+                if field == "ACCESS":
                     continue
 
                 if field == "OWNER_ID":
@@ -98,27 +98,25 @@ class StageService:
         else:
             query = query.order_by(StageModel.name.asc())
 
-
         data = query.all()
 
         stages = [
-                convert_keys_to_camel_case(
-                    {
-                        **stage.to_dict(),
-                        "cover": stage.cover,
-                        "visibility": stage.visibility,
-                        "status": stage.status,
-                        "assets": [
-                            asset.child_asset.to_dict() for asset in stage.assets
-                        ],
-                        "permission": self.stage_operation_service.resolve_permission(
-                            user.id, stage
-                        ),
-                    }
-                )
-                for stage in data]
+            convert_keys_to_camel_case(
+                {
+                    **stage.to_dict(),
+                    "cover": stage.cover,
+                    "visibility": stage.visibility,
+                    "status": stage.status,
+                    "assets": [asset.child_asset.to_dict() for asset in stage.assets],
+                    "permission": self.stage_operation_service.resolve_permission(
+                        user.id, stage
+                    ),
+                }
+            )
+            for stage in data
+        ]
 
-        if (input.sort[0] in ['ACCESS_DESC', 'ACCESS_ASC']):
+        if input.sort is not None and input.sort[0] in ["ACCESS_DESC", "ACCESS_ASC"]:
             field, direction = input.sort[0].rsplit("_", 1)
             stages.sort(key=lambda s: s["permission"], reverse=(direction == "DESC"))
 
@@ -129,7 +127,7 @@ class StageService:
         paginated_stages = stages[start:end]
 
         return {
-            "edges":paginated_stages,
+            "edges": paginated_stages,
             "totalCount": total_count,
         }
 
