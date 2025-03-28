@@ -616,6 +616,8 @@ type_defs = gql("""
         CREATED_ON_DESC
         LAST_ACCESS_ASC
         LAST_ACCESS_DESC
+        ACCESS_DESC
+        ACCESS_ASC
     }
                 
     type Mutation { 
