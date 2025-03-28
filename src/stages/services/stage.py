@@ -10,7 +10,6 @@ if projdir not in sys.path:
     sys.path.append(projdir)
     sys.path.append(projdir2)
 
-import json
 import re
 from datetime import datetime
 from graphql import GraphQLError
@@ -78,6 +77,10 @@ class StageService:
             sort = input.sort
             for sort_option in sort:
                 field, direction = sort_option.rsplit("_", 1)
+
+                if (field == "ACCESS"):
+                    continue
+
                 if field == "OWNER_ID":
                     sort_field = StageModel.owner_id
                 elif field == "NAME":
@@ -86,7 +89,7 @@ class StageService:
                     sort_field = StageModel.created_on
                 elif field == "LAST_ACCESS":
                     sort_field = StageModel.last_access
-    
+
                 if direction == "ASC":
                     query = query.order_by(sort_field.asc())
                 elif direction == "DESC":
@@ -95,13 +98,10 @@ class StageService:
         else:
             query = query.order_by(StageModel.name.asc())
 
-        limit = input.limit if input.limit else 10
-        page = input.page if input.page else 1
 
-        stages = query.limit(limit).offset((page - 1) * limit).all()
+        data = query.all()
 
-        return {
-            "edges": [
+        stages = [
                 convert_keys_to_camel_case(
                     {
                         **stage.to_dict(),
@@ -116,8 +116,20 @@ class StageService:
                         ),
                     }
                 )
-                for stage in stages
-            ],
+                for stage in data]
+
+        if (input.sort[0] in ['ACCESS_DESC', 'ACCESS_ASC']):
+            field, direction = input.sort[0].rsplit("_", 1)
+            stages.sort(key=lambda s: s["permission"], reverse=(direction == "DESC"))
+
+        limit = input.limit if input.limit else 10
+        page = input.page if input.page else 1
+        start = (page - 1) * limit
+        end = start + limit
+        paginated_stages = stages[start:end]
+
+        return {
+            "edges":paginated_stages,
             "totalCount": total_count,
         }
 

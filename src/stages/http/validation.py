@@ -89,8 +89,6 @@ class RecordInput(BaseModel):
 
 class SearchStageInput(BaseModel):
     def __init__(self, *args, **kwargs):
-        print(kwargs)
-        print(args)
         super().__init__(*args, **kwargs)
 
     page: Optional[conint(ge=1)] = Field(

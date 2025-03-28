@@ -221,7 +221,7 @@ def update_visibility(_, info, id: int):
 
 
 @mutation.field("updateLastAccess")
-def update_last_access(_, __ ,id: int):
+def update_last_access(_, __, id: int):
     return StageService().update_last_access(id)
 
 
