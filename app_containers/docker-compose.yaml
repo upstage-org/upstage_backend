@@ -15,6 +15,7 @@ services:
     command: >
       /bin/bash -c "
       cd /usr/app &&
+      export PYTHONPATH=$(pwd)/src &&
       pip install --upgrade pip &&
       pip install -r ./requirements.txt &&
       ./scripts/start_upstage.sh"
@@ -32,6 +33,7 @@ services:
     command: >
       /bin/bash -c "
       cd /usr/app &&
+      export PYTHONPATH=$(pwd)/src &&
       pip install --upgrade pip &&
       pip install -r requirements.txt &&
       python3 -m scripts.run_event_archive"
@@ -48,6 +50,7 @@ services:
     command: >
       /bin/bash -c "
       cd /usr/app &&
+      export PYTHONPATH=$(pwd)/src &&
       pip install --upgrade pip &&
       pip install -r requirements.txt &&
       python3 -m scripts.run_upstage_stats"
