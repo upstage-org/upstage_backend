@@ -360,7 +360,7 @@ class StageService:
 
             local_db_session.query(PerformanceModel).filter(
                 PerformanceModel.stage_id == id
-            )
+            ).delete()
 
             local_db_session.delete(stage)
             return {"success": True, "message": "Stage deleted"}
