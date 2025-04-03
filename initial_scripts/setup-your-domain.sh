@@ -56,7 +56,8 @@ ln -s ../sites-available/${dname}.conf .
 nginx -t
 systemctl restart nginx
 
-certbot --nginx -d $dname
+# Prosody, a Jitsi component, needs this even if users won't be logging into your stream.
+certbot --nginx -d $dname -d auth.$dname
 
 cd $currdir
 
