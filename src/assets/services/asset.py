@@ -465,7 +465,6 @@ class AssetService:
 
                 if not asset:
                     raise GraphQLError("Media not found")
-                
 
                 asset.dormant = input.status.value == MediaStatusEnum.DORMANT.value
                 local_db_session.flush()

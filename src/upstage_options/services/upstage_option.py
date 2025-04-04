@@ -28,6 +28,9 @@ FOYER_TITLE = "FOYER_TITLE"
 FOYER_DESCRIPTION = "FOYER_DESCRIPTION"
 FOYER_MENU = "FOYER_MENU"
 SHOW_REGISTRATION = "SHOW_REGISTRATION"
+EMAIL_SIGNATURE = "EMAIL_SIGNATURE"
+ADDING_EMAIL_SIGNATURE = "ADDING_EMAIL_SIGNATURE"
+
 
 
 class SettingService:
@@ -44,6 +47,7 @@ class SettingService:
 
     def system_info(self):
         enable_donate = self.get_config(ENABLE_DONATE)
+        addingEmailSignature = self.get_config(ADDING_EMAIL_SIGNATURE)
 
         return convert_keys_to_camel_case(
             {
@@ -53,6 +57,11 @@ class SettingService:
                 "enableDonate": {
                     **enable_donate.to_dict(),
                     "value": enable_donate.value == "true",
+                },
+                "emailSignature": self.get_config(EMAIL_SIGNATURE),
+                "addingEmailSignature": {
+                    **addingEmailSignature.to_dict(),
+                    "value": addingEmailSignature.value == "true",
                 },
             }
         )
