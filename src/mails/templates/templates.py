@@ -2,6 +2,7 @@
 import os
 import sys
 
+
 appdir = os.path.abspath(os.path.dirname(__file__))
 projdir = os.path.abspath(os.path.join(appdir, ".."))
 projdir2 = os.path.abspath(os.path.join(appdir, "../.."))
@@ -10,16 +11,19 @@ if projdir not in sys.path:
     sys.path.append(projdir)
     sys.path.append(projdir2)
 
-from global_config import EMAIL_HOST_USER
 
+from global_config import EMAIL_HOST_USER, DBSession
 
-footer = """<br>
-<br>
-Thank you,
-<br>
-<b style="color: #007011">The UpStage Team!</b>
-</p>
-"""
+def get_footer():
+    from upstage_options.db_models.config import ConfigModel
+    from upstage_options.services.upstage_option import ADDING_EMAIL_SIGNATURE, EMAIL_SIGNATURE
+
+    addingSignatureEmail = DBSession.query(ConfigModel).filter(ConfigModel.name == ADDING_EMAIL_SIGNATURE).first()
+    if addingSignatureEmail.value != "true":
+        return ""
+    
+    signature = DBSession.query(ConfigModel).filter(ConfigModel.name == EMAIL_SIGNATURE).first()
+    return signature.value
 
 
 def display_user(user):
@@ -39,7 +43,9 @@ The code will expire in 30 minutes.
 <br>
 <br>
 If you did not request a password reset, please ignore this email.
-{footer}
+<br>
+<br>
+{get_footer()}
 """
 
 
@@ -56,7 +62,9 @@ Please look at the <a href="https://docs.upstage.live/">UpStage User Manual</a> 
 <br>
 <br>
 If you have any questions, please contact us at <a href="mailto:{EMAIL_HOST_USER}">{EMAIL_HOST_USER}</a>.
-{footer}
+<br>
+<br>
+{get_footer()}
 """
 
 
@@ -75,7 +83,9 @@ Here is your account information:
 <b>Username:</b> {user.username}
 <br>
 <b>Password:</b> <i>the one you used to register</i>. If you forgot your password, click on the "Forgot Password" link on the login page.
-{footer}
+<br>
+<br>
+{get_footer()}
 """
 
 
@@ -101,7 +111,9 @@ The user's information is:
 <b>Email:</b> {user.email}
 <br>
 <b>Introduction:</b> {user.intro}
-{footer}
+<br>
+<br>
+{get_footer()}
 """
 
 
@@ -116,7 +128,9 @@ Hi <b>{display_user(media.owner)}</b>,
 Purpose: {note}
 <br>
 <br>
-{footer}
+<br>
+<br>
+{get_footer()}
 """
 
 
@@ -129,7 +143,9 @@ Hi <b>{display_user(user)}</b>,
 Your permission request to use media <b>{media.name}</b> has been sent to the owner. Please wait for a response.
 <br>
 <br>
-{footer}
+<br>
+<br>
+{get_footer()}
 """
 
 
@@ -146,7 +162,9 @@ Additional notes: {note}
 <br>
 {description}
 <br>
-{footer}    
+<br>
+<br>
+{get_footer()}    
 """
 
 
@@ -160,7 +178,9 @@ Your permission request for <b>{media.name}</b> with purpose \"{note}\" has been
 {f'<br><br>You can now use the media in the <a href="{studio_url}">Studio</a>.' if approved else ""}
 <br>
 <br>
-{footer}
+<br>
+<br>
+{get_footer()}
 """
 
 
@@ -173,7 +193,7 @@ Hi <b>{display_user(media.owner)}</b>,
 {display_user(user)} is using your media {media.name} and has agreed to acknowledge it as you require.
 <br>
 <br>
-{footer}
+{get_footer()}
 """
 
 
@@ -186,5 +206,5 @@ Hi <b>{display_user(media.owner)}</b>,
 Your dormant media item  {media.name} has been reactivated. You will find it in your Media list and can now edit and assign it to stages
 <br>
 <br>
-{footer}
+{get_footer()}
 """

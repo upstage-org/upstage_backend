@@ -545,7 +545,9 @@ type_defs = gql("""
         termsOfService: Config
         manual: Config
         esp: Config
-        enableDonate: BooleanConfig    
+        enableDonate: BooleanConfig   
+        emailSignature: Config 
+        addingEmailSignature: BooleanConfig
     }
                 
     type FoyerConfig {
