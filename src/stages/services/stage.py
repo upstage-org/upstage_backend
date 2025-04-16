@@ -201,8 +201,8 @@ class StageService:
             .first()
         )
 
-        if not stage:
-            raise GraphQLError("Stage not found")
+        permission = self.extract_permission(user, stage)
+
 
         return convert_keys_to_camel_case(
             {
@@ -211,9 +211,7 @@ class StageService:
                 "cover": stage.cover,
                 "visibility": stage.visibility,
                 "status": stage.status,
-                "permission": self.stage_operation_service.resolve_permission(
-                    user.id, stage
-                ),
+                "permission": permission,
                 "performances": [
                     convert_keys_to_camel_case(pf.to_dict())
                     for pf in self.stage_operation_service.resolve_performances(
@@ -228,6 +226,19 @@ class StageService:
                 ],
             }
         )
+
+    def extract_permission(self, user, stage):
+        permission = self.stage_operation_service.resolve_permission(user.id, stage)
+
+        if not stage:
+            raise GraphQLError("Stage not found")
+        if (
+            stage.owner_id != user.id
+            and user.role not in [ADMIN, SUPER_ADMIN]
+            and permission not in ["editor", "owner"]
+        ):
+            raise GraphQLError("You are not authorized to update this stage")
+        return permission
 
     def create_stage(self, user: UserModel, input: StageInput):
         with ScopedSession() as local_db_session:
@@ -264,9 +275,8 @@ class StageService:
             if not stage or not input.id:
                 raise GraphQLError("Stage not found")
 
-            if stage.owner_id != user.id and user.role not in [ADMIN, SUPER_ADMIN]:
-                raise GraphQLError("You are not authorized to update this stage")
-
+            self.extract_permission(user, stage)
+            
             stage.name = (
                 input.name if hasattr(input, "name") and input.name else stage.name
             )
@@ -333,10 +343,9 @@ class StageService:
             )
             if not stage:
                 raise GraphQLError("Stage not found")
-
-            if stage.owner_id != user.id and user.role not in [ADMIN, SUPER_ADMIN]:
-                raise GraphQLError("You are not authorized to delete this stage")
-
+            
+            self.extract_permission(user, stage)
+            
             local_db_session.query(StageAttributeModel).filter(
                 StageAttributeModel.stage_id == id
             ).delete()
@@ -475,9 +484,8 @@ class StageService:
             if not stage:
                 raise GraphQLError("Stage not found")
 
-            if stage.owner_id != user.id and user.role not in [ADMIN, SUPER_ADMIN]:
-                raise GraphQLError("You are not authorized to update this stage")
-
+            self.extract_permission(user, stage)
+            
             attribute = (
                 local_db_session.query(StageAttributeModel)
                 .filter(
@@ -516,8 +524,7 @@ class StageService:
             if not stage:
                 raise GraphQLError("Stage not found")
 
-            if stage.owner_id != user.id and user.role not in [ADMIN, SUPER_ADMIN]:
-                raise GraphQLError("You are not authorized to update this stage")
+            self.extract_permission(user, stage)
 
             attribute = (
                 local_db_session.query(StageAttributeModel)
