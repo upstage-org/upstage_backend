@@ -63,7 +63,12 @@ class AssetService:
             .join(AssetTypeModel)
             .join(UserModel)
             .outerjoin(AssetLicenseModel)
+            .outerjoin(
+                ParentStageModel, AssetModel.id == ParentStageModel.child_asset_id
+            )
+            .outerjoin(StageModel, ParentStageModel.stage_id == AssetModel.id)
             .filter(AssetModel.dormant.is_not(True))
+            
             .order_by(AssetModel.created_on.desc())
         )
 
@@ -578,6 +583,11 @@ class AssetService:
             "src": src,
             "sign": sign,
             "permission": permission,
+            "privilege": self.resolve_privilege(user.id if user else None, asset),
+            "stages": [
+                convert_keys_to_camel_case(item.stage.to_dict())
+                for item in asset.stages
+            ],
             "permissions": [
                 convert_keys_to_camel_case(permission.to_dict())
                 for permission in self.resolve_permissions(asset.id)
