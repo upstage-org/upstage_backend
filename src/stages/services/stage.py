@@ -203,8 +203,6 @@ class StageService:
 
         if not stage:
             raise GraphQLError("Stage not found")
-        if stage.owner_id != user.id and user.role not in [ADMIN, SUPER_ADMIN]:
-            raise GraphQLError("You are not authorized to update this stage")
 
         return convert_keys_to_camel_case(
             {
