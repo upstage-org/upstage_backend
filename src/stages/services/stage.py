@@ -583,6 +583,7 @@ class StageService:
             }
             for stage in DBSession.query(StageModel)
             .filter(StageModel.attributes.any(name="visibility", description="true"))
+            .order_by(StageModel.created_on.desc())
             .all()
         ]
 
