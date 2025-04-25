@@ -101,7 +101,7 @@ class AssetService:
             query = query.filter(AssetModel.dormant.is_(search_assets.dormant))
 
         if search_assets.name:
-            query = query.filter(AssetModel.name.like(f"%{search_assets.name}%"))
+            query = query.filter(AssetModel.name.ilike(f"%{search_assets.name}%"))
         if search_assets.mediaTypes:
             query = query.filter(AssetTypeModel.name.in_(search_assets.mediaTypes))
         if search_assets.owners:
