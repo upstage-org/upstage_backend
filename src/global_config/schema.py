@@ -69,6 +69,10 @@ def config_graphql_endpoints(app: FastAPI):
         "updateEmailCustomer", payment_mutation._resolvers["updateEmailCustomer"]
     )
 
+    combined_mutation.set_field(
+        "generateReceipt", payment_mutation._resolvers["generateReceipt"]
+    )
+
     combined_query.set_field(
         "performanceCommunication",
         performance_query._resolvers["performanceCommunication"],
