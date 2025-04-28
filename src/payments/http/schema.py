@@ -2,6 +2,8 @@
 import os
 import sys
 
+from payments.services.pdf_operator import create_receipt_base64
+
 appdir = os.path.abspath(os.path.dirname(__file__))
 projdir = os.path.abspath(os.path.join(appdir, ".."))
 projdir2 = os.path.abspath(os.path.join(appdir, "../.."))
@@ -50,6 +52,15 @@ async def cancel_subscription(_, info, subscription_id: str):
 @mutation.field("updateEmailCustomer")
 async def update_email_customer(_, info, customer_id: str, email: str):
     return await PaymentService().update_email_customer(customer_id, email)
+
+@mutation.field("generateReceipt")
+def resolve_generate_receipt(_, info, receivedFrom, date, description, amount):
+    pdf_base64 = create_receipt_base64(receivedFrom, date, description, amount)
+    
+    return {
+        "fileBase64": pdf_base64,
+        "fileName": f"receipt_{receivedFrom.replace(' ', '_')}.pdf"
+    }
 
 
 schema = make_executable_schema(type_defs, query, mutation)

@@ -556,6 +556,11 @@ type_defs = gql("""
         menu: Config
         showRegistration: BooleanConfig
     }
+                
+    type ReceiptFile {
+        fileBase64: String!
+        fileName: String!
+    }
             
 
     scalar Date
@@ -656,6 +661,8 @@ type_defs = gql("""
         createSubscription(input: CreateSubscriptionInput!): CommonResponse
         cancelSubscription(subscription_id: String!): CommonResponse
         updateEmailCustomer(customer_id: String!, email: String!): CommonResponse
+        generateReceipt(receivedFrom: String!,description: String!,amount: String!, date: String!): ReceiptFile!
+
                 
         createStage(input: StageInput!): Stage
         updateStage(input: StageInput!): Stage
@@ -680,6 +687,7 @@ type_defs = gql("""
         updateTermsOfService(url: String!): Config
         saveConfig(input: ConfigInput!): Config
         sendSystemEmail(input: SystemEmailInput!): CommonResponse
+        
     }
                 
     type Query {
