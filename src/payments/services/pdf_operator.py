@@ -15,9 +15,41 @@ def create_receipt_base64(received_from, date, description, amount):
 
 
     can.drawString(70, 450, received_from)
-    can.drawString(200, 450, date)
-    can.drawString(330, 450, description)
-    can.drawString(450, 450, amount)
+    can.drawString(190, 450, date)
+    # can.drawString(305, 450, description)
+    can.drawString(430, 450, amount)
+    x_start = 305
+    x_end = 410
+    y_position = 450  # Initial y position for the text
+
+    max_width = x_end - x_start
+
+    # Create a text object to calculate the wrapped text
+    text_object = can.beginText(x_start, y_position)
+    text_object.setFont("Helvetica", 12)
+    text_object.setTextOrigin(x_start, y_position)
+
+    # Wrap the description text to fit within the available width
+    words = description.split()
+    line = ""
+    for word in words:
+        # Try adding the word to the current line
+        test_line = line + " " + word if line else word
+        width = can.stringWidth(test_line, "Helvetica", 12)
+        
+        # If the line width exceeds max width, start a new line
+        if width > max_width:
+            text_object.textLine(line)
+            line = word  # Start a new line with the current word
+        else:
+            line = test_line
+    
+    # Add the last line to the text object
+    if line:
+        text_object.textLine(line)
+    
+    # Draw the wrapped text on the PDF
+    can.drawText(text_object)
 
     can.save()
 
