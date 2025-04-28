@@ -32,3 +32,4 @@ terminal_colors
 typing_inspect
 uvicorn
 PyMuPDF
+reportlab
