@@ -67,7 +67,7 @@ def create_receipt_base64(received_from, date, description, amount):
     doc.close()
     pdf_bytes = out_buf.getvalue()
 
-    file_path = f"receipt_{received_from.replace(' ', '_').lower()}.pdf"
+    file_path = f"./uploads/receipt_{received_from.replace(' ', '_').lower()}.pdf"
     with open(file_path, "wb") as f:
         f.write(pdf_bytes)
 
