@@ -53,15 +53,10 @@ async def cancel_subscription(_, info, subscription_id: str):
 async def update_email_customer(_, info, customer_id: str, email: str):
     return await PaymentService().update_email_customer(customer_id, email)
 
+
 @mutation.field("generateReceipt")
 def resolve_generate_receipt(_, info, receivedFrom, date, description, amount):
-    pdf_base64 = create_receipt_base64(receivedFrom, date, description, amount)
-    
-    return {
-        "fileBase64": pdf_base64,
-        "fileName": f"receipt_{receivedFrom.replace(' ', '_')}.pdf"
-    }
-
+    return create_receipt_base64(receivedFrom, date, description, amount)
 
 schema = make_executable_schema(type_defs, query, mutation)
 payment_graphql_app = GraphQL(schema, debug=True)
