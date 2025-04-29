@@ -1,8 +1,17 @@
+import asyncio
 import fitz  # PyMuPDF
-from reportlab.pdfgen import canvas
-from reportlab.lib.pagesizes import A4
 import io
 import base64
+
+from reportlab.pdfgen import canvas
+from reportlab.lib.pagesizes import A4
+from reportlab.lib import colors
+from reportlab.platypus import Table, TableStyle, Paragraph
+from reportlab.lib.styles import getSampleStyleSheet
+
+from global_config.env import SUPPORT_EMAILS
+from mails.helpers.mail import send
+
 
 def create_receipt_base64(received_from, date, description, amount):
     template_path = "src/payments/services/UpStage_Receipt_Template.pdf"
@@ -10,63 +19,70 @@ def create_receipt_base64(received_from, date, description, amount):
 
     packet = io.BytesIO()
     can = canvas.Canvas(packet, pagesize=A4)
-
     can.setFont("Helvetica", 12)
 
+    styles = getSampleStyleSheet()
+    normal_style = styles["Normal"]
 
-    can.drawString(70, 450, received_from)
-    can.drawString(190, 450, date)
-    # can.drawString(305, 450, description)
-    can.drawString(430, 450, amount)
-    x_start = 305
-    x_end = 410
-    y_position = 450  # Initial y position for the text
+    data = [
+        ["Received from", "Date", "Description", "Amount"],
+        [
+            Paragraph(received_from, normal_style),
+            date,
+            Paragraph(description, normal_style),
+            "$"+amount ,
+        ],
+    ]
 
-    max_width = x_end - x_start
+    col_widths = [120, 80, 200, 80]
 
-    # Create a text object to calculate the wrapped text
-    text_object = can.beginText(x_start, y_position)
-    text_object.setFont("Helvetica", 12)
-    text_object.setTextOrigin(x_start, y_position)
+    tbl = Table(data, colWidths=col_widths)
+    tbl.setStyle(
+        TableStyle(
+            [
+                ("BACKGROUND", (0, 0), (-1, 0), colors.lightgrey),
+                ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
+                ("VALIGN", (0, 0), (-1, -1), "TOP"),
+                ("ALIGN", (0, 0), (-1, -1), "LEFT"),
+                ("INNERGRID", (0, 0), (-1, -1), 0.5, colors.black),
+                ("BOX", (0, 0), (-1, -1), 1, colors.black),
+            ]
+        )
+    )
 
-    # Wrap the description text to fit within the available width
-    words = description.split()
-    line = ""
-    for word in words:
-        # Try adding the word to the current line
-        test_line = line + " " + word if line else word
-        width = can.stringWidth(test_line, "Helvetica", 12)
-        
-        # If the line width exceeds max width, start a new line
-        if width > max_width:
-            text_object.textLine(line)
-            line = word  # Start a new line with the current word
-        else:
-            line = test_line
-    
-    # Add the last line to the text object
-    if line:
-        text_object.textLine(line)
-    
-    # Draw the wrapped text on the PDF
-    can.drawText(text_object)
+    x_pos = 60
+    y_pos = 500 
+    tbl.wrapOn(can, A4[0], A4[1])
+    tbl.drawOn(can, x_pos, y_pos - tbl._height) 
 
     can.save()
-
     packet.seek(0)
 
-    overlay = fitz.open("pdf", packet.read())
-
+    overlay_pdf = fitz.open("pdf", packet.read())
     page = doc[0]
-    page.show_pdf_page(page.rect, overlay, 0)
+    page.show_pdf_page(page.rect, overlay_pdf, 0)
 
-    output_buffer = io.BytesIO()
-    doc.save(output_buffer)
+    out_buf = io.BytesIO()
+    doc.save(out_buf)
     doc.close()
+    pdf_bytes = out_buf.getvalue()
 
+    file_path = f"receipt_{received_from.replace(' ', '_').lower()}.pdf"
+    with open(file_path, "wb") as f:
+        f.write(pdf_bytes)
 
-    pdf_bytes = output_buffer.getvalue()
+    admin_emails = SUPPORT_EMAILS
+    asyncio.create_task(
+        send(
+            admin_emails,
+            "Donation receipt issued",
+            content="",
+            filenames=[file_path],
+        )
+    )
 
-    pdf_base64 = base64.b64encode(pdf_bytes).decode('utf-8')
+    return {
+        "fileBase64":  base64.b64encode(pdf_bytes).decode("utf-8"),
+        "fileName": file_path
+    }
 
-    return pdf_base64
