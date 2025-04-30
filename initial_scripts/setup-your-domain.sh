@@ -123,6 +123,7 @@ Run the contents of this script over on the service machine:
            cd ./app_containers && ./run_docker_compose.sh 
                 ;;
         3) sed "s/YOUR_DOMAIN_NAME/$dname/g" ./initial_scripts/nginx_templates/nginx_template_for_streaming_machines.conf >/etc/nginx/sites-available/$dname.conf
+i          ufw allow 10000/udp
            DIST="$(lsb_release -sc)"
 
            curl https://download.jitsi.org/jitsi-key.gpg.key | sudo sh -c 'gpg --dearmor > /usr/share/keyrings/jitsi-keyring.gpg'
