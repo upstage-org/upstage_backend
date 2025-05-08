@@ -32,8 +32,8 @@ This is used for captcha handling. Turning this off is not recommended, since bo
 1. MQTT: mosquitto: Uses SSL for websocket connections only. TCP backend connections do not use SSL.
 1. MQTT, MongoDB, Postgresql are all password protected. Passwords are auto-generated, and UFW rules ensure that remote access is only granted to the app server. 
 1. All code, data and configuration exists on the physical/virtual machines in the '/' directory, and these corresponding directories are mounted into the individual instances as needed. This means that if a docker instance inside the physical/virtual fails for some reason, data will not be lost. 
-1. Rerunning certain scripts will cause auto-generated passwords for DBs and such to be reset, and may cause data loss. See the [Restarting](#restarting-instances-in-case-of-problems) section for details.
-1. You may want to take snapshots of the above mentioned directories in each virtual/physical machine, or have them mounted from one shared, backed-up drive. This is up to you.
+1. Rerunning certain scripts will cause auto-generated passwords for DBs and such to be reset, and may cause data loss. See the [Restarting](#restarting-instances-in-case-of-problems) section for details on scripts which can be re-executed without harm. 
+1. You may want to take snapshots of the above mentioned directories in each virtual/physical machine, or have them mounted from one shared, backed-up drive. See the Restarting scripts to see how to stop and restart MongoDB and Postgresql for backups.
 
 # Directories which contain all configuration and data (you may want to take snapshots of these):
 ### In app machine: configuration and all user static content uploads:
@@ -63,6 +63,9 @@ README	certs  conf.avail  conf.d  migrator.cfg.lua  prosody.cfg.lua
 ```
 
 # Restarting instances, in case of problems:
+
+The following scripts will retain auto-generated passwords, and can be rerun safely at any time:
+
 ### App Instance:
 The app instance can be restarted by running this script, which shuts down and restarts docker:
 ```
