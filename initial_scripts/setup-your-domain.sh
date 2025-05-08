@@ -56,7 +56,7 @@ ln -s ../sites-available/${dname}.conf .
 nginx -t
 systemctl restart nginx
 
-# Prosody, a Jitsi component, needs this even if users won't be logging into your stream.
+# Prosody, a Jitsi component, needs 'auth' even if users won't be logging into your stream.
 certbot --nginx -d $dname -d auth.$dname
 
 cd $currdir
@@ -123,7 +123,7 @@ Run the contents of this script over on the service machine:
            cd ./app_containers && ./run_docker_compose.sh 
                 ;;
         3) sed "s/YOUR_DOMAIN_NAME/$dname/g" ./initial_scripts/nginx_templates/nginx_template_for_streaming_machines.conf >/etc/nginx/sites-available/$dname.conf
-i          ufw allow 10000/udp
+           ufw allow 10000/udp          # Used by Jitsi-videobridge to run an internal test when connection id bad.
            DIST="$(lsb_release -sc)"
 
            curl https://download.jitsi.org/jitsi-key.gpg.key | sudo sh -c 'gpg --dearmor > /usr/share/keyrings/jitsi-keyring.gpg'
