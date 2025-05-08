@@ -1,5 +1,4 @@
-This guide will help you set up and run the Upstage application using either Docker prebult images,
-or using Docker form the source code.
+This guide will help you set up and run the Upstage application using Docker form the source code.
 
 It is recommended that you run three Debian docker machines with three separate subdomains. 
 
@@ -83,8 +82,8 @@ Upon initial setup, a default administrator account is created with the followin
 It is highly recommended to change the default password upon first login to ensure the security of your application. To change the password, follow these steps:
 
 1. Log in to the application using the default credentials.
-2. Navigate to the account settings or profile section.
-3. Update the password to a strong, unique password.
+1. Navigate to the account settings or profile section.
+1. Update the password to a strong, unique password.
 
 Ensure that the new password meets the security requirements of your organization.
 
