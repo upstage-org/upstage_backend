@@ -63,6 +63,37 @@ README	certs  conf.avail  conf.d  migrator.cfg.lua  prosody.cfg.lua
 ```
 
 # Restarting instances, in case of problems:
+### App Instance:
+The app instance can be restarted by running this script, which shuts down and restarts docker:
+```
+cd /root/upstage_backend/app_containers
+./run_docker_compose.sh
+```
+This is a harmless script that runs docker compose to "bounce" the app instance. 
+It can be re-executed at any time.
+
+### Service Instance:
+The svc instance can be restarted by running this script, which shuts down and restarts docker:
+```
+cd /root/upstage_backend/service_containers
+./run_docker_compose.sh
+```
+This shell script can harmlessly be restarted at any time. 
+It sets the Postgresql and MongoDB passwords used by docker-compose.
+Inside the docker-compose file, you'll see how the Mosquitto password is reset upon restart, from a password backup file:
+```
+cat /mosquitto_files/etc/mosquitto/pw.backup 
+performance:mmmmmmmmmmm
+admin:nnnnnnnnnnnnn
+```
+### Streaming Instance:
+Jitsi-videonbridge is installed directly in Debian. To restart it, run the following as root:
+```
+systemctl restart jicofo.service prosody.service jitsi-videobridge2.service nginx
+```
+
+### Rerunning Other Scripts:
+Please note that rerunning setup-os.sh, setup-your-domain.sh, or any scripts other than the docker-compose scripts in the service machine, there is a risk of data loss. That being said, there should be no reason to have to rerun these scripts once things are running successfully.
 
 # Handling Upgrades
 
