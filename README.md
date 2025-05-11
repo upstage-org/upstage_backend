@@ -20,9 +20,9 @@ Example: mydomain.org (application), svc.mydomain.org (data and networking), str
 Be sure that you have a domain name registered with a DNS registrar like namecheap, gandi, etc.
 Also ensure that in your DNS records: 
 
-1: an 'A' record points to the IP address of your app server.
-1: an 'A' record points to the IP address of your svc server.
-1: Two 'A' records pointing to (a) the IP address of your streaming server, and (b) 'auth.' prefix pointing to the same IP of your streaming server as shown above. This is necessary even if users won't be logging into your jitsi streaming instance.
+1. an 'A' record points to the IP address of your app server.
+1. an 'A' record points to the IP address of your svc server.
+1. Two 'A' records pointing to (a) the IP address of your streaming server, and (b) 'auth.' prefix pointing to the same IP of your streaming server as shown above. This is necessary even if users won't be logging into your jitsi streaming instance.
 
 ### Cloudflare Turnstyle Account (free).
 This is used for captcha handling. Turning this off is not recommended, since bots already exist which try to flood Upstage with new user request attempts. We use the non-interactive, no-pre-clearance captcha configuration.
