@@ -92,7 +92,6 @@ class ScopedSession(object):
                     f"Failed to commit db session, not rolled back, as per your request: {e}"
                 )
         finally:
-            print("Closing session")
             self.session.close()
             self.session.remove()
             DBSession.expire_all()
