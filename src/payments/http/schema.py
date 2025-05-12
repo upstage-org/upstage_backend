@@ -58,5 +58,6 @@ async def update_email_customer(_, info, customer_id: str, email: str):
 def resolve_generate_receipt(_, info, receivedFrom, date, description, amount):
     return create_receipt_base64(receivedFrom, date, description, amount)
 
+
 schema = make_executable_schema(type_defs, query, mutation)
 payment_graphql_app = GraphQL(schema, debug=True)

@@ -30,7 +30,7 @@ def create_receipt_base64(received_from, date, description, amount):
             Paragraph(received_from, normal_style),
             date,
             Paragraph(description, normal_style),
-            "$"+amount ,
+            "$" + amount,
         ],
     ]
 
@@ -51,9 +51,9 @@ def create_receipt_base64(received_from, date, description, amount):
     )
 
     x_pos = 60
-    y_pos = 500 
+    y_pos = 500
     tbl.wrapOn(can, A4[0], A4[1])
-    tbl.drawOn(can, x_pos, y_pos - tbl._height) 
+    tbl.drawOn(can, x_pos, y_pos - tbl._height)
 
     can.save()
     packet.seek(0)
@@ -67,7 +67,9 @@ def create_receipt_base64(received_from, date, description, amount):
     doc.close()
     pdf_bytes = out_buf.getvalue()
 
-    file_path = f"./uploads/UpStage_receipt_{received_from.replace(' ', '_').lower()}.pdf"
+    file_path = (
+        f"./uploads/UpStage_receipt_{received_from.replace(' ', '_').lower()}.pdf"
+    )
     with open(file_path, "wb") as f:
         f.write(pdf_bytes)
 
@@ -82,7 +84,6 @@ def create_receipt_base64(received_from, date, description, amount):
     )
 
     return {
-        "fileBase64":  base64.b64encode(pdf_bytes).decode("utf-8"),
-        "fileName": f"UpStage_receipt_{received_from.replace(' ', '_').lower()}.pdf"
+        "fileBase64": base64.b64encode(pdf_bytes).decode("utf-8"),
+        "fileName": f"UpStage_receipt_{received_from.replace(' ', '_').lower()}.pdf",
     }
-

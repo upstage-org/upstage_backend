@@ -14,15 +14,25 @@ if projdir not in sys.path:
 
 from global_config import EMAIL_HOST_USER, DBSession
 
+
 def get_footer():
     from upstage_options.db_models.config import ConfigModel
-    from upstage_options.services.upstage_option import ADDING_EMAIL_SIGNATURE, EMAIL_SIGNATURE
+    from upstage_options.services.upstage_option import (
+        ADDING_EMAIL_SIGNATURE,
+        EMAIL_SIGNATURE,
+    )
 
-    addingSignatureEmail = DBSession.query(ConfigModel).filter(ConfigModel.name == ADDING_EMAIL_SIGNATURE).first()
+    addingSignatureEmail = (
+        DBSession.query(ConfigModel)
+        .filter(ConfigModel.name == ADDING_EMAIL_SIGNATURE)
+        .first()
+    )
     if addingSignatureEmail.value != "true":
         return ""
-    
-    signature = DBSession.query(ConfigModel).filter(ConfigModel.name == EMAIL_SIGNATURE).first()
+
+    signature = (
+        DBSession.query(ConfigModel).filter(ConfigModel.name == EMAIL_SIGNATURE).first()
+    )
     return signature.value
 
 

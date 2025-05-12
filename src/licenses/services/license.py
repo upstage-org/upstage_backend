@@ -58,7 +58,6 @@ class LicenseService:
                 session.commit()
                 return "License revoked {}".format(license_id)
             except Exception as e:
-                print(e)
                 return "Failed to revoke license {}".format(license_id)
             finally:
                 session.close()
