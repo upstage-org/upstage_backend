@@ -11,7 +11,7 @@ class BatchUserInput(BaseModel):
 
 class UpdateUserInput(BaseModel):
     id: int
-    username: str = Field(..., min_length=5, max_length=100)
+    username: str = Field(..., min_length=4, max_length=100)
     password: Optional[str] = Field(None, min_length=8, max_length=256)
     email: Optional[EmailStr]
     binName: Optional[str] = Field(None, max_length=100)
