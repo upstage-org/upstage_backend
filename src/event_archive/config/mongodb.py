@@ -27,9 +27,7 @@ import pymongo
 def build_mongo_client(
     host=MONGO_HOST, port=MONGO_PORT, username=MONGO_USER, password=MONGO_PASSWORD
 ):
-    print(f"Connecting to MongoDB at {host}:{port}")
     uri = f"mongodb://{username}:{password}@{host}:{port}"
-    print(f"URI: {uri}")
     return pymongo.MongoClient(uri)
 
 

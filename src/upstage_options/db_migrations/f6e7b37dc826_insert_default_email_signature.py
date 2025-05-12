@@ -42,10 +42,9 @@ def upgrade() -> None:
         exists = connection.execute(
             sa.select(config_table.c.name).where(config_table.c.name == key)
         ).fetchone()
-        print(exists)
         if exists is None:
             connection.execute(config_table.insert().values(name=key, value=value))
-    
+
 
 def downgrade() -> None:
     pass

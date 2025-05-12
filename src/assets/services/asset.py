@@ -68,7 +68,6 @@ class AssetService:
             )
             .outerjoin(StageModel, ParentStageModel.stage_id == AssetModel.id)
             .filter(AssetModel.dormant.is_not(True))
-            
             .order_by(AssetModel.created_on.desc())
         )
 

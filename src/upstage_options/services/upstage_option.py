@@ -32,7 +32,6 @@ EMAIL_SIGNATURE = "EMAIL_SIGNATURE"
 ADDING_EMAIL_SIGNATURE = "ADDING_EMAIL_SIGNATURE"
 
 
-
 class SettingService:
     def get_config(self, name: str, session=DBSession):
         return session.query(ConfigModel).filter_by(name=name).first()

@@ -111,6 +111,6 @@ def worker():
 def run():
     processes = [Process(target=worker, args=()) for _ in range(cpu_count())]
 
-    print(f"Spawning {len(processes)} processes...")
+    logging.warning(f"Spawning {len(processes)} processes...")
     for p in processes:
         p.start()

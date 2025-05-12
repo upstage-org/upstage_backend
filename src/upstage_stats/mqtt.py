@@ -36,7 +36,7 @@ def on_connect(client: mqtt.Client, userdata, flags, rc):
         client.publish(CONNECTION_TOPIC, payload=json.dumps(connection_payload))
 
         client.subscribe(LIVE_CLIENT_TOPIC)
-        print("Connected successfully! Waiting for new messages...")
+        logging.warning("Connected successfully! Waiting for new messages...")
 
 
 def on_message(client: mqtt.Client, userdata, msg: mqtt.MQTTMessage):
@@ -44,7 +44,6 @@ def on_message(client: mqtt.Client, userdata, msg: mqtt.MQTTMessage):
 
     if not msg.retain:
         client_id = client._client_id.decode("utf-8")
-        print(msg.topic, msg.payload)
         payload = json.loads(msg.payload)
         if client_id not in client_messages:
             client_messages[client_id] = 0
@@ -66,7 +65,6 @@ def on_message(client: mqtt.Client, userdata, msg: mqtt.MQTTMessage):
         else:
             client_messages[client_id] = client_messages[client_id] + 1
 
-        print(f"message_count:  {client_messages[client_id]}")
         if client_messages[client_id] == 10:
             client_messages[client_id] = 0
             try:
@@ -98,7 +96,6 @@ def on_message(client: mqtt.Client, userdata, msg: mqtt.MQTTMessage):
 
 
 def on_disconnect(client, userdata, rc):
-    print("disconnect " + client._client_id.decode("utf-8"))
     client.connected_flag = False
     client.disconnect_flag = True
 

@@ -1,4 +1,5 @@
 # -*- coding: iso8859-15 -*-
+import logging
 import os
 import sys
 
@@ -78,7 +79,7 @@ def detect_size(type, path):
         if len(size) == 2:
             return down_size(size)
         else:
-            print(
+            logging.warning(
                 '❌ Please put the video dimension in the stream name, otherwise stream will have square frame. For example "Demo stream_800x600.mp4". Current name: {}{}{}'.format(
                     bcolors.FAIL, path, bcolors.ENDC
                 )
@@ -118,7 +119,7 @@ def create_media(type, path):
         # copy asset to uploads folder
         src_path = os.path.join(DEMO_MEDIA_FOLDER, type, path)
         dest_path = os.path.join(type, path)
-        print(src_path, dest_path)
+        logging.warning(src_path, dest_path)
         copy_file(src_path, dest_path, type)
         asset.file_location = dest_path
         size += os.path.getsize(src_path)
@@ -143,7 +144,7 @@ def create_media(type, path):
     DBSession.add(asset)
     DBSession.commit()
     created_media_ids.append(asset.id)
-    print(
+    logging.warning(
         "✅ Created{} {} {}".format(
             " multi-frame" if "multi" in attributes else "", type, path
         )
@@ -157,7 +158,7 @@ def create_demo_media():
 
 def create_demo_stage():
     if DBSession.query(StageModel).filter(StageModel.name == "Demo").first():
-        print('⏩ A stage named "Demo" already exists.')
+        logging.warning('⏩ A stage named "Demo" already exists.')
         return
     stage = StageModel(
         name="Demo Stage",
@@ -189,7 +190,7 @@ def create_demo_stage():
     for media_id in created_media_ids:
         DBSession.add(ParentStageModel(stage_id=stage.id, child_asset_id=media_id))
     DBSession.commit()
-    print("✅ Created demo stage")
+    logging.warning("✅ Created demo stage")
 
 
 def create_demo_users():
@@ -206,7 +207,7 @@ def create_demo_users():
         DBSession.query(UserModel).filter(UserModel.username == admin_username).first()
         or DBSession.query(UserModel).filter(UserModel.email == admin_email).first()
     ):
-        print('⏩ An admin user with email "{}" already exists.'.format(admin_email))
+        logging.warning('⏩ An admin user with email "{}" already exists.'.format(admin_email))
     else:
         admin = UserModel()
         admin.username = admin_username
@@ -215,7 +216,7 @@ def create_demo_users():
         admin.role = ADMIN
         admin.active = True
         DBSession.add(admin)
-        print(
+        logging.warning(
             '✅ Created admin account with credentials: "{}" and password "{}"'.format(
                 admin_username, test_user_password
             )
@@ -225,7 +226,7 @@ def create_demo_users():
         DBSession.query(UserModel).filter(UserModel.username == guest_username).first()
         or DBSession.query(UserModel).filter(UserModel.email == guest_email).first()
     ):
-        print('⏩ A guest user with email "{}" already exists.'.format(guest_username))
+        logging.warning('⏩ A guest user with email "{}" already exists.'.format(guest_username))
     else:
         guest = UserModel()
         guest.username = guest_username
@@ -234,7 +235,7 @@ def create_demo_users():
         guest.role = GUEST
         guest.active = True
         DBSession.add(guest)
-        print(
+        logging.warning(
             '✅ Created guest account with credentials: "{}" and password "{}"'.format(
                 guest_username, test_user_password
             )
@@ -259,7 +260,7 @@ def scaffold_foyer():
         "FOYER_DESCRIPTION",
         "Welcome to your new UpStage! Log in to get started.",
     )
-    print("✅ Foyer Scaffolding Completed")
+    logging.warning("✅ Foyer Scaffolding Completed")
 
 
 def scaffold_system_configuration():
@@ -268,7 +269,7 @@ def scaffold_system_configuration():
         "https://raw.githubusercontent.com/upstage-org/upstage/main/LICENSE",
     )
     save_config("MANUAL", "https://docs.upstage.live")
-    print("✅ System Configuration Scaffolding Completed")
+    logging.warning("✅ System Configuration Scaffolding Completed")
 
 
 create_demo_media()

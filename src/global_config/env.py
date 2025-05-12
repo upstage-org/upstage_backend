@@ -94,11 +94,9 @@ CLIENT_MAX_BODY_SIZE = os.getenv("CLIENT_MAX_BODY_SIZE", 0)
 
 if "HARDCODED_HOSTNAME" in os.environ:
     ORIG_HOSTNAME = HOSTNAME = os.environ["HARDCODED_HOSTNAME"]
-    print("Loading local settings from a hard-coded env hostname: %s.py" % HOSTNAME)
 else:
     ORIG_HOSTNAME = socket.gethostname()
     HOSTNAME = socket.gethostname().replace(".", "_").replace("-", "_")
-    print("Loading local settings from %s.py" % HOSTNAME)
 
 UPLOAD_USER_CONTENT_FOLDER = (
     "/usr/app/uploads"  # This is mounted here by docker-compose file.
@@ -111,8 +109,6 @@ hstr = "from .load_env import *"
 
 VIDEO_MAX_SIZE = 500 * 1024 * 1024  # KB
 OTHER_MEDIA_MAX_SIZE = 500 * 1024 * 1024  # KB
-
-print(hstr)
 
 exec(hstr)
 
