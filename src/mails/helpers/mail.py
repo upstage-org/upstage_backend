@@ -52,7 +52,7 @@ async def send(to, subject, content, bcc=[], cc=[], filenames=[]):
         msg = create_email(
             to=to, subject=subject, html=content, cc=cc, bcc=bcc, filenames=filenames
         )
-        await send_async(msg=msg)
+    await send_async(msg=msg)
 
 
 def call_send_email_external_api(subject, body, recipients, cc, bcc, filenames):
@@ -124,7 +124,6 @@ def valid_token(token):
 
 
 async def generate_email_token_clients():
-    print("Generating email tokens")
     while True:
         client = get_mongo_token_collection()
         """

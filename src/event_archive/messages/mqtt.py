@@ -32,7 +32,6 @@ def on_connect(client, userdata, flags, rc):
 
 def on_message(client, userdata, msg: paho.MQTTMessage):
     if not msg.retain:
-        print(msg.topic, msg.payload)
 
         try:
             client = build_mongo_client()

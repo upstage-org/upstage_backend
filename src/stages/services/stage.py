@@ -203,7 +203,6 @@ class StageService:
 
         permission = self.extract_permission(user, stage)
 
-
         return convert_keys_to_camel_case(
             {
                 **stage.to_dict(),
@@ -276,7 +275,7 @@ class StageService:
                 raise GraphQLError("Stage not found")
 
             self.extract_permission(user, stage)
-            
+
             stage.name = (
                 input.name if hasattr(input, "name") and input.name else stage.name
             )
@@ -343,9 +342,9 @@ class StageService:
             )
             if not stage:
                 raise GraphQLError("Stage not found")
-            
+
             self.extract_permission(user, stage)
-            
+
             local_db_session.query(StageAttributeModel).filter(
                 StageAttributeModel.stage_id == id
             ).delete()
@@ -485,7 +484,7 @@ class StageService:
                 raise GraphQLError("Stage not found")
 
             self.extract_permission(user, stage)
-            
+
             attribute = (
                 local_db_session.query(StageAttributeModel)
                 .filter(
