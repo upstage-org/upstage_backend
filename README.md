@@ -90,7 +90,7 @@ performance:mmmmmmmmmmm
 admin:nnnnnnnnnnnnn
 ```
 ### Streaming Instance:
-Jitsi-videonbridge is installed directly in Debian. To restart it, run the following as root:
+Jitsi-videobridge is installed directly in Debian. To restart it, run the following as root:
 ```
 systemctl restart jicofo.service prosody.service jitsi-videobridge2.service nginx
 ```
