@@ -7,7 +7,6 @@ cp -r ../alembic /app_code
 cp -r ../scripts /app_code
 cp -r ../dashboard/demo /app_code
 cp -r ../requirements.txt /app_code
-cp -r ../startup.sh /app_code
 
 export DOCKER_CLIENT_DEBUG=1
 
