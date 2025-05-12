@@ -48,8 +48,6 @@ def upgrade() -> None:
             )
         ).fetchone()
 
-        print(result)
-
         if not result:
             op.bulk_insert(
                 asset_type_table, [{"name": asset_type, "file_location": asset_type}]
