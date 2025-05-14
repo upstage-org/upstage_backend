@@ -56,13 +56,11 @@ ln -s ../sites-available/${dname}.conf .
 nginx -t
 systemctl restart nginx
 
-# Prosody, a Jitsi component, needs 'auth' even if users won't be logging into your stream.
-certbot --nginx -d $dname -d auth.$dname
-
 cd $currdir
 
 case $machinetype in
-        1) sed "s/YOUR_DOMAIN_NAME/$dname/g" ./initial_scripts/nginx_templates/nginx_template_for_svc_machines.conf >/etc/nginx/sites-available/$dname.conf
+        1) certbot --nginx -d $dname
+           sed "s/YOUR_DOMAIN_NAME/$dname/g" ./initial_scripts/nginx_templates/nginx_template_for_svc_machines.conf >/etc/nginx/sites-available/$dname.conf
            mkdir -p /postgresql_data/var
            mkdir -p /postgresql_data/data
            mkdir -p /mongodb_data_volume
@@ -87,8 +85,8 @@ case $machinetype in
            echo "
 Completed service container setup."
                 ;;
-        2) sed "s/YOUR_DOMAIN_NAME/$dname/g" ./initial_scripts/nginx_templates/nginx_template_for_app_machines.conf >/etc/nginx/sites-available/$dname.conf
-
+        2) certbot --nginx -d $dname
+           sed "s/YOUR_DOMAIN_NAME/$dname/g" ./initial_scripts/nginx_templates/nginx_template_for_app_machines.conf >/etc/nginx/sites-available/$dname.conf
            mkdir -p /frontend_code
            mkdir -p /app_code/demo
            mkdir -p /app_code/uploads
@@ -122,7 +120,10 @@ Run the contents of this script over on the service machine:
            Press enter when finished: " ready
            cd ./app_containers && ./run_docker_compose.sh 
                 ;;
-        3) sed "s/YOUR_DOMAIN_NAME/$dname/g" ./initial_scripts/nginx_templates/nginx_template_for_streaming_machines.conf >/etc/nginx/sites-available/$dname.conf
+
+        
+        3) certbot --nginx -d $dname -d auth.$dname # Prosody, a Jitsi component, needs 'auth' even if users won't be logging into your stream.
+           sed "s/YOUR_DOMAIN_NAME/$dname/g" ./initial_scripts/nginx_templates/nginx_template_for_streaming_machines.conf >/etc/nginx/sites-available/$dname.conf
            ufw allow 10000/udp          # Used by Jitsi-videobridge to run an internal test when connection id bad.
            DIST="$(lsb_release -sc)"
 
