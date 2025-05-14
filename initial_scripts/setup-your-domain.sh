@@ -12,7 +12,7 @@ read -p "
 Enter the domain name, including subdomain. Ex: streaming.myupstage.org: " dname
 read -p "
 1: If this is a service machine (dbs, mqtt) enter 1,
-2: an app machine (running Upstage application code), enter 2,
+2: an app machine (running UpStage application code), enter 2,
 3: a streaming machine, enter 3: " machinetype
 machinetype=$((machinetype))
 

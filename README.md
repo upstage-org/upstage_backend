@@ -1,4 +1,4 @@
-This guide will help you set up and run the Upstage application using Docker from the source code.
+This guide will help you set up and run the UpStage application using Docker from the source code.
 
 It is recommended that you run three Debian docker machines/virtual machines with three separate subdomains. 
 
@@ -7,11 +7,11 @@ For example: streaming.myupstage.org, service.myupstage.org, app.myupstage.org
 It is possible to install our front end, back end and streaming service all on one instance/machine, but it is not recommended. 
 
 # Prerequisites:
-### A working email address such as "support@your-domain" or "admins@your-domain", used for LetsEncrypt and Upstage admin emails:
+### A working email address such as "support@your-domain" or "admins@your-domain", used for LetsEncrypt and UpStage admin emails:
 
 Examples: support@your_upstage.org, admins@your_upstage.org
 
-Wherever your email registry was purchased, in your email service provider dashboard (not part of this installation), it is recommended that you forward these emails to individuals who will approve account requests, receive LetsEncrypt emails, and be responsible for general Upstage administration. Sending outbound emails is handled from within an Upstage admin screen, and will use this same email account as a 'BCC' address. This is done for awareness of all outbound emails, and potential abuses of email become apparent very quickly in case that happens.
+Wherever your email registry was purchased, in your email service provider dashboard (not part of this installation), it is recommended that you forward these emails to individuals who will approve account requests, receive LetsEncrypt emails, and be responsible for general UpStage administration. Sending outbound emails is handled from within an UpStage admin screen, and will use this same email account as a 'BCC' address. This is done for awareness of all outbound emails, and potential abuses of email become apparent very quickly in case that happens.
 
 ### A wildcard domain name and four 'A' DNS records, so that we can configure subdomains for each machine:
 
@@ -25,7 +25,7 @@ Also ensure that in your DNS records:
 1. Two 'A' records pointing to (a) the IP address of your streaming server, and (b) 'auth.' prefix pointing to the same IP of your streaming server as shown above. This is necessary even if users won't be logging into your jitsi streaming instance.
 
 ### Cloudflare Turnstyle Account (free).
-This is used for captcha handling. Turning this off is not recommended, since bots already exist which try to flood Upstage with new user request attempts. We use the non-interactive, no-pre-clearance captcha configuration.
+This is used for captcha handling. Turning this off is not recommended, since bots already exist which try to flood UpStage with new user request attempts. We use the non-interactive, no-pre-clearance captcha configuration.
 
 # Dependencies that are configured on your behalf, and should remain "hands-free": This is provided for your information only, and requires no action from you other than following the interactive installation instructions:
 
@@ -100,9 +100,9 @@ Please note that rerunning setup-os.sh, setup-your-domain.sh, or any scripts oth
 
 # Handling Upgrades
 
-### To keep your Upstage instance synchronized with our latest version, please contact us and we will help you with the upgrade, until such time that we have an automated upgrade process. If your version is older than 3.0.0, a fresh installation is required. Contact us for details regarding database and static content migration to our latest version.
+### To keep your UpStage instance synchronized with our latest version, please contact us and we will help you with the upgrade, until such time that we have an automated upgrade process. If your version is older than 3.0.0, a fresh installation is required. Contact us for details regarding database and static content migration to our latest version.
 
-# Upstage Setup Guide: From Git Repo to Local Docker Images
+# UpStage Setup Guide: From Git Repo to Local Docker Images
 
 Run everything as root, preferably using ssh keys instead of login/password, for better security.
 
@@ -139,18 +139,18 @@ This will auto-generate passwords for various applications, and will store them 
 
 It will start three docker containers: MongoDB, Postgresql, Mosquitto.
 
-## Setup Instructions for your Application Server: Upstage, Upstage Event Capture, Upstage Email (optional)
+## Setup Instructions for your Application Server: UpStage, UpStage Event Capture, UpStage Email (optional)
 
 ```sh
 ./initial_scripts/setup-your-domain.sh
 ```
-Choose option 2 to set up the App server, which serves Upstage-specific Back End and Front End code.
+Choose option 2 to set up the App server, which serves UpStage-specific Back End and Front End code.
 
-This will configure and start three "app" containers: Upstage, Upstage-Event, Upstage-Stats. Note that  this script is interactive, and will prompt you to copy certain things.
+This will configure and start three "app" containers: UpStage, UpStage-Event, UpStage-Stats. Note that  this script is interactive, and will prompt you to copy certain things.
 
 ## Setup Instructions for your Application Server also running the Front End:
 
-The Front End code for Upstage runs on the same server as the application code, and comes from this repository:
+The Front End code for UpStage runs on the same server as the application code, and comes from this repository:
 
 ```
 https://github.com/upstage-org/upstage_frontend.git
