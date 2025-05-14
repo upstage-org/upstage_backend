@@ -95,7 +95,6 @@ Completed service container setup."
            cp -r ./scripts /app_code
            cp -r ./dashboard/demo /app_code
            cp -r ./requirements.txt /app_code
-           cp -r ./startup.sh /app_code
            chmod -R 777 /app_code/alembic
            chmod -R 777 /app_code/uploads
 
