@@ -1,5 +1,7 @@
 This guide will help you set up and run the UpStage application using Docker from the source code.
 
+Installation starts [here](#upstage-setup-guide-from-git-repo-to-local-docker-images) but please read the [Prerequisites](#prerequisites) section below first.
+
 It is recommended that you run three Debian docker machines/virtual machines with three separate subdomains. 
 
 For example: streaming.myupstage.org, service.myupstage.org, app.myupstage.org
