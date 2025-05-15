@@ -26,6 +26,8 @@ then
         exit -1
 fi
 
+hostnamectl set-hostname $dname
+
 # Setup Nginx and Certbot
 apt -y install certbot python3-certbot-nginx
 
@@ -126,8 +128,8 @@ Run the contents of this script over on the service machine:
            ufw allow 10000/udp          # Used by Jitsi-videobridge to run an internal test when connection id bad.
            DIST="$(lsb_release -sc)"
 
-           curl https://download.jitsi.org/jitsi-key.gpg.key | sudo sh -c 'gpg --dearmor > /usr/share/keyrings/jitsi-keyring.gpg'
-           echo 'deb [signed-by=/usr/share/keyrings/jitsi-keyring.gpg] https://download.jitsi.org stable/' > /etc/apt/sources.list.d/jitsi-stable.list
+           curl https://download.jitsi.org/jitsi-key.gpg.key | sudo gpg --dearmor -o /usr/share/keyrings/jitsi-keyring.gpg
+           echo "deb [signed-by=/usr/share/keyrings/jitsi-keyring.gpg] https://download.jitsi.org stable/" | sudo tee /etc/apt/sources.list.d/jitsi-stable.list
 
            apt update -y
            apt upgrade -y
