@@ -32,17 +32,6 @@ def upgrade() -> None:
         ),
         sa.PrimaryKeyConstraint("id"),
     )
-    op.execute(
-        """
-        -- Seed foyer config
-        INSERT INTO "config" ("name", "value") VALUES ('FOYER_TITLE', 'CYBERFORMANCE PLATFORM');
-        INSERT INTO "config" ("name", "value") VALUES ('FOYER_DESCRIPTION', 'UpStage is an online venue for live performance: remote performers collaborate in real time using digital media, and online audiences anywhere in the world join events by going to a web page, without having to download and install any additional software. UpStage is available free to anyone who would like to use it.');
-        INSERT INTO "config" ("name", "value") VALUES ('FOYER_MENU', 'UpStage User Manual (https://docs.upstage.live/)
-        Customise Foyer (/studio/legacy/backstage/admin/foyer-customisation) (8,32)');
-
-        INSERT INTO "config" ("name", "value") VALUES ('ENABLE_DONATE', 'true');
-        """
-    )
 
 
 def downgrade() -> None:
