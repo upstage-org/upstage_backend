@@ -42,7 +42,7 @@ CLOUDFLARE_CAPTCHA_VERIFY_ENDPOINT = "https://challenges.cloudflare.com/turnstil
 CLIENT_MAX_BODY_SIZE=500 * 1024 * 1024
 
 UPLOAD_USER_CONTENT_FOLDER="/usr/app/uploads" # Mounted this way in docker-compose
-DEMO_MEDIA_FOLDER="./dashboard/demo"
+DEMO_MEDIA_FOLDER="/usr/app/dashboard/demo"
 
 # These settings are only for the upstage.live server. 
 # payment
