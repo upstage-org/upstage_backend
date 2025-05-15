@@ -57,6 +57,7 @@ ln -s ../sites-available/${dname}.conf .
 
 nginx -t
 systemctl restart nginx
+systemctl enable nginx
 
 cd $currdir
 
@@ -141,6 +142,7 @@ Jitsi will prompt you for the location of the existing SSL keys. These are the r
 
 Once you've copy-pasted these to another screen, press enter to continue:" resp
 
+           mkdir -p /var/lib/prosody
            cp /etc/letsencrypt/live/$dname/fullchain.pem /var/lib/prosody/$dname.crt
            cp /etc/letsencrypt/live/$dname/fullchain.pem /var/lib/prosody/auth.$dname.crt
            cp /etc/letsencrypt/live/$dname/privkey.pem /var/lib/prosody/$dname.key
