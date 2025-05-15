@@ -124,7 +124,7 @@ Run the contents of this script over on the service machine:
                 ;;
 
         
-        3) read "Please log into another shell on this server and run this command manually:
+        3) read -p "Please log into another shell on this server and run this command manually:
 
 certbot --nginx -d $dname -d auth.$dname
 
