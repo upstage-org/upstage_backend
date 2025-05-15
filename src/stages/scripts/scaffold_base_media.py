@@ -74,7 +74,7 @@ def copy_file(src_path, dest_path, type):
 
 
 def detect_size(type, path):
-    if type == "stream":
+    if type == "video":
         size = path.split(".")[0].split("_")[-1].split("x")
         if len(size) == 2:
             return down_size(size)
