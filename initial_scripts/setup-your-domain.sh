@@ -124,7 +124,12 @@ Run the contents of this script over on the service machine:
                 ;;
 
         
-        3) certbot --nginx -d $dname -d auth.$dname # Prosody, a Jitsi component, needs 'auth' even if users won't be logging into your stream.
+        3) read "Please log into another shell on this server and run this command manually:
+
+certbot --nginx -d $dname -d auth.$dname
+
+Only press enter when this command succeeds. This avoids failure if certbot fails to find both DNS entries, which happens sometimes when adding two or more certbot domains. Manually rerun the above certbot command until it works, then press Enter here to proceed:" 
+           # Prosody, a Jitsi component, needs 'auth' even if users won't be logging into your stream.
            sed "s/YOUR_DOMAIN_NAME/$dname/g" ./initial_scripts/nginx_templates/nginx_template_for_streaming_machines.conf >/etc/nginx/sites-available/$dname.conf
            ufw allow 10000/udp          # Used by Jitsi-videobridge to run an internal test when connection id bad.
            DIST="$(lsb_release -sc)"
