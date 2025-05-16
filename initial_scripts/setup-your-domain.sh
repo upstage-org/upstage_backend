@@ -137,6 +137,7 @@ Run the contents of this script over on the service machine:
            server {
                    server_name ${dname} auth.${dname};
            } " > ${dname}.conf
+	   cd $currdir
 
            certbot --nginx -d $dname -d auth.$dname
            if [[ $? -ne 0 ]]; then
