@@ -132,7 +132,13 @@ Run the contents of this script over on the service machine:
                 ;;
 
         
-        3) certbot --nginx -d $dname -d auth.$dname
+	3) cd /etc/nginx/sites-available
+           echo "
+           server {
+                   server_name ${dname} auth.${dname};
+           } " > ${dname}.conf
+
+           certbot --nginx -d $dname -d auth.$dname
            if [[ $? -ne 0 ]]; then
                echo "Certbot failed. Please wait a bit for your new DNS entries to propagate through the internet, and then retry."
 	       exit 1
