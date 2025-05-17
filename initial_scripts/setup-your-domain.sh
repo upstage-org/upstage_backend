@@ -167,10 +167,22 @@ Jitsi will prompt you for the location of the existing SSL keys. These are the r
 Once you've copy-pasted these to another screen, press enter to continue:" resp
 
            mkdir -p /var/lib/prosody
+           mkdir -p /etc/prosody/certs
+
            cp /etc/letsencrypt/live/$dname/fullchain.pem /var/lib/prosody/$dname.crt
            cp /etc/letsencrypt/live/$dname/fullchain.pem /var/lib/prosody/auth.$dname.crt
            cp /etc/letsencrypt/live/$dname/privkey.pem /var/lib/prosody/$dname.key
            cp /etc/letsencrypt/live/$dname/privkey.pem /var/lib/prosody/auth.$dname.key
+
+           cp /etc/letsencrypt/live/$dname/fullchain.pem /etc/prosody/certs/$dname.crt
+           cp /etc/letsencrypt/live/$dname/fullchain.pem /etc/prosody/certs/auth.$dname.crt
+           cp /etc/letsencrypt/live/$dname/privkey.pem /etc/prosody/certs/$dname.key
+           cp /etc/letsencrypt/live/$dname/privkey.pem /etc/prosody/certs/auth.$dname.key
+
+	   chmod 640 /etc/prosody/certs/*key
+           chmod 640 /var/lib/prosody/*key
+	   chgrp prosody /etc/prosody/certs/*
+	   chgrp prosody /var/lib/prosody/*
 
            apt-get install jitsi-meet
            sed "s/YOUR_DOMAIN_NAME/$dname/g" ./initial_scripts/post_install/jitsi-cert-cron-script.sh >/root/jitsi-cert-cron-script.sh
