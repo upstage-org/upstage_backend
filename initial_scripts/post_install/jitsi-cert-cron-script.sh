@@ -12,3 +12,7 @@ cp /etc/letsencrypt/live/YOUR_DOMAIN_NAME/privkey.pem /etc/prosody/certs/auth.YO
 
 chmod 640 /etc/prosody/certs/*key
 chmod 640 /var/lib/prosody/*key
+
+chgrp prosody /etc/prosody/certs/*
+chgrp prosody /var/lib/prosody/*
+
