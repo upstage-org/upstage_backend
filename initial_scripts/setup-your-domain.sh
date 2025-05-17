@@ -65,8 +65,8 @@ case $machinetype in
         1) certbot --nginx -d $dname
            if [[ $? -ne 0 ]]; then
                echo "Certbot failed. Please wait a bit for your new DNS entries to propagate through the internet, and then retry."
-	       exit 1
-	   fi 
+               exit 1
+           fi 
            sed "s/YOUR_DOMAIN_NAME/$dname/g" ./initial_scripts/nginx_templates/nginx_template_for_svc_machines.conf >/etc/nginx/sites-available/$dname.conf
            mkdir -p /postgresql_data/var
            mkdir -p /postgresql_data/data
@@ -95,8 +95,8 @@ Completed service container setup."
         2) certbot --nginx -d $dname
            if [[ $? -ne 0 ]]; then
                echo "Certbot failed. Please wait a bit for your new DNS entries to propagate through the internet, and then retry."
-	       exit 1
-	   fi 
+               exit 1
+           fi 
            sed "s/YOUR_DOMAIN_NAME/$dname/g" ./initial_scripts/nginx_templates/nginx_template_for_app_machines.conf >/etc/nginx/sites-available/$dname.conf
            mkdir -p /frontend_code
            mkdir -p /app_code/demo
@@ -132,19 +132,22 @@ Run the contents of this script over on the service machine:
                 ;;
 
         
-	3) cd /etc/nginx/sites-available
+        3) IFS='.' read -ra parts <<< "$dname"
+           sed -i "s/^127.0.1.1.*$/127.0.1.1 ${dname} auth.${dname} ${parts[0]} auth.${parts[0]}/" /etc/hosts
            export DEBIAN_FRONTEND=dialog
+
+           cd /etc/nginx/sites-available
            echo "
            server {
                    server_name ${dname} auth.${dname};
            } " > ${dname}.conf
-	   cd $currdir
+           cd $currdir
 
            certbot --nginx -d $dname -d auth.$dname
            if [[ $? -ne 0 ]]; then
                echo "Certbot failed. Please wait a bit for your new DNS entries to propagate through the internet, and then retry."
-	       exit 1
-	   fi 
+               exit 1
+           fi 
            # Prosody, a Jitsi component, needs 'auth' even if users won't be logging into your stream.
            sed "s/YOUR_DOMAIN_NAME/$dname/g" ./initial_scripts/nginx_templates/nginx_template_for_streaming_machines.conf >/etc/nginx/sites-available/$dname.conf
            ufw allow 10000/udp          # Used by Jitsi-videobridge to run an internal test when connection id bad.
