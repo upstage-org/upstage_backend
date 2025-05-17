@@ -158,13 +158,16 @@ Run the contents of this script over on the service machine:
 
            apt update -y
            apt upgrade -y
-           read -p "In the next prompt, pick 'Use my own SSL keys'. 
+	   read -p "In the next two prompts, Jitsi will ask for your full domain name (not the 'auth.' domain). 
+	   
+It will then ask you about SSL keys. Choose 'Use my own SSL keys'. 
+
 Jitsi will prompt you for the location of the existing SSL keys. These are the responses:
 
-/etc/letsencrypt/live/$dname/fullchain.pem
-/etc/letsencrypt/live/$dname/privkey.pem
+For the cert, copy-paste: /etc/letsencrypt/live/$dname/fullchain.pem
+For the key, copy-paste: /etc/letsencrypt/live/$dname/privkey.pem
 
-Once you've copy-pasted these to another screen, press enter to continue:" resp
+Once you've copy-pasted these two paths to another screen/location, press enter to continue:" resp
 
            mkdir -p /var/lib/prosody
            mkdir -p /etc/prosody/certs
