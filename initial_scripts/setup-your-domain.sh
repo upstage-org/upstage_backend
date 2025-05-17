@@ -133,6 +133,7 @@ Run the contents of this script over on the service machine:
 
         
 	3) cd /etc/nginx/sites-available
+           export DEBIAN_FRONTEND=dialog
            echo "
            server {
                    server_name ${dname} auth.${dname};
@@ -168,7 +169,7 @@ Once you've copy-pasted these to another screen, press enter to continue:" resp
            cp /etc/letsencrypt/live/$dname/privkey.pem /var/lib/prosody/$dname.key
            cp /etc/letsencrypt/live/$dname/privkey.pem /var/lib/prosody/auth.$dname.key
 
-           apt -y install jitsi-meet
+           apt-get install jitsi-meet
            sed "s/YOUR_DOMAIN_NAME/$dname/g" ./initial_scripts/post_install/jitsi-cert-cron-script.sh >/root/jitsi-cert-cron-script.sh
            chmod 755 /root/jitsi-cert-cron-script.sh
            echo "0 1 * * * /root/jitsi-cert-cron-script.sh" >/tmp/pcron
