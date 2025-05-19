@@ -2,6 +2,8 @@
 import os
 import sys
 
+from src.global_config.env import DATABASE_HOST, DATABASE_NAME, DATABASE_PASSWORD, DATABASE_PORT, DATABASE_USER
+
 appdir = os.path.abspath(os.path.dirname(__file__))
 projdir = os.path.abspath(os.path.join(appdir, ".."))
 projdir2 = os.path.abspath(os.path.join(appdir, "../.."))
@@ -119,6 +121,35 @@ def update_upstage_user_passwords(new_engine, new_password):
             except SQLAlchemyError as e:
                 print(f"Error updating passwords in 'upstage_user': {e}", file=sys.stderr)
 
+def update_asset_names(engine):
+    """
+    Updates all asset names from 'stream' to 'video' in the 'assets' table.
+    
+    Args:
+        engine: SQLAlchemy engine instance for database connection
+    
+    Returns:
+        dict: Success message with number of affected rows
+    
+    Raises:
+        HTTPException: If database operation fails
+    """
+    update_sql = text("UPDATE asset_type SET name = :new_name , file_location = :new_name WHERE name = :old_name")
+    
+    try:
+        with engine.connect() as conn:
+            with conn.begin() as transaction:
+                result = conn.execute(
+                    update_sql,
+                    {"new_name": "video", "old_name": "stream"}
+                )
+                affected_rows = result.rowcount
+                transaction.commit()
+                
+        print( f"Successfully updated {affected_rows} assets from 'stream' to 'video'")
+    
+    except SQLAlchemyError as e:
+        print(f"Error updating asset type in 'upstage_user': {e}", file=sys.stderr) 
 
 def update_sequences(new_engine, tables):
     """
@@ -139,12 +170,10 @@ def update_sequences(new_engine, tables):
 
 
 def main():
-    old_db_url = input("Enter OLD DB connection string (e.g., user:password@host:port/db): ").strip().replace(" ", "")
-    new_db_url = input("Enter NEW DB connection string (e.g., user:password@host:port/db): ").strip().replace(" ", "")
     new_password = input("Enter NEW PASSWORD: ").strip().replace(" ", "")
 
-    old_engine = create_engine(f"postgresql://{old_db_url}")
-    new_engine = create_engine(f"postgresql://{new_db_url}")
+    old_engine = create_engine(f"postgresql://{DATABASE_USER}:{DATABASE_PASSWORD}@{DATABASE_HOST}:{DATABASE_PORT}/original_upstage")
+    new_engine = create_engine(f"postgresql://{DATABASE_USER}:{DATABASE_PASSWORD}@{DATABASE_HOST}:{DATABASE_PORT}/{DATABASE_NAME}")
 
     # List the tables you want to migrate.
     tables_to_migrate = [
@@ -175,6 +204,8 @@ def main():
     update_sequences(new_engine, tables_to_migrate)
     
     update_upstage_user_passwords(new_engine, new_password)
+
+    update_asset_names(new_engine)
 
     print("Migration completed successfully.")
 
