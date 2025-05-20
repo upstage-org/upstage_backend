@@ -107,7 +107,6 @@ class StageService:
                     "cover": stage.cover,
                     "visibility": stage.visibility,
                     "status": stage.status,
-                    "assets": [asset.child_asset.to_dict() for asset in stage.assets],
                     "permission": self.stage_operation_service.resolve_permission(
                         user.id, stage
                     ),
@@ -127,7 +126,10 @@ class StageService:
         paginated_stages = stages[start:end]
 
         return {
-            "edges": paginated_stages,
+            "edges": [ {
+                **stage,
+                "assets": [asset.child_asset.to_dict() for asset in stage["assets"]],
+            } for stage in paginated_stages ],
             "totalCount": total_count,
         }
 

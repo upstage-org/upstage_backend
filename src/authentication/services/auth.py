@@ -111,6 +111,8 @@ class AuthenticationService:
         if "@" in username:
             return parseaddr(username)[1]
 
+        return username
+
     def validate_password(self, enter_password: str, user: UserModel):
         try:
             if decrypt(user.password) != enter_password:
