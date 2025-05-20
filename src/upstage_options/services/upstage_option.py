@@ -1,4 +1,5 @@
 # -*- coding: iso8859-15 -*-
+from datetime import datetime
 import os
 import sys
 
@@ -48,6 +49,8 @@ class SettingService:
         enable_donate = self.get_config(ENABLE_DONATE)
         addingEmailSignature = self.get_config(ADDING_EMAIL_SIGNATURE)
 
+        addingEmailSignature = addingEmailSignature.to_dict() if addingEmailSignature else  { "id": 1, "name": "ADDING_EMAIL_SIGNATURE" , "value": "true" }
+
         return convert_keys_to_camel_case(
             {
                 "termsOfService": self.get_config(TERMS_OF_SERVICE),
@@ -59,8 +62,8 @@ class SettingService:
                 },
                 "emailSignature": self.get_config(EMAIL_SIGNATURE),
                 "addingEmailSignature": {
-                    **addingEmailSignature.to_dict(),
-                    "value": addingEmailSignature.value == "true",
+                    **addingEmailSignature,
+                    "value": addingEmailSignature["value"] == "true",
                 },
             }
         )
