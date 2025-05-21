@@ -49,7 +49,11 @@ class SettingService:
         enable_donate = self.get_config(ENABLE_DONATE)
         addingEmailSignature = self.get_config(ADDING_EMAIL_SIGNATURE)
 
-        addingEmailSignature = addingEmailSignature.to_dict() if addingEmailSignature else  { "id": 1, "name": "ADDING_EMAIL_SIGNATURE" , "value": "true" }
+        addingEmailSignature = (
+            addingEmailSignature.to_dict()
+            if addingEmailSignature
+            else {"id": 1, "name": "ADDING_EMAIL_SIGNATURE", "value": "true"}
+        )
 
         return convert_keys_to_camel_case(
             {

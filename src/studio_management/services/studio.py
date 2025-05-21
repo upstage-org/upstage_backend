@@ -467,8 +467,15 @@ class StudioService:
             .all()
         ]
 
-    def stages(self):
+    def stages(self, user: UserModel):
         return [
-            convert_keys_to_camel_case(stage.to_dict())
+            convert_keys_to_camel_case(
+                {
+                    **stage.to_dict(),
+                    "permission": self.stage_operation_service.resolve_permission(
+                        user.id, stage
+                    ),
+                }
+            )
             for stage in DBSession.query(StageModel).all()
         ]

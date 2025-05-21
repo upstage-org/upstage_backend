@@ -44,8 +44,8 @@ def admin_players(_, __, **kwargs):
 
 @query.field("getAllStages")
 @authenticated()
-def stages(_, __):
-    return StudioService().stages()
+def stages(_, info):
+    return StudioService().stages(UserModel(**info.context["request"].state.current_user))
 
 
 @query.field("users")
