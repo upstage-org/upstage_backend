@@ -11,7 +11,7 @@ services:
       - /app_code/uploads:/usr/app/uploads
       - /app_code/demo:/usr/app/dashboard/demo
       - /app_code/scripts:/usr/app/scripts
-
+      - /app_code/migration_scripts:/usr/app/migration_scripts
     command: >
       /bin/bash -c "
       cd /usr/app &&
@@ -68,6 +68,7 @@ services:
   #  command: >
   #    /bin/bash -c "
   #    cd /usr/app &&
+  #    export PYTHONPATH=$(pwd)/src &&
   #    pip install --upgrade pip &&
   #    pip install -r requirements.txt &&
   #    python3 -m scripts.run_upstage_email"

@@ -27,7 +27,7 @@ def get_footer():
         .filter(ConfigModel.name == ADDING_EMAIL_SIGNATURE)
         .first()
     )
-    if addingSignatureEmail.value != "true":
+    if addingSignatureEmail and addingSignatureEmail.value != "true":
         return ""
 
     signature = (
