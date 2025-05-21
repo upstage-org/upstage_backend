@@ -15,7 +15,7 @@ from datetime import datetime
 from graphql import GraphQLError
 import jwt
 from requests import Request
-from sqlalchemy import and_
+from sqlalchemy import and_, nulls_last
 from global_config import (
     DBSession,
     ScopedSession,
@@ -584,7 +584,7 @@ class StageService:
             }
             for stage in DBSession.query(StageModel)
             .filter(StageModel.attributes.any(name="visibility", description="true"))
-            .order_by(StageModel.last_access.desc())
+            .order_by(nulls_last(StageModel.last_access.desc()))
             .all()
         ]
 
