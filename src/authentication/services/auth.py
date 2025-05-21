@@ -76,7 +76,11 @@ class AuthenticationService:
             ).delete()
             local_db_session.add(user_session)
             local_db_session.flush()
-        self.user_service.update(user)
+
+            local_db_session.query(UserModel).filter(UserModel.id == user.id).update({
+                "last_login":  datetime.now()
+            })
+            local_db_session.commit()
 
         title_prefix = "" if ENV_TYPE == "Production" else "DEV "
         default_title = title_prefix + "Upstage"
@@ -198,8 +202,10 @@ class AuthenticationService:
             local_db_session.add(user_session)
             local_db_session.flush()
 
-        user.last_login = datetime.now()
-        self.user_service.update(user)
+            local_db_session.query(UserModel).filter(UserModel.id == user.id).update({
+                "last_login":  datetime.now()
+            })
+            local_db_session.commit()
 
         return {"access_token": access_token, "refresh_token": refresh_token}
 
