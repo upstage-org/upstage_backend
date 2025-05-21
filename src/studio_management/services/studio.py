@@ -16,7 +16,7 @@ import json
 import os
 from typing import List
 
-from sqlalchemy import and_, or_
+from sqlalchemy import and_, or_, nulls_last
 
 from assets.db_models.asset_usage import AssetUsageModel
 from authentication.db_models.user_session import UserSessionModel
@@ -97,9 +97,9 @@ class StudioService:
                     sort_field = UserModel.last_login
 
                 if direction == "ASC":
-                    query = query.order_by(sort_field.asc())
+                    query = query.order_by(nulls_last(sort_field.asc()))
                 elif direction == "DESC":
-                    query = query.order_by(sort_field.desc())
+                    query = query.order_by(nulls_last(sort_field.desc()))
 
         total_count = query.count()
 
