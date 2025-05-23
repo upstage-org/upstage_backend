@@ -477,5 +477,5 @@ class StudioService:
                     ),
                 }
             )
-            for stage in DBSession.query(StageModel).all()
+            for stage in DBSession.query(StageModel).order_by(StageModel.name.asc()).all()
         ]
