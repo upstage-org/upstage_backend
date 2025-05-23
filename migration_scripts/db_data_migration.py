@@ -46,7 +46,9 @@ def clear_tables(new_engine, tables):
         with conn.begin() as transaction:
             for table in tables:
                 try:
+                    print(f"Start TRUNCATE {table} ")
                     conn.execute(text(f"TRUNCATE TABLE {table} CASCADE"))
+                    print(f"Finished TRUNCATE {table} ")
                 except SQLAlchemyError as e:
                     print(f"Error truncating table {table}: {e}", file=sys.stderr)
             transaction.commit()
