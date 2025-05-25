@@ -18,6 +18,7 @@ services:
       export PYTHONPATH=$(pwd)/src &&
       pip install --upgrade pip &&
       pip install -r ./requirements.txt &&
+      ./initial_scripts/post_install/generate_cipher_key.sh &&
       ./scripts/start_upstage.sh"
     networks:
       - upstage-network
