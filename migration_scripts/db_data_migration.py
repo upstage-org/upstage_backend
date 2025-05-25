@@ -172,7 +172,7 @@ def update_sequences(new_engine, tables):
 
 
 def main():
-    new_password = input("Enter NEW PASSWORD: ").strip().replace(" ", "")
+    new_password = input("Enter NEW PASSWORD (this password will be used for all user logins): ").strip().replace(" ", "")
 
     old_engine = create_engine(f"postgresql://{DATABASE_USER}:{DATABASE_PASSWORD}@{DATABASE_HOST}:{DATABASE_PORT}/original_upstage")
     new_engine = create_engine(f"postgresql://{DATABASE_USER}:{DATABASE_PASSWORD}@{DATABASE_HOST}:{DATABASE_PORT}/{DATABASE_NAME}")

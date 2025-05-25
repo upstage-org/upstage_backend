@@ -12,7 +12,7 @@ service_containers_file="./service_containers/run_docker_compose.sh"
 # Function to prompt user for input and replace placeholders
 generate_config() {
     local key value
-    keys=("REPLACE_POSTGRES_PASSWORD" "REPLACE_MQTT_P_PASSWORD" "REPLACE_MQTT_A_PASSWORD" "REPLACE_MONGO_PASSWORD" "REPLACE_CLOUDFLARE_CAPTCHA_SECRETKEY" "EMAIL_HOST" "EMAIL_HOST_USER" "EMAIL_HOST_PASSWORD" "EMAIL_PORT")
+    keys=("REPLACE_FASTAPI_SECRET_KEY" "REPLACE_POSTGRES_PASSWORD" "REPLACE_MQTT_P_PASSWORD" "REPLACE_MQTT_A_PASSWORD" "REPLACE_MONGO_PASSWORD" "REPLACE_CLOUDFLARE_CAPTCHA_SECRETKEY" "EMAIL_HOST" "EMAIL_HOST_USER" "EMAIL_HOST_PASSWORD" "EMAIL_PORT")
     values=()
 
     # Generate POSTGRES_PASSWORD and MQTT_PASSWORD using openssl
@@ -20,14 +20,19 @@ generate_config() {
     REPLACE_MQTT_P_PASSWORD=$(openssl rand -base64 9 | tr -dc 'A-Za-z0-9' | head -c 12)
     REPLACE_MQTT_A_PASSWORD=$(openssl rand -base64 9 | tr -dc 'A-Za-z0-9' | head -c 12)
     REPLACE_MONGO_PASSWORD=$(openssl rand -base64 9 | tr -dc 'A-Za-z0-9' | head -c 12)
+    REPLACE_MONGO_PASSWORD=$(openssl rand -base64 9 | tr -dc 'A-Za-z0-9' | head -c 12)
+    REPLACE_FASTAPI_SECRET_KEY= $(openssl rand -hex 48 )
+
+
     values+=("$REPLACE_POSTGRES_PASSWORD")
     values+=("$REPLACE_MQTT_P_PASSWORD")
     values+=("$REPLACE_MQTT_A_PASSWORD")
     values+=("$REPLACE_MONGO_PASSWORD")
+    values+=("$REPLACE_FASTAPI_SECRET_KEY")
 
     # Prompt user for the rest of the keys
     echo "Enter the following values"
-    for key in "${keys[@]:4}"; do
+    for key in "${keys[@]:5}"; do
         read -p "Enter value for ${key}: " value
 	if [[ "$key" =~ .*"PORT".* ]] && [[ -z "$value" ]]
 	then 
