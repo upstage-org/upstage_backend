@@ -1,6 +1,6 @@
 #!/bin/bash
 
-FILE="src/global_config/load_env.py"
+FILE="/app_code/src/global_config/load_env.py"
 PLACEHOLDER="{REPLACE_CIPHER_KEY}"
 
 if grep -q "$PLACEHOLDER" "$FILE"; then
