@@ -124,6 +124,8 @@ Please log into your service machine in another shell, and copy your load_env.py
            chmod 755 $output_file
            sed -i "s/{APP_HOST}/$dname/g" $output_file
 
+           ./scripts/generate_cipher_key.sh
+
            read -p "
 Run the contents of this script over on the service machine:
            `cat $run_these_ufw_commands` 

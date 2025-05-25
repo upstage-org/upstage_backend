@@ -20,9 +20,6 @@ def update_upstage_user_passwords():
     new_password = input("Enter NEW PASSWORD (this password will be used for all user logins):").strip().replace(" ", "")
     update_sql = text("UPDATE upstage_user SET password = :new_password")
 
-    # For a hashed approach with pgcrypto (if your schema uses it), do something like:
-    update_sql = text("UPDATE upstage_user SET password = crypt(:new_password, gen_salt('bf'))")
-
     with new_engine.connect() as conn:
         with conn.begin() as transaction:
             try:

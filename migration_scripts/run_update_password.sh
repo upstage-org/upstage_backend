@@ -7,5 +7,5 @@ docker exec -it $container sh -c '
   cd /usr/app
   PYTHONPATH=$(pwd)/src
   export PYTHONPATH
-  python3 -m scripts.run_update_password
+  python3 -m migration_scripts.run_update_password
 '
