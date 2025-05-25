@@ -160,9 +160,9 @@ Run the contents of this script over on the service machine:
 
            apt update -y
            apt upgrade -y
-	   read -p "In the next two prompts, Jitsi will ask for your full domain name (not the 'auth.' domain). 
-	   
-It will then ask you about SSL keys. Choose 'Use my own SSL keys'. 
+           read -p "In the next two prompts, Jitsi will ask for your full domain name (not the 'auth.' domain). 
+
+It will then ask you about SSL keys. Choose 'I want to use my own certificate'. 
 
 Jitsi will prompt you for the location of the existing SSL keys. These are the responses:
 
@@ -184,10 +184,10 @@ Once you've copy-pasted these two paths to another screen/location, press enter 
            cp /etc/letsencrypt/live/$dname/privkey.pem /etc/prosody/certs/$dname.key
            cp /etc/letsencrypt/live/$dname/privkey.pem /etc/prosody/certs/auth.$dname.key
 
-	   chmod 640 /etc/prosody/certs/*key
+           chmod 640 /etc/prosody/certs/*key
            chmod 640 /var/lib/prosody/*key
-	   chgrp prosody /etc/prosody/certs/*
-	   chgrp prosody /var/lib/prosody/*
+           chgrp prosody /etc/prosody/certs/*
+           chgrp prosody /var/lib/prosody/*
 
            apt-get install jitsi-meet
            sed "s/YOUR_DOMAIN_NAME/$dname/g" ./initial_scripts/post_install/jitsi-cert-cron-script.sh >/root/jitsi-cert-cron-script.sh
@@ -196,6 +196,12 @@ Once you've copy-pasted these two paths to another screen/location, press enter 
            crontab /tmp/pcron
            rm /tmp/pcron
            crontab -l
+
+           # Repeat this. Jitsi changes perms after installation.
+           chmod 640 /etc/prosody/certs/*key
+           chmod 640 /var/lib/prosody/*key
+           chgrp prosody /etc/prosody/certs/*
+           chgrp prosody /var/lib/prosody/*
 
                 ;;
         *) echo "No match for machine type $machinetype, exiting."
