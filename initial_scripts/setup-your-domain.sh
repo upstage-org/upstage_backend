@@ -124,7 +124,7 @@ Please log into your service machine in another shell, and copy your load_env.py
            chmod 755 $output_file
            sed -i "s/{APP_HOST}/$dname/g" $output_file
 
-           chmod + ./scripts/generate_cipher_key.sh
+           chmod +x ./scripts/generate_cipher_key.sh
            ./scripts/generate_cipher_key.sh
 
            read -p "
