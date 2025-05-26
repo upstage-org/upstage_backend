@@ -144,7 +144,7 @@ This will auto-generate passwords for various applications, and will store them 
 
 It will start three docker containers: MongoDB, Postgresql, Mosquitto.
 
-## Next is the Application Server: UpStage, UpStage Event Capture, UpStage Email (optional)
+## Next is the Application Server: UpStage, UpStage Event Capture, Optional UpStage Email
 
 ```sh
 ./initial_scripts/setup-your-domain.sh
