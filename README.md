@@ -128,20 +128,23 @@ Then git clone this repo and 'cd' into the topmost directory of that repo copy.
 ```
 
 ## Specific to the Back End, Front End, or Streaming Service:
-This uses LetsEncrypt and will also run the script to configure the service environment and set default passwords:
+
+You will run this once on each machine, selecting the menu option 1,2,or 3 based on which machine you are establishing:
 ```sh
 ./initial_scripts/setup-your-domain.sh
 ```
+This uses LetsEncrypt and will also run the script to configure the service environment and set default passwords.
+
 If you don't wish to use LetsEncrypt, you can replace its keys with your own, and uninstall it after this entire installation process is complete. Note that nginx runs on each instance, managing the SSL layer on all instances. SSL is never handled or expected within docker instance configuration or code.
 
-## On the Back End Server: Your Foundational Services Installed and Configured:
-Choose option 1 to set up the Back End.
+## Start with the Back End Service Server: Your Foundational Services Installed and Configured:
+Choose option 1 to set up the Service Back End.
 
 This will auto-generate passwords for various applications, and will store them in a local config file. It will also configure nginx for the specific type of machine you are setting up. Note that nginx, LetsEncrypt and ufw all run on the machine itself, not in the instances.
 
 It will start three docker containers: MongoDB, Postgresql, Mosquitto.
 
-## Setup Instructions for your Application Server: UpStage, UpStage Event Capture, UpStage Email (optional)
+## Next is the Application Server: UpStage, UpStage Event Capture, UpStage Email (optional)
 
 ```sh
 ./initial_scripts/setup-your-domain.sh
@@ -150,7 +153,7 @@ Choose option 2 to set up the App server, which serves UpStage-specific Back End
 
 This will configure and start three "app" containers: UpStage, UpStage-Event, UpStage-Stats. Note that  this script is interactive, and will prompt you to copy certain things.
 
-## Setup Instructions for your Application Server also running the Front End:
+## The Same Application Server also runs the Front End:
 
 The Front End code for UpStage runs on the same server as the application code, and comes from this repository:
 
@@ -168,9 +171,14 @@ cd upstage_frontend
 
 Note that this script is also interactive. 
 
-## Setup Instructions for Initializing Default Data
+## Last is the Streaming Server:
+Choose option 3, and then _carefully_ follow the instructions. 
+Jitsi will interactively prompt you for domain and SSL certificate information. If this isn't filled out correctly, jitsi will fail.
+If it is filled out correctly, it just works, and requires no additional attention on your part.
 
-### Default Admin User, still on Application
+## Setup Instructions for Initializing Default Data on Application server
+
+### Default Admin User, in Application Web Site (https://your-domain-name.net)
 
 Upon initial setup, a default administrator account is created with the following credentials:
 
@@ -179,7 +187,7 @@ Upon initial setup, a default administrator account is created with the followin
 
 It is highly recommended to change the default password upon first login to ensure the security of your application. To change the password, follow these steps:
 
-1. Log in to the application using the default credentials.
+1. Log in to the application web site using the default credentials.
 1. Navigate to the account settings or profile section.
 1. Update the password to a strong, unique password.
 
