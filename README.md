@@ -121,7 +121,7 @@ ufw enable
 
 Then git clone this repo and 'cd' into the topmost directory of that repo copy.
 
-## On All Three Machines: Install Docker, Nginx, and Certbot:
+## On All Three Machines: Install Docker, Nginx, and Certbot by Running the Following:
 
 ```sh
 ./initial_scripts/setup-os.sh
