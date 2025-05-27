@@ -1,0 +1,9 @@
+FROM fedora:41
+
+USER root
+
+RUN dnf install -y https://download.postgresql.org/pub/repos/yum/reporpms/F-41-x86_64/pgdg-fedora-repo-latest.noarch.rpm && \
+    dnf install -y postgresql17 python3-pip && \
+    dnf clean all
+
+RUN /usr/bin/pg_dump --version
