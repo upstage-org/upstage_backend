@@ -1,7 +1,7 @@
 services:
   upstage:
     image: registry.access.redhat.com/ubi9/python-312:latest
-    container_name: upstage_container
+    container_name: upstage_backend
     ports:
       - "3000:3000"
     volumes:
@@ -24,7 +24,7 @@ services:
 
   upstage_event_archive:
     image: registry.access.redhat.com/ubi9/python-312:latest
-    container_name: upstage_event_archive_container
+    container_name: upstage_event_archive
     volumes:
       - /app_code/src:/usr/app/src
       - /app_code/requirements.txt:/usr/app/requirements.txt
@@ -42,7 +42,7 @@ services:
 
   upstage_stats:
     image: registry.access.redhat.com/ubi9/python-312:latest
-    container_name: upstage_stats_container
+    container_name: upstage_stats
     volumes:
       - /app_code/src:/usr/app/src
       - /app_code/requirements.txt:/usr/app/requirements.txt
@@ -57,23 +57,33 @@ services:
     networks:
       - upstage-network   
 
-  # For Upstage internal use only.
-  #upstage_emails:
-  #  image: registry.access.redhat.com/ubi9/python-312:latest
-  #  container_name: upstage_external_email_tokens
+  # For Upstage internal use. Maybe some clients will need this as well.
+  # Backups happen on a conventional mounted disk, because all images disks are SSD.
+  #upstage_backups:
+  #  container_name: upstage_backups
   #  volumes:
-  #    - /app_code/src:/usr/app/src
-  #    - /app_code/requirements.txt:/usr/app/requirements.txt
   #    - /app_code/scripts:/usr/app/scripts
-  #  command: >
-  #    /bin/bash -c "
-  #    cd /usr/app &&
-  #    export PYTHONPATH=$(pwd)/src &&
-  #    pip install --upgrade pip &&
-  #    pip install -r requirements.txt &&
-  #    python3 -m scripts.run_upstage_email"
-  #  networks:
-  #    - upstage-network   
+  #    - /mnt/backups:/mnt/backups # upstage mounted backup drive
+  #  build:
+  #    dockerfile: ./Dockerfile_for_backups
+
+  # For Upstage internal use. Maybe some clients will need this as well.
+  upstage_emails:
+    image: registry.access.redhat.com/ubi9/python-312:latest
+    container_name: upstage_external_email_tokens
+    volumes:
+      - /app_code/src:/usr/app/src
+      - /app_code/requirements.txt:/usr/app/requirements.txt
+      - /app_code/scripts:/usr/app/scripts
+    command: >
+      /bin/bash -c "
+      cd /usr/app &&
+      export PYTHONPATH=$(pwd)/src &&
+      pip install --upgrade pip &&
+      pip install -r requirements.txt &&
+      python3 -m scripts.run_upstage_email"
+    networks:
+      - upstage-network   
 
 networks:
   upstage-network:
