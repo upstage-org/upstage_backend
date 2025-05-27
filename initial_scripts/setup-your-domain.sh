@@ -120,7 +120,16 @@ Note that on Digital Ocean, the third IP in the 'hostname -I' command: ${arr[2]}
            echo "ufw allow from $APP_HOST proto any to any port 1884 " >> $run_these_ufw_commands
 
            read -p "
-Please log into your service machine in another shell, and copy your load_env.py file generated on your service machine (most likely here: /root/upstage_backend/src/global_config ) to /app_code/src/global_config on this machine. Once this is done, press enter to continue: " ready
+Please log into your service machine in another shell, and copy your load_env.py file generated on your service machine (most likely here: /root/upstage_backend/src/global_config ) to /app_code/src/global_config on this machine. 
+
+You can do so by running 'scp' to copy the file down to your local machine, then using scp to copy it up to the app machine: 
+
+On your own machine, in a shell window, run these, something like this:
+
+scp root@your_service_machine.org:/root/upstage_backend/src/global_config/load_env.py .
+scp ./load_env.py root@your_app_machine.org:/app_code/src/global_config/load_env.py
+
+Once this is done, press enter to continue: " ready
            chmod 755 $output_file
            sed -i "s/{APP_HOST}/$dname/g" $output_file
 

@@ -17,7 +17,7 @@ hypercorn
 loguru
 paho-mqtt          
 Pillow
-psycopg2
+psycopg2-binary
 pydash
 pyjwt
 pymongo
