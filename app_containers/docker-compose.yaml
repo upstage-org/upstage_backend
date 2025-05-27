@@ -58,32 +58,45 @@ services:
       - upstage-network   
 
   # For Upstage internal use. Maybe some clients will need this as well.
-  # Backups happen on a conventional mounted disk, because all images disks are SSD.
+  # Backups happen on a conventional mounted disk, because all image disks are SSD.
   #upstage_backups:
+  #  image: registry.access.redhat.com/ubi9/python-312:latest
   #  container_name: upstage_backups
+  #  build:
+  #    dockerfile: Dockerfile_backups
   #  volumes:
+  #    - /app_code/src:/usr/app/src
+  #    - /app_code/requirements.txt:/usr/app/requirements.txt
+  #    - /app_code/uploads:/usr/app/uploads
   #    - /app_code/scripts:/usr/app/scripts
   #    - /mnt/backups:/mnt/backups # upstage mounted backup drive
-  #  build:
-  #    dockerfile: ./Dockerfile_for_backups
+  #  command: >
+  #    /bin/bash -c "
+  #    cd /usr/app &&
+  #    export PYTHONPATH=$(pwd)/src &&
+  #    pip install --upgrade pip &&
+  #    pip install --no-cache-dir -r requirements.txt &&
+  #    python3 -m scripts.backup_to_local_drive"
+  #  networks:
+  #    - upstage-network   
 
   # For Upstage internal use. Maybe some clients will need this as well.
-  upstage_emails:
-    image: registry.access.redhat.com/ubi9/python-312:latest
-    container_name: upstage_external_email_tokens
-    volumes:
-      - /app_code/src:/usr/app/src
-      - /app_code/requirements.txt:/usr/app/requirements.txt
-      - /app_code/scripts:/usr/app/scripts
-    command: >
-      /bin/bash -c "
-      cd /usr/app &&
-      export PYTHONPATH=$(pwd)/src &&
-      pip install --upgrade pip &&
-      pip install -r requirements.txt &&
-      python3 -m scripts.run_upstage_email"
-    networks:
-      - upstage-network   
+  #upstage_emails:
+  #  image: registry.access.redhat.com/ubi9/python-312:latest
+  #  container_name: upstage_external_email_tokens
+  #  volumes:
+  #    - /app_code/src:/usr/app/src
+  #    - /app_code/requirements.txt:/usr/app/requirements.txt
+  #    - /app_code/scripts:/usr/app/scripts
+  #  command: >
+  #    /bin/bash -c "
+  #    cd /usr/app &&
+  #    export PYTHONPATH=$(pwd)/src &&
+  #    pip install --upgrade pip &&
+  #    pip install -r requirements.txt &&
+  #    python3 -m scripts.run_upstage_email"
+  #  networks:
+  #    - upstage-network   
 
 networks:
   upstage-network:
