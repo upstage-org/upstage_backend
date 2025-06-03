@@ -30,7 +30,7 @@ def create_receipt_base64(received_from, date, description, amount):
             Paragraph(received_from, normal_style),
             date,
             Paragraph(description, normal_style),
-            "USD$" + amount + ' (Amount shown in US Dollars)',
+            "USD$" + amount,
         ],
     ]
 
