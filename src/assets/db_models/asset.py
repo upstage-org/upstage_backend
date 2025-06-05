@@ -74,5 +74,9 @@ class AvatarVoice:
 
 
 class Voice:
+    def __init__(self, avatar=None, voice=None):
+        self.voice = voice
+        self.avatar = avatar
+
     voice: AvatarVoice
     avatar: AssetModel
