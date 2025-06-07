@@ -106,6 +106,7 @@ class SearchStageInput(BaseModel):
     createdBetween: Optional[List[date]] = Field(
         None, description="List of two dates representing the created date range"
     )
+    access: Optional[List[str]] = Field(None, description="List of access")
 
 
 class StageStreamInput(BaseModel):
