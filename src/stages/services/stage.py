@@ -100,33 +100,29 @@ class StageService:
 
         data = query.all()
 
-        stages = [
-            convert_keys_to_camel_case(
-                {
-                    **stage.to_dict(),
-                    "cover": stage.cover,
-                    "visibility": stage.visibility,
-                    "status": stage.status,
-                    "permission": self.stage_operation_service.resolve_permission(
-                        user.id, stage
-                    ),
-                }
-            )
-            for stage in data
-        ]
+        access = input.access if len(input.access) else ['owner', 'editor', 'player']
 
-        access_order = {"owner": 0, "editor": 1, "player": 2, "audience": 3}
+        stages = []
+        for stage in data:
+            permission = self.stage_operation_service.resolve_permission(user.id, stage)
+            if permission in access:
+                stages.append(
+                    convert_keys_to_camel_case(
+                        {
+                            **stage.to_dict(),
+                            "cover": stage.cover,
+                            "visibility": stage.visibility,
+                            "status": stage.status,
+                            "permission": permission,
+                        }
+                    )
+                )
+
 
 
         if input.sort is not None and input.sort[0] in ["ACCESS_DESC", "ACCESS_ASC"]:
             field, direction = input.sort[0].rsplit("_", 1)
-            stages.sort(
-                key=lambda s: (
-                    access_order.get(s["permission"], 999),
-                    -(s.get("last_access", 0) or 0) 
-                ),
-                reverse=(direction == "DESC")
-                )
+            stages.sort(key=lambda s: s["permission"], reverse=(direction == "DESC"))
 
         limit = input.limit if input.limit else 10
         page = input.page if input.page else 1
