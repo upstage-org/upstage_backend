@@ -115,7 +115,7 @@ class StageService:
             for stage in data
         ]
 
-        access_order = {"Owner": 0, "Editor": 1, "Player": 2, "Audience": 3}
+        access_order = {"owner": 0, "editor": 1, "player": 2, "audience": 3}
 
 
         if input.sort is not None and input.sort[0] in ["ACCESS_DESC", "ACCESS_ASC"]:
