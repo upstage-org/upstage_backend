@@ -120,23 +120,13 @@ class StageService:
 
         if input.sort is not None and input.sort[0] in ["ACCESS_DESC", "ACCESS_ASC"]:
             field, direction = input.sort[0].rsplit("_", 1)
-            
-            
-            if field == "ACCESS":
-                stages.sort(
-                    key=lambda s: (
-                        access_order.get(s["permission"], 999),
-                        -(s.get("last_access", 0) or 0) 
-                    ),
-                    reverse=(direction == "DESC")
-                )
-        else:
             stages.sort(
                 key=lambda s: (
                     access_order.get(s["permission"], 999),
                     -(s.get("last_access", 0) or 0) 
+                ),
+                reverse=(direction == "DESC")
                 )
-            )
 
         limit = input.limit if input.limit else 10
         page = input.page if input.page else 1
