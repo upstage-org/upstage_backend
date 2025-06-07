@@ -91,9 +91,9 @@ class StageService:
                     sort_field = StageModel.last_access
 
                 if direction == "ASC":
-                    query = query.order_by(sort_field.asc())
+                    query = query.order_by(nulls_last(sort_field.asc()))
                 elif direction == "DESC":
-                    query = query.order_by(sort_field.desc())
+                    query = query.order_by(nulls_last(sort_field.desc()))
 
         else:
             query = query.order_by(StageModel.name.asc())
@@ -115,9 +115,26 @@ class StageService:
             for stage in data
         ]
 
+        access_order = {"Owner": 0, "Editor": 1, "Player": 2, "Audience": 3}
+
+
         if input.sort is not None and input.sort[0] in ["ACCESS_DESC", "ACCESS_ASC"]:
             field, direction = input.sort[0].rsplit("_", 1)
-            stages.sort(key=lambda s: s["permission"], reverse=(direction == "DESC"))
+            
+            if field == "ACCESS":
+                stages.sort(
+                    key=lambda s: access_order.get(s["permission"], 999),
+                    reverse=(direction == "DESC")
+                )
+        else:
+
+            stages.sort(
+                key=lambda s: (
+                    access_order.get(s["permission"], 999),  
+                    -(s.get("last_active", 0) or 0)
+                )
+            )
+
 
         limit = input.limit if input.limit else 10
         page = input.page if input.page else 1
@@ -126,10 +143,15 @@ class StageService:
         paginated_stages = stages[start:end]
 
         return {
-            "edges": [ {
-                **stage,
-                "assets": [asset.child_asset.to_dict() for asset in stage["assets"]],
-            } for stage in paginated_stages ],
+            "edges": [
+                {
+                    **stage,
+                    "assets": [
+                        asset.child_asset.to_dict() for asset in stage["assets"]
+                    ],
+                }
+                for stage in paginated_stages
+            ],
             "totalCount": total_count,
         }
 
