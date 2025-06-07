@@ -118,7 +118,7 @@ class StageService:
                     )
                 )
 
-
+        total_count = len(stages)
 
         if input.sort is not None and input.sort[0] in ["ACCESS_DESC", "ACCESS_ASC"]:
             field, direction = input.sort[0].rsplit("_", 1)
