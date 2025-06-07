@@ -100,7 +100,7 @@ class StageService:
 
         data = query.all()
 
-        access = input.access if len(input.access) else ['owner', 'editor', 'player']
+        access = input.access if input.access and len(input.access) else ['owner', 'editor', 'player']
 
         stages = []
         for stage in data:

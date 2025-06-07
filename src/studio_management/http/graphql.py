@@ -169,6 +169,7 @@ type_defs = gql("""
         name: String
         owners: [String]
         createdBetween: [Date]
+        access: [String]
     }
                 
      input AssignMediaInput {
