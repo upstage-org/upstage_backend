@@ -8,13 +8,12 @@ if projdir not in sys.path:
     sys.path.append(appdir)
     sys.path.append(projdir)
 
-import logging
 import time
 import pytest
 from sqlalchemy import create_engine, text
 from starlette.testclient import TestClient
-from global_config import env
-from main import app
+from src.global_config import env, logger
+from src.main import app
 
 
 @pytest.fixture(scope='session')
@@ -24,7 +23,7 @@ def anyio_backend():
 @pytest.fixture(scope='session', autouse=True)
 def client():
   with TestClient(app=app, base_url='http://localhost:8000') as client:
-    logging.error('Client is ready')
+    logger.info('Client is ready')
     yield client
 
 
@@ -47,4 +46,4 @@ def db_engine():
         # Drop the database
         # connection.execute(text(f"DROP DATABASE {env.DATABASE_NAME}"))
     end_time = time.time()
-    logging.info(f"Time taken to drop all tables: {end_time - start_time} seconds")
+    logger.info(f"Time taken to drop all tables: {end_time - start_time} seconds")
