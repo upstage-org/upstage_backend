@@ -23,14 +23,14 @@ async def lifespan(app: FastAPI):
 
 
 def add_cors_middleware(app):
-    if ENV_TYPE != "Production":
-        app.add_middleware(
-            CORSMiddleware,
-            allow_origins=[HOSTNAME, f"*.{HOSTNAME}"],
-            allow_credentials=True,
-            allow_methods=["*"],
-            allow_headers=["*"],
-        )
+    allowed_origins = ["*"] if ENV_TYPE != "Production" else [HOSTNAME, f"*.{HOSTNAME}"]
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=allowed_origins,
+        allow_credentials=True,
+        allow_methods=["*"],
+        allow_headers=["*"],
+    )
 
 
 class Bootstrap:
