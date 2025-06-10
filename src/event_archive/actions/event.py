@@ -2,6 +2,8 @@
 import os
 import sys
 
+from src.global_config import logger
+
 appdir = os.path.abspath(os.path.dirname(__file__))
 projdir = os.path.abspath(os.path.join(appdir, ".."))
 projdir2 = os.path.abspath(os.path.join(appdir, "../.."))
@@ -10,8 +12,6 @@ if projdir not in sys.path:
     sys.path.append(projdir)
     sys.path.append(projdir2)
 
-import logging
-import json
 
 from global_config import ScopedSession
 from event_archive.db_models.event import EventModel
@@ -29,7 +29,7 @@ def record_event(topic, payload, timestamp):
             session.add(event)
             session.flush()
     except Exception as error:
-        logging.error(error)
+        logger.error(error)
     finally:
         if session is not None:
             session.close()

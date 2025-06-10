@@ -2,6 +2,8 @@
 import os
 import sys
 
+from src.global_config import logger
+
 appdir = os.path.abspath(os.path.dirname(__file__))
 projdir = os.path.abspath(os.path.join(appdir, ".."))
 if projdir not in sys.path:
@@ -9,7 +11,6 @@ if projdir not in sys.path:
     sys.path.append(projdir)
 
 import json
-import logging
 import secrets
 from datetime import datetime, timedelta
 
@@ -36,7 +37,7 @@ def on_connect(client: mqtt.Client, userdata, flags, rc):
         client.publish(CONNECTION_TOPIC, payload=json.dumps(connection_payload))
 
         client.subscribe(LIVE_CLIENT_TOPIC)
-        logging.warning("Connected successfully! Waiting for new messages...")
+        logger.warning("Connected successfully! Waiting for new messages...")
 
 
 def on_message(client: mqtt.Client, userdata, msg: mqtt.MQTTMessage):
@@ -58,7 +59,7 @@ def on_message(client: mqtt.Client, userdata, msg: mqtt.MQTTMessage):
                     )
                     session.add(connection_stat)
             except Exception as error:
-                logging.error(error)
+                logger.error(error)
             finally:
                 if session is not None:
                     session.close()
@@ -89,7 +90,7 @@ def on_message(client: mqtt.Client, userdata, msg: mqtt.MQTTMessage):
                             synchronize_session=False,
                         )
             except Exception as error:
-                logging.error(error)
+                logger.error(error)
             finally:
                 if session is not None:
                     session.close()

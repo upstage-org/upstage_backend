@@ -2,6 +2,8 @@
 import os
 import sys
 
+from src.global_config import logger
+
 appdir = os.path.abspath(os.path.dirname(__file__))
 projdir = os.path.abspath(os.path.join(appdir, ".."))
 projdir2 = os.path.abspath(os.path.join(appdir, "../.."))
@@ -10,7 +12,6 @@ if projdir not in sys.path:
     sys.path.append(projdir)
     sys.path.append(projdir2)
 
-import logging
 import re
 import json
 from multiprocessing import Process, cpu_count
@@ -80,12 +81,12 @@ def functions_for(payload):
                 break
         if should_add:
             output.append(f)
-    logging.info(f"Functions to be called for payload: {[f.__name__ for f in output]}")
+    logger.info(f"Functions to be called for payload: {[f.__name__ for f in output]}")
     return output
 
 
 def worker():
-    logging.info(f"Worker started (PID: {os.getpid()})")
+    logger.info(f"Worker started (PID: {os.getpid()})")
     client = build_mongo_client()
     db = client[MONGO_DB]
     queue = db[EVENT_COLLECTION]
@@ -95,22 +96,22 @@ def worker():
             if event:
                 from event_archive.actions.event import record_event
 
-                logging.info(f"{os.getpid()} Processing: {event}")
+                logger.info(f"{os.getpid()} Processing: {event}")
                 topic = event["topic"]
                 payload = json.loads(event["payload"])
                 timestamp = event["timestamp"]
                 record_event(topic, payload, timestamp)
-                logging.info(f"{os.getpid()} Stored event: {event}")
+                logger.info(f"{os.getpid()} Stored event: {event}")
             else:
-                logging.info(f"{os.getpid()} No event found, sleeping for a while")
+                logger.info(f"{os.getpid()} No event found, sleeping for a while")
                 time.sleep(1)
         except Exception as e:
-            logging.error(e)
+            logger.error(e)
 
 
 def run():
     processes = [Process(target=worker, args=()) for _ in range(cpu_count())]
 
-    logging.warning(f"Spawning {len(processes)} processes...")
+    logger.warning(f"Spawning {len(processes)} processes...")
     for p in processes:
         p.start()

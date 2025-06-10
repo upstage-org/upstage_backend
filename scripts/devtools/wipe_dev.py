@@ -11,7 +11,7 @@ if projdir not in sys.path:
 
 from sqlalchemy import not_
 from terminal_colors import bcolors
-from src.global_config import UPLOAD_USER_CONTENT_FOLDER, ScopedSession
+from src.global_config import UPLOAD_USER_CONTENT_FOLDER, ScopedSession, logger
 from src.assets.db_models.asset import AssetModel
 from src.assets.db_models.asset_license import AssetLicenseModel
 from src.assets.db_models.asset_usage import AssetUsageModel
@@ -25,22 +25,22 @@ from src.performance_config.db_models.scene import SceneModel
 
 stages_to_be_kepts = ["8thMarch"]
 
-print(
+logger.warning(
     bcolors.WARNING
     + "Are you sure you want to do the clean up? This will delete all stages except {0}!".format(
         stages_to_be_kepts
     )
     + bcolors.ENDC
 )
-print(
+logger.info(
     'If you want to keep any stages, please add them to the "stages_to_be_kepts" list in "scripts/wipe_dev.py".'
 )
 
 if input(bcolors.BOLD + 'Type "confirm" to continue: ' + bcolors.ENDC) != "confirm":
-    print(bcolors.FAIL + "Aborted!" + bcolors.ENDC)
+    logger.error(bcolors.FAIL + "Aborted!" + bcolors.ENDC)
     sys.exit(0)
 
-print(bcolors.OKGREEN + "Start cleaning up..." + bcolors.ENDC)
+logger.info(bcolors.OKGREEN + "Start cleaning up..." + bcolors.ENDC)
 
 
 with ScopedSession() as session:
@@ -54,7 +54,7 @@ with ScopedSession() as session:
     )
 
     for asset in session.query(AssetModel).filter(not_(AssetModel.stages.any())).all():
-        print("🗑️ Deleting asset: {}".format(asset.name))
+        logger.info("🗑️ Deleting asset: {}".format(asset.name))
         session.query(AssetLicenseModel).filter(AssetLicenseModel.asset_id == asset.id).delete(
             synchronize_session=False
         )
@@ -76,13 +76,13 @@ with ScopedSession() as session:
                     .filter(AssetModel.file_location == "{}/{}".format(ftype, media))
                     .first()
                 ):
-                    print("🗑️ Deleting file {}/{}".format(ftype, media))
+                    logger.info("🗑️ Deleting file {}/{}".format(ftype, media))
                     try:
                         pathlib.Path(
                             "{}/{}/{}".format(upload_assets_folder, ftype, media)
                         ).unlink()
                     except:
-                        print(
+                        logger.error(
                             "Failed to remove {}/{}/{}".format(
                                 upload_assets_folder, ftype, media
                             )
@@ -90,7 +90,7 @@ with ScopedSession() as session:
 
     for stage in session.query(StageModel).all():
         if stage.file_location not in stages_to_be_kepts:
-            print("🗑️ Deleting stage: {}".format(stage.name))
+            logger.info("🗑️ Deleting stage: {}".format(stage.name))
             session.query(StageAttributeModel).filter(
                 StageAttributeModel.stage_id == stage.id
             ).delete(synchronize_session=False)
@@ -117,7 +117,7 @@ with ScopedSession() as session:
             )
             session.delete(stage)
         else:
-            print("🗑️ Clearing replays and scenes of {}".format(stage.name))
+            logger.info("🗑️ Clearing replays and scenes of {}".format(stage.name))
             session.query(PerformanceModel).filter(PerformanceModel.stage_id == stage.id).delete(
                 synchronize_session=False
             )
@@ -128,4 +128,4 @@ with ScopedSession() as session:
     session.commit()
     session.close()
 
-print("Done!")
+logger.info("Done!")

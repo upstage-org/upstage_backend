@@ -23,6 +23,7 @@ from global_config.helpers import (
     convert_keys_to_camel_case,
     camel_to_snake,
 )
+from global_config.logger import logger
 
 __all__ = [
     "encrypt",
@@ -37,6 +38,7 @@ __all__ = [
     "camel_to_snake",
     "BaseModel",
     "authenticated",
+    "logger"
 ]
 
 __all__ += [name for name in dir(global_config.env) if not name.startswith("__")]

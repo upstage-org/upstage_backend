@@ -2,6 +2,7 @@
 import os
 import sys
 
+from src.global_config import logger
 from src.global_config.env import DATABASE_HOST, DATABASE_NAME, DATABASE_PASSWORD, DATABASE_PORT, DATABASE_USER
 
 appdir = os.path.abspath(os.path.dirname(__file__))
@@ -14,15 +15,12 @@ if projdir not in sys.path:
 
 import sys
 import json
-import logging
 from sqlalchemy import create_engine, text
 from sqlalchemy.exc import SQLAlchemyError
 
 from src.global_config.helpers.fernet_crypto import encrypt
 
 # Disable SQLAlchemy engine logging for less verbosity
-logging.getLogger('sqlalchemy.engine').setLevel(logging.ERROR)
-
 def get_new_table_columns(new_engine, table_name):
     """
     Return a list of column names for the specified table in the *new* database.
@@ -46,20 +44,20 @@ def clear_tables(new_engine, tables):
         with conn.begin() as transaction:
             for table in tables:
                 try:
-                    print(f"Start TRUNCATE {table} ")
+                    logger.info(f"Start TRUNCATE {table} ")
                     conn.execute(text(f"TRUNCATE TABLE {table} CASCADE"))
-                    print(f"Finished TRUNCATE {table} ")
+                    logger.info(f"Finished TRUNCATE {table} ")
                 except SQLAlchemyError as e:
-                    print(f"Error truncating table {table}: {e}", file=sys.stderr)
+                    logger.info(f"Error truncating table {table}: {e}", file=sys.stderr)
             transaction.commit()
 
 def migrate_table(old_engine, new_engine, table_name):
-    print(f"Migrating table '{table_name}'...")
+    logger.info(f"Migrating table '{table_name}'...")
 
     # Fetch the list of columns that exist in the new table.
     new_table_columns = get_new_table_columns(new_engine, table_name)
     if not new_table_columns:
-        print(f"No columns found for table '{table_name}' in the new database. Skipping.")
+        logger.info(f"No columns found for table '{table_name}' in the new database. Skipping.")
         return
 
     # Fetch all rows from the old database table.
@@ -67,7 +65,7 @@ def migrate_table(old_engine, new_engine, table_name):
         result = old_conn.execute(text(f"SELECT * FROM {table_name}"))
         rows = result.fetchall()
         if not rows:
-            print(f"No data found in '{table_name}'. Skipping.")
+            logger.info(f"No data found in '{table_name}'. Skipping.")
             return
 
         # Only keep columns that exist in the new table.
@@ -102,9 +100,9 @@ def migrate_table(old_engine, new_engine, table_name):
                         new_conn.execute(insert_query, filtered_data)
                     migrated_count += 1
                 except SQLAlchemyError as e:
-                    print(f"Error inserting row {filtered_data} into '{table_name}': {e}", file=sys.stderr)
+                    logger.info(f"Error inserting row {filtered_data} into '{table_name}': {e}", file=sys.stderr)
 
-            print(f"  Migrated {migrated_count} rows from '{table_name}'.")
+            logger.info(f"  Migrated {migrated_count} rows from '{table_name}'.")
 
 def update_upstage_user_passwords(new_engine, new_password):
     """
@@ -119,9 +117,9 @@ def update_upstage_user_passwords(new_engine, new_password):
         with conn.begin() as transaction:
             try:
                 conn.execute(update_sql, {"new_password": encrypt(new_password)})
-                print(f"All 'upstage_user' passwords have been updated to '{new_password}'.")
+                logger.info(f"All 'upstage_user' passwords have been updated to '{new_password}'.")
             except SQLAlchemyError as e:
-                print(f"Error updating passwords in 'upstage_user': {e}", file=sys.stderr)
+                logger.info(f"Error updating passwords in 'upstage_user': {e}", file=sys.stderr)
 
 def update_asset_names(engine):
     """
@@ -148,10 +146,10 @@ def update_asset_names(engine):
                 affected_rows = result.rowcount
                 transaction.commit()
                 
-        print( f"Successfully updated {affected_rows} assets from 'stream' to 'video'")
+        logger.info( f"Successfully updated {affected_rows} assets from 'stream' to 'video'")
     
     except SQLAlchemyError as e:
-        print(f"Error updating asset type in 'upstage_user': {e}", file=sys.stderr) 
+        logger.info(f"Error updating asset type in 'upstage_user': {e}", file=sys.stderr) 
 
 def update_sequences(new_engine, tables):
     """
@@ -165,9 +163,9 @@ def update_sequences(new_engine, tables):
                 update_seq_sql = text(f"SELECT setval(:seq_name, (SELECT COALESCE(MAX(id), 1) FROM {table}))")
                 try:
                     conn.execute(update_seq_sql, {"seq_name": seq_name})
-                    print(f"Updated sequence for table '{table}' using sequence '{seq_name}'.")
+                    logger.info(f"Updated sequence for table '{table}' using sequence '{seq_name}'.")
                 except SQLAlchemyError as e:
-                    print(f"Error updating sequence for table '{table}': {e}", file=sys.stderr)
+                    logger.info(f"Error updating sequence for table '{table}': {e}", file=sys.stderr)
             transaction.commit()
 
 
@@ -209,7 +207,7 @@ def main():
 
     update_asset_names(new_engine)
 
-    print("Migration completed successfully.")
+    logger.info("Migration completed successfully.")
 
 if __name__ == "__main__":
     main()

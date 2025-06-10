@@ -2,6 +2,8 @@
 import os
 import sys
 
+from src.global_config.env import ENV_TYPE
+
 appdir = os.path.abspath(os.path.dirname(__file__))
 projdir = os.path.abspath(os.path.join(appdir, ".."))
 projdir2 = os.path.abspath(os.path.join(appdir, "../.."))
@@ -103,6 +105,9 @@ class UserService:
         return {"user": user.to_dict()}
 
     def verify_captcha(self, token: str, request: Request):
+        if ENV_TYPE != "Production":
+            return
+
         if not CLOUDFLARE_CAPTCHA_SECRETKEY:
             return
 

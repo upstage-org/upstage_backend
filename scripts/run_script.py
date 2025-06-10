@@ -2,6 +2,7 @@
 from os import listdir
 import sys
 import devtools.wipe_dev
+from src.global_config import logger
 
 
 class bcolors:
@@ -18,15 +19,15 @@ class bcolors:
 
 if __name__ == "__main__":
     if not len(sys.argv) == 2:
-        print("Usage: run_script.py <script_name>")
-        print("Available scripts:")
+        logger.info("Usage: run_script.py <script_name>")
+        logger.info("Available scripts:")
         for script in listdir("scripts"):
             if script.endswith(".py"):
-                print("\t" + script[:-3])
+                logger.info("\t" + script[:-3])
         sys.exit(1)
     script_name = sys.argv[1]
     if script_name == "wipe_dev":
         devtools.wipe_dev.run()
     else:
-        print("Unknown script: {}".format(script_name))
+        logger.info("Unknown script: {}".format(script_name))
         sys.exit(1)

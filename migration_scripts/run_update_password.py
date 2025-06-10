@@ -1,9 +1,9 @@
 import sys
 from sqlalchemy import text
+from src.global_config import logger
 from src.global_config.helpers.fernet_crypto import encrypt
 from src.global_config.env import DATABASE_HOST, DATABASE_NAME, DATABASE_PASSWORD, DATABASE_PORT, DATABASE_USER
 
-import logging
 from sqlalchemy import create_engine, text
 from sqlalchemy.exc import SQLAlchemyError
 
@@ -24,9 +24,9 @@ def update_upstage_user_passwords():
         with conn.begin() as transaction:
             try:
                 conn.execute(update_sql, {"new_password": encrypt(new_password)})
-                logging.warning(f"All 'upstage_user' passwords have been updated to '{new_password}'.")
+                logger.warning(f"All 'upstage_user' passwords have been updated to '{new_password}'.")
             except SQLAlchemyError as e:
-                logging.warning(f"Error updating passwords in 'upstage_user': {e}", file=sys.stderr)
+                logger.warning(f"Error updating passwords in 'upstage_user': {e}", file=sys.stderr)
 
 if __name__ == "__main__":
     update_upstage_user_passwords()
