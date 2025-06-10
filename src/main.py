@@ -26,7 +26,7 @@ def add_cors_middleware(app):
     if ENV_TYPE != "Production":
         app.add_middleware(
             CORSMiddleware,
-            allow_origins=[HOSTNAME],
+            allow_origins=[HOSTNAME, f"*.{HOSTNAME}"],
             allow_credentials=True,
             allow_methods=["*"],
             allow_headers=["*"],
