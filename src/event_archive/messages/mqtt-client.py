@@ -2,6 +2,8 @@
 import os
 import sys
 
+from src.global_config import logger
+
 appdir = os.path.abspath(os.path.dirname(__file__))
 projdir = os.path.abspath(os.path.join(appdir, ".."))
 projdir2 = os.path.abspath(os.path.join(appdir, "../.."))
@@ -12,14 +14,19 @@ if projdir not in sys.path:
 
 import arrow
 import json
-import logging
 from paho.mqtt import client as mqtt
 import pprint
 import time
 import uuid
-import logging
 
-logging.basicConfig(filename="mqtt_client.log", level=logging.DEBUG)
+logger.add(
+    "mqtt_client.log",
+    level="DEBUG",
+    format="{time:YYYY-MM-DD HH:mm:ss} | {level: <8} | {name}:{function}:{line} - {message}",
+    rotation="10 MB",
+    retention="7 days"
+)
+
 global_topic = "performance/{}"
 global_domain_name = "128.199.69.170"
 global_port = 1883
@@ -42,7 +49,7 @@ class MQTTClient(object):
     def on_connect(self, client, userdata, flags, rc, something):
         if str(rc) == "Success":
             msg = f"Connected successfully: {rc}, Flags: {flags} {something}"
-            logging.info(msg)
+            logger.info(msg)
 
         else:
             msg = "Not authorized to connect, or hub time is wrong: ({0}, {1}, {2}, {3})".format(
@@ -51,29 +58,29 @@ class MQTTClient(object):
                 pprint.pformat(userdata),
                 pprint.pformat(flags),
             )
-            logging.error(msg)
+            logger.error(msg)
 
     def on_disconnect(self, client, userdata, rc):
         if rc == 1:
             msg = "Unexpected Connection fail: return code 1"
-            logging.error(msg)
+            logger.error(msg)
         else:
             msg = "Disconnected from the Platform"
-            logging.error(msg)
+            logger.error(msg)
 
         self.count_disconnects += 1
         if self.count_disconnects > 10:
             msg = "Process unexpectedly disconnected more than 10 times, killing and restarting the process."
-            logging.error(msg)
+            logger.error(msg)
             sys.exit(-1)
 
     def on_message(self, client, userdata, msg):
         msg = " - ".join((msg.topic, str(msg.payload)))
-        logging.warning(msg)
+        logger.warning(msg)
 
     def on_publish(self, client, userdata, mid):
         msg = "Publish Callback message ID for internal: {0}".format(mid)
-        logging.warning(msg)
+        logger.warning(msg)
         self.count_disconnects = 0
         if mid in self.unacked_messages:
             self.unacked_messages.remove(mid)
@@ -82,7 +89,7 @@ class MQTTClient(object):
         msg = "Log entry from device {0}: {1}, {2}, {3}".format(
             self.client_id, level, buffer, userdata
         )
-        logging.warning(msg)
+        logger.warning(msg)
 
     def client_start(self, on_message=None):
         self.client = mqtt.Client(client_id=self.client_id, protocol=mqtt.MQTTv5)
@@ -100,7 +107,7 @@ class MQTTClient(object):
         """
 
         self.client.connect(self.domain_name, port=self.port)
-        logging.warning("Connected")
+        logger.warning("Connected")
         self.client.loop_start()
 
     def client_publish(self, json_payload):
@@ -111,17 +118,17 @@ class MQTTClient(object):
             msg = "Published message ID {0}: return code is not zero: {1}".format(
                 message_id, result
             )
-            logging.error(msg)
+            logger.error(msg)
             self.nonzero_count += 1
             if self.nonzero_count >= 10:
                 msg = "Process for device {0} had greater than 10 publish failures, killing and restarting the process.".format(
                     self.client_id
                 )
-                logging.error(msg)
+                logger.error(msg)
                 sys.exit(-1)
         else:
             msg = "Published message ID {0}: {1}".format(message_id, result)
-            logging.warning(msg)
+            logger.warning(msg)
             self.unacked_messages.append(message_id)
 
     def client_shutdown(self):
@@ -148,7 +155,7 @@ if __name__ == "__main__":
                 }
                 x.client_publish(json.dumps(outbound))
                 time.sleep(5)
-                logging.warning("Publishing: {0}".format(count))
+                logger.warning("Publishing: {0}".format(count))
         finally:
             x.client_shutdown()
 

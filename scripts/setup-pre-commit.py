@@ -1,5 +1,7 @@
 import os
 
+from src.global_config import logger
+
 hook_file_path = ".git/hooks/pre-commit"
 
 hook_contents = """#!/bin/sh
@@ -19,4 +21,4 @@ with open(hook_file_path, "w") as f:
 # Make the hook file executable
 os.chmod(hook_file_path, 0o755)
 
-print(f"Pre-commit hook file created at {hook_file_path} 🪝")
+logger.info(f"Pre-commit hook file created at {hook_file_path} 🪝")

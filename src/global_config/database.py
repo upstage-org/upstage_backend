@@ -2,26 +2,21 @@
 import os
 import sys
 
+from src.global_config import logger
+
 appdir = os.path.abspath(os.path.dirname(__file__))
 projdir = os.path.abspath(os.path.join(appdir, ".."))
 if projdir not in sys.path:
     sys.path.append(appdir)
     sys.path.append(projdir)
 
-import logging
 from sqlalchemy import create_engine, MetaData
 from databases import Database
 
 from global_config.env import DATABASE_URL
 from sqlalchemy.orm import sessionmaker, scoped_session
 
-# from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.pool import NullPool
-
-# logging.basicConfig()
-# logging.getLogger("sqlalchemy.engine").setLevel(logging.INFO)
-
-# db = declarative_base()
 
 database = Database(DATABASE_URL)
 metadata = MetaData()
@@ -86,9 +81,9 @@ class ScopedSession(object):
         except Exception as e:
             if self.rollback_upon_failure:
                 self.session.rollback()
-                logging.error(f"Failed to commit db session, rolled back: {e}")
+                logger.error(f"Failed to commit db session, rolled back: {e}")
             else:
-                logging.error(
+                logger.error(
                     f"Failed to commit db session, not rolled back, as per your request: {e}"
                 )
         finally:

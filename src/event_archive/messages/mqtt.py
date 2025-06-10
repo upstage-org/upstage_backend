@@ -2,6 +2,8 @@
 import os
 import sys
 
+from src.global_config import logger
+
 appdir = os.path.abspath(os.path.dirname(__file__))
 projdir = os.path.abspath(os.path.join(appdir, ".."))
 projdir2 = os.path.abspath(os.path.join(appdir, "../.."))
@@ -10,7 +12,6 @@ if projdir not in sys.path:
     sys.path.append(projdir)
     sys.path.append(projdir2)
 
-import logging
 import secrets
 from time import time
 
@@ -27,12 +28,11 @@ from event_archive.config.mongodb import build_mongo_client
 
 def on_connect(client, userdata, flags, rc):
     client.subscribe(PERFORMANCE_TOPIC_RULE)
-    print("Connected successfully! Waiting for new messages...")
+    logger.info("Connected successfully! Waiting for new messages...")
 
 
 def on_message(client, userdata, msg: paho.MQTTMessage):
     if not msg.retain:
-
         try:
             client = build_mongo_client()
             db = client[MONGO_DB]
@@ -41,7 +41,7 @@ def on_message(client, userdata, msg: paho.MQTTMessage):
             )
             client.close()
         except Exception as e:
-            logging.error(e)
+            logger.error(e)
 
 
 def get_client_id():
