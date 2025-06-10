@@ -2,6 +2,8 @@
 import os
 import sys
 
+from src.global_config import logger
+
 appdir = os.path.abspath(os.path.dirname(__file__))
 projdir = os.path.abspath(os.path.join(appdir, ".."))
 projdir2 = os.path.abspath(os.path.join(appdir, "../.."))
@@ -167,4 +169,4 @@ class PaymentService:
 if __name__ == "__main__":
     pi = PaymentService()
     result = pi.create_payment_intent(amount=100, currency="usd")
-    print(result)
+    logger.info(result)

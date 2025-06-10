@@ -1,7 +1,8 @@
 # -*- coding: iso8859-15 -*-
-import logging
 import os
 import sys
+
+from src.global_config import logger
 
 appdir = os.path.abspath(os.path.dirname(__file__))
 projdir = os.path.abspath(os.path.join(appdir, ".."))
@@ -79,7 +80,7 @@ def detect_size(type, path):
         if len(size) == 2:
             return down_size(size)
         else:
-            logging.warning(
+            logger.warning(
                 '❌ Please put the video dimension in the stream name, otherwise stream will have square frame. For example "Demo stream_800x600.mp4". Current name: {}{}{}'.format(
                     bcolors.FAIL, path, bcolors.ENDC
                 )
@@ -119,7 +120,7 @@ def create_media(type, path):
         # copy asset to uploads folder
         src_path = os.path.join(DEMO_MEDIA_FOLDER, type, path)
         dest_path = os.path.join(type, path)
-        logging.warning(src_path, dest_path)
+        logger.warning(src_path, dest_path)
         copy_file(src_path, dest_path, type)
         asset.file_location = dest_path
         size += os.path.getsize(src_path)
@@ -144,7 +145,7 @@ def create_media(type, path):
     DBSession.add(asset)
     DBSession.commit()
     created_media_ids.append(asset.id)
-    logging.warning(
+    logger.warning(
         "✅ Created{} {} {}".format(
             " multi-frame" if "multi" in attributes else "", type, path
         )
@@ -158,7 +159,7 @@ def create_demo_media():
 
 def create_demo_stage():
     if DBSession.query(StageModel).filter(StageModel.name == "Demo").first():
-        logging.warning('⏩ A stage named "Demo" already exists.')
+        logger.warning('⏩ A stage named "Demo" already exists.')
         return
     stage = StageModel(
         name="Demo Stage",
@@ -190,7 +191,7 @@ def create_demo_stage():
     for media_id in created_media_ids:
         DBSession.add(ParentStageModel(stage_id=stage.id, child_asset_id=media_id))
     DBSession.commit()
-    logging.warning("✅ Created demo stage")
+    logger.warning("✅ Created demo stage")
 
 
 def create_demo_users():
@@ -207,7 +208,9 @@ def create_demo_users():
         DBSession.query(UserModel).filter(UserModel.username == admin_username).first()
         or DBSession.query(UserModel).filter(UserModel.email == admin_email).first()
     ):
-        logging.warning('⏩ An admin user with email "{}" already exists.'.format(admin_email))
+        logger.warning(
+            '⏩ An admin user with email "{}" already exists.'.format(admin_email)
+        )
     else:
         admin = UserModel()
         admin.username = admin_username
@@ -216,7 +219,7 @@ def create_demo_users():
         admin.role = ADMIN
         admin.active = True
         DBSession.add(admin)
-        logging.warning(
+        logger.warning(
             '✅ Created admin account with credentials: "{}" and password "{}"'.format(
                 admin_username, test_user_password
             )
@@ -226,7 +229,9 @@ def create_demo_users():
         DBSession.query(UserModel).filter(UserModel.username == guest_username).first()
         or DBSession.query(UserModel).filter(UserModel.email == guest_email).first()
     ):
-        logging.warning('⏩ A guest user with email "{}" already exists.'.format(guest_username))
+        logger.warning(
+            '⏩ A guest user with email "{}" already exists.'.format(guest_username)
+        )
     else:
         guest = UserModel()
         guest.username = guest_username
@@ -235,7 +240,7 @@ def create_demo_users():
         guest.role = GUEST
         guest.active = True
         DBSession.add(guest)
-        logging.warning(
+        logger.warning(
             '✅ Created guest account with credentials: "{}" and password "{}"'.format(
                 guest_username, test_user_password
             )
@@ -260,7 +265,7 @@ def scaffold_foyer():
         "FOYER_DESCRIPTION",
         "Welcome to your new UpStage! Log in to get started.",
     )
-    logging.warning("✅ Foyer Scaffolding Completed")
+    logger.warning("✅ Foyer Scaffolding Completed")
 
 
 def scaffold_system_configuration():
@@ -269,7 +274,7 @@ def scaffold_system_configuration():
         "https://raw.githubusercontent.com/upstage-org/upstage/main/LICENSE",
     )
     save_config("MANUAL", "https://docs.upstage.live")
-    logging.warning("✅ System Configuration Scaffolding Completed")
+    logger.warning("✅ System Configuration Scaffolding Completed")
 
 
 create_demo_media()
