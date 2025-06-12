@@ -9,7 +9,7 @@ echo "2. Create necessary tables if they do not exist."
 echo "3. Insert predefined scaffold base data into the tables."
 echo "Please ensure that the database connection parameters are correctly configured before running this script."
 
-container=`docker ps | grep upstage_container| awk '{print $1}'`
+container=`docker ps | grep upstage_backend| awk '{print $1}'`
 
 docker exec -it $container sh -c '
   cd /usr/app
