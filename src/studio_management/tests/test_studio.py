@@ -26,8 +26,6 @@ from main import app
 test_AuthenticationController = TestAuthenticationController()
 test_StageController = TestStageController()
 
-app.mount("/studio_graphql", studio_graphql_app)
-
 
 @pytest.mark.anyio
 class TestStudioController:
@@ -62,7 +60,7 @@ class TestStudioController:
         }
 
         response = client.post(
-            "/studio_graphql",
+            "/api/studio_graphql",
             headers=headers,
             json={"query": query, "variables": variables},
         )
@@ -83,7 +81,7 @@ class TestStudioController:
         }
 
         response = client.post(
-            "/studio_graphql",
+            "/api/studio_graphql",
             headers=headers,
             json={"query": query, "variables": variables},
         )
@@ -99,7 +97,7 @@ class TestStudioController:
         }
 
         response = client.post(
-            "/studio_graphql",
+            "/api/studio_graphql",
             headers=headers,
             json={"query": query, "variables": variables},
         )
@@ -158,7 +156,7 @@ class TestStudioController:
         }
 
         response = client.post(
-            "/studio_graphql",
+            "/api/studio_graphql",
             headers=headers,
             json={"query": query, "variables": variables},
         )
@@ -167,8 +165,6 @@ class TestStudioController:
         assert "data" in response.json()
         assert "updateUser" in response.json()["data"]
         assert "email" in response.json()["data"]["updateUser"]
-
-        user = DBSession.query(UserModel).filter(UserModel.username == username).first()
 
         assert (
             response.json()["data"]["updateUser"]["lastName"]
@@ -182,9 +178,10 @@ class TestStudioController:
                 "active": False,
             }
         }
+        
 
         response = client.post(
-            "/studio_graphql",
+            "/api/studio_graphql",
             headers=headers,
             json={"query": query, "variables": variables},
         )
@@ -196,8 +193,10 @@ class TestStudioController:
 
         variables = {"input": {**variables["input"], "id": 1000}}
 
+
+
         response = client.post(
-            "/studio_graphql",
+            "/api/studio_graphql",
             headers=headers,
             json={"query": query, "variables": variables},
         )
@@ -213,13 +212,14 @@ class TestStudioController:
         }
 
         response = client.post(
-            "/studio_graphql",
+            "/api/studio_graphql",
             headers=headers,
             json={"query": query, "variables": variables},
         )
 
         assert response.status_code == 200
         assert "errors" in response.json()
+
 
         user_2 = DBSession.query(UserModel).all()[-1]
 
@@ -232,7 +232,7 @@ class TestStudioController:
         }
 
         response = client.post(
-            "/studio_graphql",
+            "/api/studio_graphql",
             headers=headers,
             json={"query": query, "variables": variables},
         )
@@ -268,7 +268,7 @@ class TestStudioController:
         }
 
         response = client.post(
-            "/studio_graphql",
+            "/api/studio_graphql",
             headers=headers,
             json={"query": query, "variables": variables},
         )
@@ -295,7 +295,7 @@ class TestStudioController:
         variables = {"id": user.id}
 
         response = client.post(
-            "/studio_graphql",
+            "/api/studio_graphql",
             headers=headers,
             json={"query": query, "variables": variables},
         )
@@ -306,7 +306,7 @@ class TestStudioController:
         assert "success" in response.json()["data"]["deleteUser"]
         headers = test_AuthenticationController.get_headers(client, SUPER_ADMIN)
         response = client.post(
-            "/studio_graphql",
+            "/api/studio_graphql",
             headers=headers,
             json={"query": query, "variables": variables},
         )
@@ -335,7 +335,7 @@ class TestStudioController:
         }
 
         response = client.post(
-            "/studio_graphql",
+            "/api/studio_graphql",
             headers=headers,
             json={"query": query, "variables": variables},
         )
@@ -354,7 +354,7 @@ class TestStudioController:
         }
 
         response = client.post(
-            "/studio_graphql",
+            "/api/studio_graphql",
             headers=headers,
             json={"query": query, "variables": variables},
         )
@@ -371,7 +371,7 @@ class TestStudioController:
         }
 
         response = client.post(
-            "/studio_graphql",
+            "/api/studio_graphql",
             headers=headers,
             json={"query": query, "variables": variables},
         )
@@ -390,7 +390,7 @@ class TestStudioController:
         """
 
         response = client.post(
-            "/studio_graphql",
+            "/api/studio_graphql",
             headers=headers,
             json={"query": query},
         )
@@ -431,7 +431,7 @@ class TestStudioController:
         }
 
         response = client.post(
-            "/studio_graphql",
+            "/api/studio_graphql",
             headers=headers,
             json={"query": query, "variables": variables},
         )
@@ -448,7 +448,7 @@ class TestStudioController:
         }
 
         response = client.post(
-            "/studio_graphql",
+            "/api/studio_graphql",
             headers=headers,
             json={"query": query, "variables": variables},
         )
@@ -466,7 +466,7 @@ class TestStudioController:
             }
 
             response = client.post(
-                "/studio_graphql",
+                "/api/studio_graphql",
                 headers=headers,
                 json={"query": query, "variables": variables},
             )
@@ -509,7 +509,7 @@ class TestStudioController:
         }
 
         response = client.post(
-            "/studio_graphql",
+            "/api/studio_graphql",
             headers=player_headers,
             json={"query": query, "variables": variables},
         )
@@ -518,7 +518,7 @@ class TestStudioController:
         assert "errors" in response.json()
 
         response = client.post(
-            "/studio_graphql",
+            "/api/studio_graphql",
             headers=headers,
             json={"query": query, "variables": variables},
         )
@@ -535,7 +535,7 @@ class TestStudioController:
         }
 
         response = client.post(
-            "/studio_graphql",
+            "/api/studio_graphql",
             headers=headers,
             json={"query": query, "variables": variables},
         )
@@ -549,7 +549,7 @@ class TestStudioController:
         }
 
         response = client.post(
-            "/studio_graphql",
+            "/api/studio_graphql",
             headers=headers,
             json={"query": query, "variables": variables},
         )
@@ -559,8 +559,8 @@ class TestStudioController:
     async def test_09_quick_assign_mutation(self, client):
         headers = test_AuthenticationController.get_headers(client, SUPER_ADMIN)
         query = """
-            mutation quickAssignMutation($stageId: ID!, $assetId: ID!) {
-                quickAssignMutation(stageId: $stageId, assetId: $assetId) {
+            mutation quickAssignMutation($stageIds: [ID]!, $assetId: ID!) {
+                quickAssignMutation(stageIds: $stageIds, assetId: $assetId) {
                         success
                     }
                 }
@@ -571,12 +571,12 @@ class TestStudioController:
         stage = DBSession.query(StageModel).first()
 
         variables = {
-            "stageId": stage.id,
+            "stageIds": [stage.id],
             "assetId": asset.id,
         }
 
         response = client.post(
-            "/studio_graphql",
+            "/api/studio_graphql",
             headers=headers,
             json={"query": query, "variables": variables},
         )
@@ -592,7 +592,7 @@ class TestStudioController:
         }
 
         response = client.post(
-            "/studio_graphql",
+            "/api/studio_graphql",
             headers=headers,
             json={"query": query, "variables": variables},
         )
@@ -606,7 +606,7 @@ class TestStudioController:
         }
 
         response = client.post(
-            "/studio_graphql",
+            "/api/studio_graphql",
             headers=headers,
             json={"query": query, "variables": variables},
         )
@@ -627,7 +627,7 @@ class TestStudioController:
         """
 
         response = client.post(
-            "/studio_graphql",
+            "/api/studio_graphql",
             headers=headers,
             json={"query": query},
         )
@@ -659,7 +659,7 @@ class TestStudioController:
         }
 
         response = client.post(
-            "/studio_graphql",
+            "/api/studio_graphql",
             headers=headers,
             json={"query": query, "variables": variables},
         )

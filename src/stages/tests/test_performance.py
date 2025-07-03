@@ -22,7 +22,6 @@ from users.db_models.user import PLAYER, SUPER_ADMIN
 from stages.tests.test_stage import TestStageController
 from stages.http.schema import stage_graphql_app
 
-app.mount("/stage_graphql", stage_graphql_app)
 test_AuthenticationController = TestAuthenticationController()
 test_StageController = TestStageController()
 
@@ -47,7 +46,7 @@ class TestPerformanceController:
         """
 
         response = client.post(
-            "/stage_graphql",
+            "/api/studio_graphql",
             json={"query": query, "variables": variables},
             headers=headers,
         )
@@ -71,7 +70,7 @@ class TestPerformanceController:
         """
 
         response = client.post(
-            "/stage_graphql",
+            "/api/studio_graphql",
             json={"query": query, "variables": variables},
             headers=headers,
         )
@@ -87,7 +86,7 @@ class TestPerformanceController:
 
         headers = test_AuthenticationController.get_headers(client, PLAYER)
         response = client.post(
-            "/stage_graphql",
+            "/api/studio_graphql",
             json={"query": query, "variables": variables},
             headers=headers,
         )
@@ -115,7 +114,7 @@ class TestPerformanceController:
         """
 
         response = client.post(
-            "/stage_graphql",
+            "/api/studio_graphql",
             json={"query": query, "variables": variables},
             headers=headers,
         )
@@ -140,7 +139,7 @@ class TestPerformanceController:
         """
 
         response = client.post(
-            "/stage_graphql",
+            "/api/studio_graphql",
             json={"query": query, "variables": variables},
             headers=headers,
         )
@@ -164,7 +163,7 @@ class TestPerformanceController:
         """
 
         response = client.post(
-            "/stage_graphql",
+            "/api/studio_graphql",
             json={"query": query, "variables": variables},
             headers=headers,
         )
@@ -184,7 +183,7 @@ class TestPerformanceController:
 
         headers = test_AuthenticationController.get_headers(client, PLAYER)
         response = client.post(
-            "/stage_graphql",
+            "/api/studio_graphql",
             json={"query": query, "variables": variables},
             headers=headers,
         )
@@ -210,7 +209,7 @@ class TestPerformanceController:
         """
 
         response = client.post(
-            "/stage_graphql",
+            "/api/studio_graphql",
             json={"query": query, "variables": variables},
             headers=headers,
         )
@@ -230,7 +229,7 @@ class TestPerformanceController:
             session.flush()
 
         response = client.post(
-            "/stage_graphql",
+            "/api/studio_graphql",
             json={"query": query, "variables": variables},
             headers=headers,
         )
@@ -254,7 +253,7 @@ class TestPerformanceController:
         """
 
         response = client.post(
-            "/stage_graphql",
+            "/api/studio_graphql",
             json={"query": query, "variables": variables},
             headers=headers,
         )
@@ -268,7 +267,7 @@ class TestPerformanceController:
 
         headers = test_AuthenticationController.get_headers(client, PLAYER)
         response = client.post(
-            "/stage_graphql",
+            "/api/studio_graphql",
             json={"query": query, "variables": variables},
             headers=headers,
         )
@@ -294,7 +293,7 @@ class TestPerformanceController:
         """
 
         response = client.post(
-            "/stage_graphql",
+            "/api/studio_graphql",
             json={"query": query, "variables": variables},
             headers=headers,
         )
@@ -318,7 +317,7 @@ class TestPerformanceController:
         """
 
         response = client.post(
-            "/stage_graphql",
+            "/api/studio_graphql",
             json={"query": query, "variables": variables},
             headers=headers,
         )
@@ -332,7 +331,7 @@ class TestPerformanceController:
 
         headers = test_AuthenticationController.get_headers(client, PLAYER)
         response = client.post(
-            "/stage_graphql",
+            "/api/studio_graphql",
             json={"query": query, "variables": variables},
             headers=headers,
         )
@@ -365,7 +364,7 @@ class TestPerformanceController:
         """
 
         response = client.post(
-            "/stage_graphql",
+            "/api/studio_graphql",
             json={"query": query, "variables": variables},
             headers=headers,
         )
@@ -385,7 +384,7 @@ class TestPerformanceController:
         }
 
         response = client.post(
-            "/stage_graphql",
+            "/api/studio_graphql",
             json={"query": query, "variables": variables},
             headers=headers,
         )
@@ -406,7 +405,7 @@ class TestPerformanceController:
         }
 
         response = client.post(
-            "/stage_graphql",
+            "/api/studio_graphql",
             json={"query": query, "variables": variables},
             headers=headers,
         )
@@ -431,7 +430,7 @@ class TestPerformanceController:
         """
 
         response = client.post(
-            "/stage_graphql",
+            "/api/studio_graphql",
             json={"query": query, "variables": variables},
             headers=headers,
         )
@@ -454,7 +453,7 @@ class TestPerformanceController:
         """
 
         response = client.post(
-            "/stage_graphql",
+            "/api/studio_graphql",
             json={"query": query, "variables": variables},
             headers=headers,
         )
@@ -468,7 +467,7 @@ class TestPerformanceController:
 
         headers = test_AuthenticationController.get_headers(client, PLAYER)
         response = client.post(
-            "/stage_graphql",
+            "/api/studio_graphql",
             json={"query": query, "variables": variables},
             headers=headers,
         )

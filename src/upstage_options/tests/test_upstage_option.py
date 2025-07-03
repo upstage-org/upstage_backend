@@ -16,8 +16,6 @@ from authentication.tests.auth_test import TestAuthenticationController
 from main import app
 from users.db_models.user import SUPER_ADMIN
 from upstage_options.http.schema import config_graphql_app
-
-app.mount("/config_graphql", config_graphql_app)
 test_AuthenticationController = TestAuthenticationController()
 
 
@@ -25,7 +23,7 @@ test_AuthenticationController = TestAuthenticationController()
 class TestUpStageOptionsController:
     async def test_01_nginx_config(self, client):
         query = "{ nginx { limit } }"
-        response = client.post("/config_graphql", json={"query": query})
+        response = client.post("/api/studio_graphql", json={"query": query})
         assert response.status_code == 200
         assert "nginx" in response.json()["data"]
         assert "limit" in response.json()["data"]["nginx"]
@@ -61,7 +59,7 @@ class TestUpStageOptionsController:
             }
         }
         """
-        response = client.post("/config_graphql", json={"query": query})
+        response = client.post("/api/studio_graphql", json={"query": query})
         assert response.status_code == 200
         data = response.json()["data"]["system"]
         assert "termsOfService" in data
@@ -101,7 +99,7 @@ class TestUpStageOptionsController:
             }
         }
         """
-        response = client.post("/config_graphql", json={"query": query})
+        response = client.post("/api/studio_graphql", json={"query": query})
         assert response.status_code == 200
         data = response.json()["data"]["foyer"]
         assert "title" in data
@@ -123,7 +121,7 @@ class TestUpStageOptionsController:
         }
         """
         response = client.post(
-            "/config_graphql", json={"query": query}, headers=headers
+            "/api/studio_graphql", json={"query": query}, headers=headers
         )
         assert response.status_code == 200
         data = response.json()["data"]["updateTermsOfService"]
@@ -144,7 +142,7 @@ class TestUpStageOptionsController:
             }
         """
         response = client.post(
-            "/config_graphql", json={"query": query}, headers=headers
+            "/api/studio_graphql", json={"query": query}, headers=headers
         )
         assert response.status_code == 200
         data = response.json()["data"]["updateTermsOfService"]
@@ -167,7 +165,7 @@ class TestUpStageOptionsController:
             }
         """
         response = client.post(
-            "/config_graphql", json={"query": query}, headers=headers
+            "/api/studio_graphql", json={"query": query}, headers=headers
         )
         assert response.status_code == 200
         data = response.json()["data"]["saveConfig"]
@@ -188,7 +186,7 @@ class TestUpStageOptionsController:
             }
         """
         response = client.post(
-            "/config_graphql", json={"query": query}, headers=headers
+            "/api/studio_graphql", json={"query": query}, headers=headers
         )
         assert response.status_code == 200
         data = response.json()["data"]["saveConfig"]
@@ -218,7 +216,7 @@ class TestUpStageOptionsController:
         }
 
         response = client.post(
-            "/config_graphql",
+            "/api/studio_graphql",
             json={"query": query, "variables": variables},
             headers=headers,
         )

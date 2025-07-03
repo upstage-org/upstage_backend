@@ -19,9 +19,7 @@ from main import app
 from licenses.http.schema import license_graphql_app
 from global_config import DBSession
 
-app.mount("/license_graphql", license_graphql_app)
 test_AssetController = TestAssetController()
-
 
 @pytest.mark.anyio
 class TestLicenseController:
@@ -47,7 +45,7 @@ class TestLicenseController:
         }
 
         response = client.post(
-            "/license_graphql", json={"query": query, "variables": variables}
+            "/api/studio_graphql", json={"query": query, "variables": variables}
         )
         assert response.status_code == 200
         assert response.json()["data"]["createLicense"]["assetId"] == str(asset.id)
@@ -66,7 +64,7 @@ class TestLicenseController:
         variables = {"id": license.id}
 
         response = client.post(
-            "/license_graphql", json={"query": query, "variables": variables}
+            "/api/studio_graphql", json={"query": query, "variables": variables}
         )
         assert response.status_code == 200
         assert response.json()["data"]["revokeLicense"] == "License revoked {}".format(
@@ -74,7 +72,7 @@ class TestLicenseController:
         )
 
         response = client.post(
-            "/license_graphql", json={"query": query, "variables": variables}
+            "/api/studio_graphql", json={"query": query, "variables": variables}
         )
         assert response.status_code == 200
         assert response.json()["data"][

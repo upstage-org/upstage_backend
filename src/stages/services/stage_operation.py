@@ -33,6 +33,9 @@ class StageOperationService:
                 .first()
             )
 
+            if (not stage):
+                return
+
             playerAccess = stage.attributes.filter(
                 StageAttributeModel.name == "playerAccess"
             ).first()
