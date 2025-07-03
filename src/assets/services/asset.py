@@ -43,7 +43,7 @@ from assets.http.validation import (
 )
 from stages.db_models.stage import StageModel
 from stages.db_models.parent_stage import ParentStageModel
-from users.db_models.user import ADMIN, SUPER_ADMIN, UserModel
+from users.db_models.user import ADMIN, PLAYER, SUPER_ADMIN, UserModel
 from files.file_handling import FileHandling
 from mails.helpers.mail import send
 from mails.templates.templates import notify_mark_media_active
@@ -211,7 +211,7 @@ class AssetService:
             asset.copyright_level = input.copyrightLevel
             file_location = self.process_file_location(input, local_db_session, asset)
 
-            # self.change_owner(owner, local_db_session, asset)
+            self.change_owner(input.owner, local_db_session, asset)
 
             self.process_urls(input, local_db_session, asset_type, asset, file_location)
 
@@ -376,17 +376,18 @@ class AssetService:
                     ParentStageModel(stage_id=id, child_asset_id=asset.id)
                 )
 
-    def change_owner(self, owner: UserModel, local_db_session, asset: AssetModel):
+    def change_owner(self, owner: str, local_db_session: ScopedSession, asset: AssetModel):
         if owner:
             new_owner = (
                 local_db_session.query(UserModel)
-                .filter(UserModel.username == owner.username)
+                .filter(UserModel.username == owner)
                 .first()
             )
             if new_owner:
-                if new_owner.id != asset.owner_id and owner.role in (
+                if new_owner.id != asset.owner_id and new_owner.role in (
                     ADMIN,
                     SUPER_ADMIN,
+                    PLAYER
                 ):
                     asset.owner_id = new_owner.id
             else:
