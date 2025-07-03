@@ -15,10 +15,6 @@ import pytest
 from global_config import DBSession, ScopedSession, convert_keys_to_camel_case
 from main import app
 from performance_config.http.schema import performance_graphql_app
-
-app.mount("/performance_graphql", performance_graphql_app)
-
-
 @pytest.mark.anyio
 class TestPerformanceConfig:
     async def test_01_get_performance_communication(self, client):
@@ -31,7 +27,7 @@ class TestPerformanceConfig:
 
             }
         """
-        response = client.post("/performance_graphql", json={"query": query})
+        response = client.post("/api/studio_graphql", json={"query": query})
         assert response.status_code == 200
         data = response.json()
         assert "errors" not in data
@@ -49,7 +45,7 @@ class TestPerformanceConfig:
 
             }
         """
-        response = client.post("/performance_graphql", json={"query": query})
+        response = client.post("/api/studio_graphql", json={"query": query})
         assert response.status_code == 200
         data = response.json()
         assert "errors" not in data
@@ -67,7 +63,7 @@ class TestPerformanceConfig:
 
             }
         """
-        response = client.post("/performance_graphql", json={"query": query})
+        response = client.post("/api/studio_graphql", json={"query": query})
         assert response.status_code == 200
         data = response.json()
         assert "errors" not in data
@@ -85,7 +81,7 @@ class TestPerformanceConfig:
 
             }
         """
-        response = client.post("/performance_graphql", json={"query": query})
+        response = client.post("/api/studio_graphql", json={"query": query})
         assert response.status_code == 200
         data = response.json()
         assert "errors" not in data

@@ -2,6 +2,8 @@
 import os
 import sys
 
+from global_config.schema import config_graphql_endpoints
+
 appdir = os.path.abspath(os.path.dirname(__file__))
 projdir = os.path.abspath(os.path.join(appdir, ".."))
 projdir2 = os.path.abspath(os.path.join(appdir, "../.."))
@@ -18,9 +20,6 @@ from authentication.http.schema import auth_graphql_app
 from global_config import encrypt
 from users.db_models.user import PLAYER, SUPER_ADMIN, UserModel
 from faker import Faker
-
-app.mount("/graphql", auth_graphql_app)
-
 
 @pytest.mark.anyio
 class TestAuthenticationController:
@@ -55,12 +54,12 @@ class TestAuthenticationController:
             "payload": {"username": Faker().email(), "password": "testpassword"}
         }
         response = client.post(
-            "/graphql", json={"query": self.login_query, "variables": variables}
+            "/api/studio_graphql", json={"query": self.login_query, "variables": variables}
         )
         assert response.status_code == 200
         data = response.json()
         assert "errors" in data
-        assert data["errors"][0]["message"] == "Incorrect username or password"
+        assert data["errors"][0]["message"] == "Incorrect username or password. Please try again."
 
     async def test_02_login_successfully(self, client):
         email = f"{random.randint(1, 1000)}{Faker().email()}"
@@ -76,7 +75,7 @@ class TestAuthenticationController:
         global_session.flush()
         variables = {"payload": {"username": email, "password": "testpassword"}}
         response = client.post(
-            "/graphql", json={"query": self.login_query, "variables": variables}
+                     "/api/studio_graphql", json={"query": self.login_query, "variables": variables}
         )
         assert response.status_code == 200
         data = response.json()
@@ -100,7 +99,7 @@ class TestAuthenticationController:
         global_session.close()
         variables = {"payload": {"username": email, "password": "testpassword"}}
         response = client.post(
-            "/graphql", json={"query": self.login_query, "variables": variables}
+            "/api/studio_graphql", json={"query": self.login_query, "variables": variables}
         )
         assert response.status_code == 200
         data = response.json()
@@ -125,7 +124,7 @@ class TestAuthenticationController:
 
         variables = {"payload": {"username": email, "password": "testpassword"}}
         response = client.post(
-            "/graphql", json={"query": self.login_query, "variables": variables}
+            "/api/studio_graphql", json={"query": self.login_query, "variables": variables}
         )
         data = response.json()
         headers = {
@@ -133,7 +132,7 @@ class TestAuthenticationController:
             JWT_HEADER_NAME: data["data"]["login"]["refresh_token"],
         }
         response = client.post(
-            "/graphql", json={"query": self.refresh_token_query}, headers=headers
+            "/api/studio_graphql", json={"query": self.refresh_token_query}, headers=headers
         )
         assert response.status_code == 200
         data = response.json()
@@ -146,7 +145,7 @@ class TestAuthenticationController:
             JWT_HEADER_NAME: "invalid_token",
         }
         response = client.post(
-            "/graphql", json={"query": self.refresh_token_query}, headers=headers
+            "/api/studio_graphql", json={"query": self.refresh_token_query}, headers=headers
         )
         assert response.status_code == 200
         data = response.json()
@@ -168,7 +167,7 @@ class TestAuthenticationController:
 
         variables = {"payload": {"username": email, "password": "testpassword"}}
         response = client.post(
-            "/graphql", json={"query": self.login_query, "variables": variables}
+            "/api/studio_graphql", json={"query": self.login_query, "variables": variables}
         )
         data = response.json()
         headers = {
@@ -181,7 +180,7 @@ class TestAuthenticationController:
             logout
         }
         """
-        response = client.post("/graphql", json={"query": query}, headers=headers)
+        response = client.post("/api/studio_graphql", json={"query": query}, headers=headers)
         assert response.status_code == 200
         data = response.json()
         assert "errors" not in data
@@ -199,7 +198,7 @@ class TestAuthenticationController:
             logout
         }
         """
-        response = client.post("/graphql", json={"query": query}, headers=headers)
+        response = client.post("/api/studio_graphql", json={"query": query}, headers=headers)
         assert response.status_code == 200
         data = response.json()
         assert "errors" in data
@@ -220,7 +219,7 @@ class TestAuthenticationController:
 
         variables = {"payload": {"username": email, "password": "testpassword"}}
         response = client.post(
-            "/graphql", json={"query": self.login_query, "variables": variables}
+            "/api/studio_graphql", json={"query": self.login_query, "variables": variables}
         )
         data = response.json()
         return {

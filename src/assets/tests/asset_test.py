@@ -2,6 +2,8 @@
 import os
 import sys
 
+from global_config.schema import config_graphql_endpoints
+
 appdir = os.path.abspath(os.path.dirname(__file__))
 projdir = os.path.abspath(os.path.join(appdir, ".."))
 projdir2 = os.path.abspath(os.path.join(appdir, "../.."))
@@ -28,7 +30,6 @@ def load_base64_from_image(image_path):
     return base64_encoded
 
 
-app.mount("/asset_graphql", asset_graphql_app)
 test_AuthenticationController = TestAuthenticationController()
 test_stageController = TestStageController()
 
@@ -56,10 +57,11 @@ class TestAssetController:
             "filename": "test.png",
         }
         response = client.post(
-            "/asset_graphql",
+            "/api/studio_graphql",
             json={"query": self.mutation_query, "variables": variables},
             headers=headers,
         )
+
         assert response.status_code == 200
         data = response.json()
         assert "data" in data
@@ -73,7 +75,7 @@ class TestAssetController:
             "filename": "test.png",
         }
         response = client.post(
-            "/asset_graphql",
+            "/api/studio_graphql",
             json={"query": self.mutation_query, "variables": variables},
         )
         assert response.status_code == 200
@@ -120,12 +122,13 @@ class TestAssetController:
             }
         }
         response = client.post(
-            "/asset_graphql",
+            "/api/studio_graphql",
             json={"query": mutation_query, "variables": variables},
             headers=headers,
         )
         assert response.status_code == 200
         data = response.json()
+        print(data)
         assert "data" in data
         assert "saveMedia" in data["data"]
         assert "id" in data["data"]["saveMedia"]["asset"]
@@ -159,7 +162,7 @@ class TestAssetController:
             }
         }
         response = client.post(
-            "/asset_graphql",
+            "/api/studio_graphql",
             json={"query": mutation_query, "variables": variables},
         )
         assert response.status_code == 200
@@ -192,7 +195,7 @@ class TestAssetController:
         stages = DBSession.query(StageModel).all()
 
         response = client.post(
-            "/asset_graphql",
+            "/api/studio_graphql",
             json={
                 "query": query,
                 "variables": {
@@ -250,7 +253,7 @@ class TestAssetController:
         """
 
         response = client.post(
-            "/asset_graphql",
+            "/api/studio_graphql",
             json={
                 "query": query,
                 "variables": {"mediaType": "image", "owner": asset.owner.username},
@@ -298,7 +301,7 @@ class TestAssetController:
             }
         }
         response = client.post(
-            "/asset_graphql",
+            "/api/studio_graphql",
             json={"query": mutation_query, "variables": variables},
             headers=headers,
         )
@@ -342,7 +345,7 @@ class TestAssetController:
             }
         }
         response = client.post(
-            "/asset_graphql",
+            "/api/studio_graphql",
             json={"query": mutation_query, "variables": variables},
             headers=headers,
         )
@@ -370,7 +373,7 @@ class TestAssetController:
 
         variables = {"id": asset.id}
         client.post(
-            "/asset_graphql",
+            "/api/studio_graphql",
             json={"query": mutation_query, "variables": variables},
             headers=headers,
         )
@@ -382,7 +385,7 @@ class TestAssetController:
         }
 
         response = client.post(
-            "/asset_graphql",
+            "/api/studio_graphql",
             json={"query": mutation_query, "variables": {"id": 12}},
             headers=headers,
         )
@@ -407,7 +410,7 @@ class TestAssetController:
 
         variables = {"id": asset.id}
         response = client.post(
-            "/asset_graphql",
+            "/api/studio_graphql",
             json={"query": mutation_query, "variables": variables},
             headers=headers,
         )
@@ -429,7 +432,7 @@ class TestAssetController:
             "filename": "large-file.jpg",
         }
         response = client.post(
-            "/asset_graphql",
+            "/api/studio_graphql",
             json={"query": self.mutation_query, "variables": variables},
             headers=headers,
         )
@@ -437,4 +440,4 @@ class TestAssetController:
         data = response.json()
         assert "data" in data
         assert "errors" in data
-        assert data["errors"][0]["message"] == "Image files must be under 1MB."
+        assert data["errors"][0]["message"] == "File size must be under 1MB."

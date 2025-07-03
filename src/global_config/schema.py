@@ -13,7 +13,7 @@ from fastapi import FastAPI
 from ariadne.asgi import GraphQL
 
 
-def config_graphql_endpoints(app: FastAPI):
+def config_graphql_endpoints(app: FastAPI,endpoint = '/api/studio_graphql'):
     from assets.http.schema import query as asset_query, mutation as asset_mutation
     from studio_management.http.schema import (
         query as studio_query,
@@ -200,5 +200,6 @@ def config_graphql_endpoints(app: FastAPI):
 
     combined_graphql_app = GraphQL(combined_schema, debug=True)
 
-    app.add_route("/api/studio_graphql", combined_graphql_app)
-    app.add_websocket_route("/api/studio_graphql", combined_graphql_app)
+    print(endpoint)
+    app.add_route(endpoint, combined_graphql_app)
+    app.add_websocket_route(endpoint, combined_graphql_app)

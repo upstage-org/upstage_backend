@@ -12,16 +12,11 @@ if projdir not in sys.path:
 
 import pytest
 from authentication.tests.auth_test import TestAuthenticationController
-from main import app
 from global_config import JWT_HEADER_NAME
-from users.http.schema import user_graphql_app
-from mails.http.schema import mail_graphql_app
 from faker import Faker
 
-app.mount("/user_graphql", user_graphql_app)
 test_AuthenticationController = TestAuthenticationController()
 
-app.mount("/api/email_graphql", mail_graphql_app)
 email = Faker().email()
 
 
@@ -56,7 +51,7 @@ class TestUserController:
         }
 
         response = client.post(
-            "/user_graphql",
+            "/api/studio_graphql",
             json={"query": self.create_user_query, "variables": variables},
         )
 
@@ -86,7 +81,7 @@ class TestUserController:
         }
 
         response = client.post(
-            "/user_graphql",
+            "/api/studio_graphql",
             json={"query": self.create_user_query, "variables": variables},
         )
 
@@ -118,7 +113,7 @@ class TestUserController:
             }
         """
 
-        response = client.post("/user_graphql", json={"query": query}, headers=headers)
+        response = client.post("/api/studio_graphql", json={"query": query}, headers=headers)
         data = response.json()
 
         assert "errors" not in data

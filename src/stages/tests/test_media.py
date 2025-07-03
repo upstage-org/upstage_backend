@@ -21,7 +21,6 @@ from stages.http.schema import stage_graphql_app
 from users.db_models.user import SUPER_ADMIN
 import random
 
-app.mount("/stage_graphql", stage_graphql_app)
 test_AuthenticationController = TestAuthenticationController()
 test_StageController = TestStageController()
 test_AssetController = TestAssetController()
@@ -42,7 +41,7 @@ class TestMediaController:
         """
 
         response = client.post(
-            "/stage_graphql",
+            "/api/studio_graphql",
             json={"query": query, "variables": variables},
             headers=headers,
         )
@@ -91,7 +90,7 @@ class TestMediaController:
         """
 
         response = client.post(
-            "/stage_graphql",
+            "/api/studio_graphql",
             json={"query": query, "variables": variables},
             headers=headers,
         )
@@ -149,7 +148,7 @@ class TestMediaController:
         """
 
         response = client.post(
-            "/stage_graphql",
+            "/api/studio_graphql",
             json={"query": query, "variables": variables},
             headers=headers,
         )
@@ -183,7 +182,7 @@ class TestMediaController:
         """
 
         response = client.post(
-            "/stage_graphql",
+            "/api/studio_graphql",
             json={"query": query, "variables": variables},
             headers=headers,
         )
@@ -205,7 +204,7 @@ class TestMediaController:
         """
 
         response = client.post(
-            "/stage_graphql",
+            "/api/studio_graphql",
             json={"query": query, "variables": variables},
             headers=headers,
         )
