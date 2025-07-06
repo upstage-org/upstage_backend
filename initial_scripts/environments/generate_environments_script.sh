@@ -20,7 +20,7 @@ generate_config() {
     REPLACE_MQTT_P_PASSWORD=$(openssl rand -base64 9 | tr -dc 'A-Za-z0-9' | head -c 12)
     REPLACE_MQTT_A_PASSWORD=$(openssl rand -base64 9 | tr -dc 'A-Za-z0-9' | head -c 12)
     REPLACE_MONGO_PASSWORD=$(openssl rand -base64 9 | tr -dc 'A-Za-z0-9' | head -c 12)
-    REPLACE_FASTAPI_SECRET_KEY= $(openssl rand -hex 48 )
+    REPLACE_FASTAPI_SECRET_KEY=$(openssl rand -hex 48 )
 
 
     values+=("$REPLACE_FASTAPI_SECRET_KEY")
