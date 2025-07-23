@@ -35,8 +35,9 @@ apt -y update
 apt -y upgrade
 
 ufw status
-ufw allow 'Nginx Full'
 ufw delete allow 'Nginx HTTP'
+ufw allow 80
+ufw allow 443
 ufw status
 
 mkdir -p /etc/nginx/ssl
