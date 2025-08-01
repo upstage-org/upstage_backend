@@ -14,6 +14,7 @@ class StageInput(BaseModel):
     description: Optional[str] = Field(None, description="Description of the stage")
     playerAccess: Optional[str] = Field(None, description="Player access information")
     config: Optional[str] = Field(None, description="Configuration of the stage")
+    owner: Optional[str] = None
 
 
 class UpdateStageInput(BaseModel):
@@ -26,6 +27,7 @@ class UpdateStageInput(BaseModel):
     description: Optional[str] = Field(None, description="Description of the stage")
     playerAccess: Optional[str] = Field(None, description="Player access information")
     config: Optional[str] = Field(None, description="Configuration of the stage")
+    owner: Optional[str] = None
 
 
 class DuplicateStageInput(BaseModel):

@@ -256,7 +256,7 @@ class StageService:
             stage = StageModel(
                 name=input.name,
                 description=input.description,
-                owner_id=user.id,
+                owner_id=input.owner if input.owner else user.id,
                 file_location=input.fileLocation,
             )
 
@@ -301,6 +301,8 @@ class StageService:
                 if hasattr(input, "fileLocation") and input.fileLocation
                 else stage.file_location
             )
+
+            stage.owner_id = input.owner if  hasattr(input, "owner") and input.owner else stage.owner_id
 
             self.update_stage_attribute(
                 stage.id, "cover", input.cover, local_db_session
