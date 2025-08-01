@@ -187,6 +187,7 @@ type_defs = gql("""
         description: String
         playerAccess: String
         config: String
+        owner: ID
     }
                 
     input UpdateMediaInput {
