@@ -25,10 +25,11 @@ import requests
 import pymongo
 import aiosmtplib
 
-from global_config.database import DBSession, ScopedSession
+from global_config.database import ScopedSession
 from global_config.env import (
     ACCEPT_EMAIL_HOST,
     ACCEPT_SERVER_SEND_EMAIL_EXTERNAL,
+    DOMAIN,
     EMAIL_HOST,
     EMAIL_HOST_DISPLAY_NAME,
     EMAIL_HOST_PASSWORD,
