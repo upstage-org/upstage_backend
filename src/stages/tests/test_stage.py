@@ -17,7 +17,8 @@ from event_archive.db_models.event import EventModel
 from global_config.database import ScopedSession
 from assets.db_models.asset import AssetModel
 from main import app
-from global_config import JWT_HEADER_NAME, DBSession
+from global_config.env import JWT_HEADER_NAME
+from global_config.database import DBSession
 from stages.db_models.parent_stage import ParentStageModel
 from stages.db_models.stage_attribute import StageAttributeModel
 from users.db_models.user import PLAYER, SUPER_ADMIN

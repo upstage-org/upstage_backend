@@ -12,7 +12,8 @@ if projdir not in sys.path:
 
 
 import pytest
-from global_config import DBSession, ScopedSession, convert_keys_to_camel_case
+from global_config.database import DBSession, ScopedSession
+from global_config.helpers.object import convert_keys_to_camel_case
 from main import app
 from performance_config.http.schema import performance_graphql_app
 @pytest.mark.anyio

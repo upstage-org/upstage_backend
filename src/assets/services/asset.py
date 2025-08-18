@@ -21,14 +21,13 @@ import time
 from graphql import GraphQLError
 
 
-from global_config import (
-    ScopedSession,
-    DBSession,
+from global_config.database import ScopedSession, DBSession
+from global_config.env import (
     UPLOAD_USER_CONTENT_FOLDER,
     STREAM_EXPIRY_DAYS,
     STREAM_KEY,
-    convert_keys_to_camel_case,
 )
+from global_config.helpers.object import convert_keys_to_camel_case
 from assets.db_models.asset import AssetModel, AvatarVoice, Voice, Previlege
 from assets.db_models.asset_license import AssetLicenseModel
 from assets.db_models.asset_type import AssetTypeModel

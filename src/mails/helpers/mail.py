@@ -24,9 +24,11 @@ import uuid
 import requests
 import pymongo
 import aiosmtplib
-from global_config import (
+
+from global_config.database import DBSession, ScopedSession
+from global_config.env import (
+    ACCEPT_EMAIL_HOST,
     ACCEPT_SERVER_SEND_EMAIL_EXTERNAL,
-    DOMAIN,
     EMAIL_HOST,
     EMAIL_HOST_DISPLAY_NAME,
     EMAIL_HOST_PASSWORD,
@@ -35,12 +37,12 @@ from global_config import (
     EMAIL_TIME_EXPIRED_TOKEN,
     EMAIL_USE_TLS,
     FULL_DOMAIN,
+    HOSTNAME,
     SEND_EMAIL_SERVER,
     SUPPORT_EMAILS,
-    ScopedSession,
-    ACCEPT_EMAIL_HOST,
-    HOSTNAME,
 )
+
+
 from event_archive.config.mongodb import get_mongo_token_collection
 from upstage_options.db_models.config import ConfigModel
 

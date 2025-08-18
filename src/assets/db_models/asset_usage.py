@@ -22,7 +22,7 @@ from sqlalchemy import (
     String,
 )
 from sqlalchemy.orm import relationship
-from global_config import BaseModel
+from global_config.db_models.base import BaseModel
 
 
 class AssetUsageModel(BaseModel):

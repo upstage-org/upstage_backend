@@ -12,7 +12,8 @@ if projdir not in sys.path:
     sys.path.append(projdir2)
 
 
-from global_config import EMAIL_HOST_USER, DBSession
+from global_config.env import EMAIL_HOST_USER
+from global_config.database import DBSession
 
 
 def get_footer():

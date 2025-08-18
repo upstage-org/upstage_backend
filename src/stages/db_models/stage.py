@@ -14,7 +14,7 @@ from datetime import datetime
 from sqlalchemy import BigInteger, Column, DateTime, ForeignKey, Integer, String, Text
 from sqlalchemy.orm import relationship
 from sqlalchemy.ext.hybrid import hybrid_property
-from global_config import BaseModel
+from global_config.db_models.base import BaseModel
 from stages.db_models.stage_attribute import StageAttributeModel
 from stages.db_models.parent_stage import ParentStageModel
 

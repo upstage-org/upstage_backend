@@ -12,7 +12,7 @@ if projdir not in sys.path:
 
 import pytest
 from authentication.tests.auth_test import TestAuthenticationController
-from global_config import JWT_HEADER_NAME
+from global_config.env import JWT_HEADER_NAME
 from faker import Faker
 
 test_AuthenticationController = TestAuthenticationController()

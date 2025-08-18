@@ -12,7 +12,7 @@ if projdir not in sys.path:
 
 from sqlalchemy import Column, Integer, BigInteger, ForeignKey
 from sqlalchemy.orm import relationship
-from global_config import BaseModel
+from global_config.db_models.base import BaseModel
 from assets.db_models.tag import TagModel
 
 

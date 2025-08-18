@@ -23,12 +23,12 @@ from assets.db_models.asset_usage import AssetUsageModel
 from assets.db_models.media_tag import MediaTagModel
 from assets.services.asset import AssetService
 from assets.services.asset_license import AssetLicenseService
-from global_config import (
+from global_config.database import (
     DBSession,
     ScopedSession,
-    convert_keys_to_camel_case,
-    UPLOAD_USER_CONTENT_FOLDER,
 )
+from global_config.env import UPLOAD_USER_CONTENT_FOLDER
+from global_config.helpers.object import convert_keys_to_camel_case
 from files.file_handling import FileHandling
 from stages.db_models.parent_stage import ParentStageModel
 from stages.db_models.stage import StageModel

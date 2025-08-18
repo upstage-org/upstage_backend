@@ -12,7 +12,7 @@ if projdir not in sys.path:
 
 from sqlalchemy import Column, DateTime, String, BigInteger, Text
 from datetime import datetime
-from global_config import BaseModel
+from global_config.db_models.base import BaseModel
 
 
 class ConfigModel(BaseModel):

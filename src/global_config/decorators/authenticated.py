@@ -14,7 +14,7 @@ from functools import wraps
 from fastapi import Request
 import jwt
 from graphql import GraphQLError
-from global_config import ALGORITHM, SECRET_KEY
+from global_config.env import ALGORITHM, SECRET_KEY
 from users.services.user import UserService
 
 
