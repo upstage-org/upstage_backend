@@ -11,7 +11,7 @@ if projdir not in sys.path:
     sys.path.append(projdir2)
 
 from datetime import datetime
-from global_config import BaseModel
+from global_config.db_models.base import BaseModel
 from sqlalchemy import Column, Integer, String, DateTime
 from sqlalchemy.dialects import postgresql
 

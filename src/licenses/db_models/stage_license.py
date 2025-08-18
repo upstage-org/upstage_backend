@@ -20,7 +20,7 @@ from sqlalchemy import (
     Integer,
     String,
 )
-from global_config import BaseModel
+from global_config.db_models.base import BaseModel
 from stages.db_models.stage import StageModel
 from sqlalchemy.orm import relationship
 

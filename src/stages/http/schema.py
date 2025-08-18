@@ -11,7 +11,7 @@ if projdir not in sys.path:
     sys.path.append(projdir2)
 
 from ariadne import MutationType, QueryType, make_executable_schema
-from global_config import authenticated
+from global_config.decorators.authenticated import authenticated
 from performance_config.services.performance import PerformanceService
 from performance_config.services.scene import SceneService
 from studio_management.http.graphql import type_defs

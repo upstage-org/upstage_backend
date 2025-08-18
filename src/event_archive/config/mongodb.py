@@ -10,7 +10,7 @@ if projdir not in sys.path:
     sys.path.append(projdir)
     sys.path.append(projdir2)
 
-from global_config import (
+from global_config.env import (
     EMAIL_TIME_EXPIRED_TOKEN,
     MONGO_EMAIL_DB,
     MONGO_EMAIL_HOST,

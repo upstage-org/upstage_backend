@@ -14,10 +14,11 @@ if projdir not in sys.path:
 
 import random
 from main import app
-from global_config import global_session, JWT_HEADER_NAME
+from global_config.database import global_session
+from global_config.env import JWT_HEADER_NAME
 import pytest
 from authentication.http.schema import auth_graphql_app
-from global_config import encrypt
+from global_config.helpers.fernet_crypto import encrypt
 from users.db_models.user import PLAYER, SUPER_ADMIN, UserModel
 from faker import Faker
 

@@ -2,7 +2,7 @@
 import os
 import sys
 
-from src.global_config import logger
+from global_config.logger import logger
 
 appdir = os.path.abspath(os.path.dirname(__file__))
 projdir = os.path.abspath(os.path.join(appdir, ".."))

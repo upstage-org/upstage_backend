@@ -12,7 +12,7 @@ if projdir not in sys.path:
 
 import pytest
 from authentication.tests.auth_test import TestAuthenticationController
-from global_config import DBSession, ScopedSession
+from global_config.database import DBSession, ScopedSession
 from event_archive.db_models.event import EventModel
 from main import app
 from performance_config.db_models.performance import PerformanceModel

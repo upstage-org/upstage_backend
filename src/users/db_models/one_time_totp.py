@@ -14,7 +14,7 @@ from datetime import datetime
 from sqlalchemy import BigInteger, Boolean, Column, DateTime, ForeignKey, Integer, Text
 from sqlalchemy.orm import relationship
 
-from global_config import BaseModel
+from global_config.db_models.base import BaseModel
 
 
 class OneTimeTOTPModel(BaseModel):

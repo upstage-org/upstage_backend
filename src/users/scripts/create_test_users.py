@@ -10,7 +10,8 @@ if projdir not in sys.path:
     sys.path.append(projdir)
     sys.path.append(projdir2)
 
-from global_config import global_session, encrypt
+from global_config.database import global_session
+from global_config.helpers.fernet_crypto import encrypt
 from users.db_models.user import SUPER_ADMIN, UserModel
 
 

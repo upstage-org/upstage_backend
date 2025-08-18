@@ -2,7 +2,6 @@
 import os
 import sys
 
-from src.global_config.env import ENV_TYPE
 
 appdir = os.path.abspath(os.path.dirname(__file__))
 projdir = os.path.abspath(os.path.join(appdir, ".."))
@@ -19,14 +18,17 @@ from fastapi import Request
 from graphql import GraphQLError
 import pyotp
 import requests
-from global_config import (
-    CLOUDFLARE_CAPTCHA_SECRETKEY,
-    CLOUDFLARE_CAPTCHA_VERIFY_ENDPOINT,
-    SUPPORT_EMAILS,
-    HOSTNAME,
+from global_config.database import (
+   
     DBSession,
     ScopedSession,
 )
+from global_config.env import (ENV_TYPE,
+    CLOUDFLARE_CAPTCHA_SECRETKEY,
+    CLOUDFLARE_CAPTCHA_VERIFY_ENDPOINT,
+    SUPPORT_EMAILS,
+    HOSTNAME)
+
 from mails.helpers.mail import send
 from mails.templates.templates import (
     admin_registration_notification,
@@ -68,7 +70,7 @@ class UserService:
         user = UserModel()
 
         with ScopedSession() as local_db_session:
-            from global_config import encrypt
+            from global_config.helpers.fernet_crypto import encrypt
 
             user.password = encrypt(data["password"])
             user.role = PLAYER if not user.role else user.role
@@ -215,7 +217,7 @@ class UserService:
             if not user:
                 raise GraphQLError("Invalid token")
 
-            from global_config import encrypt
+            from global_config.helpers.fernet_crypto import encrypt
 
             user.password = encrypt(input["password"])
             local_db_session.delete(otp)

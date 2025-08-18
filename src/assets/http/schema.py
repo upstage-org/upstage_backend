@@ -17,7 +17,7 @@ from assets.http.validation import (
     SaveMediaInput,
     UpdateMediaStatusInput,
 )
-from global_config import authenticated
+from global_config.decorators.authenticated import authenticated
 from studio_management.http.graphql import type_defs
 from assets.services.asset import AssetService
 from users.db_models.user import ADMIN, PLAYER, SUPER_ADMIN, UserModel

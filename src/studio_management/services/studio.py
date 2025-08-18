@@ -20,15 +20,13 @@ from sqlalchemy import and_, or_, nulls_last
 
 from assets.db_models.asset_usage import AssetUsageModel
 from authentication.db_models.user_session import UserSessionModel
-from global_config import (
+from global_config.helpers.object import convert_keys_to_camel_case
+from global_config.database import ScopedSession, DBSession
+from global_config.env import (
     UPLOAD_USER_CONTENT_FOLDER,
     HOSTNAME,
-    DBSession,
-    ScopedSession,
-    convert_keys_to_camel_case,
-    decrypt,
-    encrypt,
 )
+from global_config.helpers.fernet_crypto import encrypt, decrypt
 from mails.helpers.mail import send
 from mails.templates.templates import (
     display_user,

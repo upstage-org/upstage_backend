@@ -13,7 +13,7 @@ if projdir not in sys.path:
 import pytest
 from assets.db_models.asset import AssetModel
 from authentication.tests.auth_test import TestAuthenticationController
-from global_config import DBSession
+from global_config.database import DBSession
 from stages.tests.test_stage import TestStageController
 from assets.tests.asset_test import TestAssetController, load_base64_from_image
 from main import app

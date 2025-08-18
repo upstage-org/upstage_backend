@@ -13,7 +13,8 @@ if projdir not in sys.path:
 from secrets import token_urlsafe
 
 from graphql import GraphQLError
-from global_config import ScopedSession, convert_keys_to_camel_case, DBSession
+from global_config.database import ScopedSession, DBSession
+from global_config.helpers.object import convert_keys_to_camel_case
 from licenses.http.validation import LicenseInput
 from assets.db_models.asset_license import AssetLicenseModel
 
