@@ -12,7 +12,8 @@ if projdir not in sys.path:
 
 from typing import List, Optional
 from ariadne import MutationType, QueryType, make_executable_schema
-from global_config import authenticated, convert_keys_to_camel_case
+from global_config.decorators.authenticated import authenticated
+from global_config.helpers.object import convert_keys_to_camel_case
 from ariadne.asgi import GraphQL
 from mails.helpers.mail import send
 from studio_management.http.graphql import type_defs

@@ -21,7 +21,7 @@ from sqlalchemy import (
     String,
     Text,
 )
-from global_config import BaseModel
+from global_config.db_models.base import BaseModel
 from sqlalchemy.orm import relationship
 
 

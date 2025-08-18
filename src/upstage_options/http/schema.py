@@ -12,7 +12,7 @@ if projdir not in sys.path:
 
 from ariadne import MutationType, QueryType, make_executable_schema
 
-from global_config import authenticated
+from global_config.decorators.authenticated import authenticated
 from upstage_options.http.validation import ConfigInput, SystemEmailInput
 from upstage_options.services.upstage_option import SettingService
 from studio_management.http.graphql import type_defs

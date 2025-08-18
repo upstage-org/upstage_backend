@@ -13,7 +13,7 @@ import os
 import uuid
 from graphql import GraphQLError
 
-from global_config import OTHER_MEDIA_MAX_SIZE, VIDEO_MAX_SIZE
+from global_config.env import OTHER_MEDIA_MAX_SIZE, VIDEO_MAX_SIZE
 
 
 class FileHandling:

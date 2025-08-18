@@ -12,7 +12,7 @@ if projdir not in sys.path:
 
 from sqlalchemy import TIMESTAMP, BigInteger, Boolean, Column, Integer, String, Text
 from datetime import datetime
-from global_config import BaseModel
+from global_config.db_models.base import BaseModel
 
 
 PLAYER = 1

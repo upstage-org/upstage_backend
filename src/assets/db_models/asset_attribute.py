@@ -14,7 +14,7 @@ from datetime import datetime
 from sqlalchemy import BigInteger, Column, DateTime, ForeignKey, Integer, String, Text
 from sqlalchemy.orm import relationship
 from assets.db_models.asset import AssetModel
-from global_config import BaseModel
+from global_config.db_models.base import BaseModel
 
 
 class AssetAttributeModel(BaseModel):

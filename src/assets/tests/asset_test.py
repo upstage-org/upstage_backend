@@ -15,7 +15,8 @@ if projdir not in sys.path:
 import base64
 import pytest
 from main import app
-from global_config import JWT_HEADER_NAME, DBSession
+from global_config.env import JWT_HEADER_NAME
+from global_config.database import DBSession
 from assets.http.schema import asset_graphql_app
 from authentication.tests.auth_test import TestAuthenticationController
 from assets.db_models.asset import AssetModel

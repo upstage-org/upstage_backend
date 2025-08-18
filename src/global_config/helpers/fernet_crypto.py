@@ -1,6 +1,6 @@
 from cryptography.fernet import Fernet
 
-from global_config import CIPHER_KEY
+from global_config.env import CIPHER_KEY
 
 cipher = Fernet(CIPHER_KEY)
 

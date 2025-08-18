@@ -13,7 +13,7 @@ if projdir not in sys.path:
 from datetime import datetime
 from sqlalchemy import BigInteger, Column, Integer, Text, DateTime, ForeignKey
 from sqlalchemy.orm import relationship
-from global_config import BaseModel
+from global_config.db_models.base import BaseModel
 from users.db_models.user import UserModel
 
 

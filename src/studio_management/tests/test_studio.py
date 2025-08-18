@@ -20,7 +20,7 @@ from stages.db_models.stage import StageModel
 from stages.tests.test_stage import TestStageController
 from studio_management.http.schema import studio_graphql_app
 from users.db_models.user import GUEST, PLAYER, SUPER_ADMIN, UserModel
-from global_config import DBSession, ScopedSession
+from global_config.database import DBSession, ScopedSession
 from main import app
 
 test_AuthenticationController = TestAuthenticationController()

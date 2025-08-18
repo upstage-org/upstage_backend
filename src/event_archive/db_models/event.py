@@ -15,7 +15,7 @@ import datetime
 from sqlalchemy import Column, String, Integer, Float, DateTime
 from sqlalchemy.dialects import postgresql
 
-from global_config import BaseModel
+from global_config.db_models.base import BaseModel
 
 
 class EventModel(BaseModel):

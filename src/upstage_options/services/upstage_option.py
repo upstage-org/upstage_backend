@@ -11,12 +11,10 @@ if projdir not in sys.path:
     sys.path.append(projdir)
     sys.path.append(projdir2)
 
-from global_config import (
-    CLIENT_MAX_BODY_SIZE,
-    DBSession,
-    ScopedSession,
-    convert_keys_to_camel_case,
-)
+from global_config.env import CLIENT_MAX_BODY_SIZE
+
+from global_config.helpers.object import convert_keys_to_camel_case
+from global_config.database import ScopedSession, DBSession
 from mails.helpers.mail import send
 from upstage_options.db_models.config import ConfigModel
 from upstage_options.http.validation import ConfigInput, SystemEmailInput

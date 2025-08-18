@@ -18,17 +18,16 @@ from email.utils import parseaddr
 from authentication.http.validation import LoginInput
 from users.db_models.user import ADMIN, GUEST, PLAYER, SUPER_ADMIN, UserModel
 from users.services.user import UserService
-from global_config import decrypt
-from global_config import (
+from global_config.helpers.fernet_crypto import decrypt
+from global_config.env import (
     ENV_TYPE,
     JWT_ACCESS_TOKEN_MINUTES,
     JWT_HEADER_NAME,
     JWT_REFRESH_TOKEN_DAYS,
     SECRET_KEY,
     ALGORITHM,
-    ScopedSession,
-    DBSession,
 )
+from global_config.database import ScopedSession, DBSession
 from authentication.db_models.user_session import UserSessionModel
 
 

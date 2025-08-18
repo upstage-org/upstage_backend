@@ -16,7 +16,8 @@ from datetime import datetime, timedelta
 
 import paho.mqtt.client as mqtt
 
-from global_config import MQTT_TRANSPORT, DBSession, ScopedSession
+from global_config.env import MQTT_TRANSPORT
+from global_config.database import DBSession, ScopedSession
 from upstage_stats.db_models.receive_stat import ReceiveStatModel
 from upstage_stats.db_models.connection_stat import ConnectionStatModel
 

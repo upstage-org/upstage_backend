@@ -11,7 +11,8 @@ if projdir not in sys.path:
     sys.path.append(projdir2)
 
 from ariadne import MutationType, QueryType, make_executable_schema
-from global_config import convert_keys_to_camel_case, authenticated
+from global_config.helpers.object import convert_keys_to_camel_case
+from global_config.decorators.authenticated import authenticated
 from studio_management.http.graphql import type_defs
 from ariadne.asgi import GraphQL
 

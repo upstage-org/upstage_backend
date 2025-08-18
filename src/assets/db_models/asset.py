@@ -23,7 +23,7 @@ from sqlalchemy import (
     Boolean,
 )
 from sqlalchemy.orm import relationship
-from global_config import BaseModel
+from global_config.db_models.base import BaseModel
 from assets.db_models.asset_type import AssetTypeModel
 from assets.db_models.asset_license import AssetLicenseModel
 from assets.db_models.media_tag import MediaTagModel
