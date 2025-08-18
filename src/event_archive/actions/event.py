@@ -13,7 +13,7 @@ if projdir not in sys.path:
     sys.path.append(projdir2)
 
 
-from global_config import ScopedSession
+from global_config.database import ScopedSession
 from event_archive.db_models.event import EventModel
 from event_archive.systems.system import reacts_to_anything
 

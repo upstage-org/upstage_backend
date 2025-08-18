@@ -18,7 +18,7 @@ from global_config.helpers import convert_keys_to_camel_case
 from stages.http.validation import StageStreamInput
 from stages.db_models.stage_attribute import StageAttributeModel
 from stages.db_models.stage import StageModel
-from global_config import ScopedSession, DBSession
+from global_config.database import ScopedSession, DBSession
 
 
 class StageOperationService:

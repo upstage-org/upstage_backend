@@ -13,7 +13,8 @@ if projdir not in sys.path:
     sys.path.append(projdir2)
 
 import stripe
-from global_config import STRIPE_KEY, STRIPE_PRODUCT_ID, convert_keys_to_camel_case
+from global_config.env import STRIPE_KEY, STRIPE_PRODUCT_ID
+from global_config.helpers.object import convert_keys_to_camel_case
 from payments.http.validation import OneTimePurchaseInput, CreateSubscriptionInput
 
 stripe.api_key = STRIPE_KEY

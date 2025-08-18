@@ -11,7 +11,8 @@ if projdir not in sys.path:
     sys.path.append(projdir2)
 
 from graphql import GraphQLError
-from global_config import DBSession, ScopedSession, convert_keys_to_camel_case
+from global_config.database import DBSession, ScopedSession
+from global_config.helpers.object import convert_keys_to_camel_case
 from performance_config.db_models.scene import SceneModel
 from stages.http.validation import SceneInput
 from users.db_models.user import ADMIN, SUPER_ADMIN, UserModel

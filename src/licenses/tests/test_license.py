@@ -17,7 +17,7 @@ from assets.tests.asset_test import TestAssetController
 from assets.db_models.asset_license import AssetLicenseModel
 from main import app
 from licenses.http.schema import license_graphql_app
-from global_config import DBSession
+from global_config.database import DBSession
 
 test_AssetController = TestAssetController()
 

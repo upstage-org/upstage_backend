@@ -12,7 +12,8 @@ if projdir not in sys.path:
 
 from datetime import datetime
 from graphql import GraphQLError
-from global_config import DBSession, ScopedSession, convert_keys_to_camel_case
+from global_config.database import DBSession, ScopedSession
+from global_config.helpers.object import convert_keys_to_camel_case
 from event_archive.db_models.event import EventModel
 from performance_config.db_models.performance import PerformanceModel
 from performance_config.db_models.performance_mqtt_config import (

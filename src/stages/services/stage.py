@@ -16,13 +16,12 @@ from graphql import GraphQLError
 import jwt
 from requests import Request
 from sqlalchemy import and_, nulls_last
-from global_config import (
+from global_config.database import (
     DBSession,
     ScopedSession,
-    convert_keys_to_camel_case,
-    ALGORITHM,
-    SECRET_KEY,
 )
+from global_config.env import ALGORITHM, SECRET_KEY
+from global_config.helpers.object import convert_keys_to_camel_case
 
 from assets.db_models.asset_usage import AssetUsageModel, NotificationType
 from stages.services.stage_operation import StageOperationService

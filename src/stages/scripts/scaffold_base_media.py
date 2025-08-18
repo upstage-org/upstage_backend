@@ -23,12 +23,9 @@ from stages.db_models.stage_attribute import StageAttributeModel
 from stages.db_models.parent_stage import ParentStageModel
 from users.db_models.user import UserModel, ADMIN, GUEST
 from upstage_options.db_models.config import ConfigModel
-from global_config import (
-    encrypt,
-    UPLOAD_USER_CONTENT_FOLDER,
-    global_session,
-    DEMO_MEDIA_FOLDER,
-)
+from global_config.helpers.fernet_crypto import encrypt
+from global_config.env import UPLOAD_USER_CONTENT_FOLDER, DEMO_MEDIA_FOLDER
+from global_config.database import global_session
 
 DBSession = global_session
 
