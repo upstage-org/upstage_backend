@@ -167,7 +167,7 @@ It will start three docker containers: MongoDB, Postgresql, Mosquitto.
 
 ### Important: Same Machine Setup Configuration
 
-**If you are setting up the service backend and application server on the same machine**, you must read and follow the firewall configuration guide before proceeding to the app setup:
+**If you are setting up the service backend and application all on the same server**, you must read and follow the firewall configuration guide before proceeding to the app setup:
 
 1. Read the complete [Docker Firewall Configuration Guide](docker-firewall-config.md)
 2. Follow the steps to configure UFW rules and Docker network access
