@@ -76,6 +76,9 @@ case $machinetype in
            mkdir -p /mosquitto_files/etc/mosquitto/cron
            mkdir -p /mosquitto_files/var/lib/mosquitto
            ./initial_scripts/environments/generate_environments_script.sh
+           
+           chmod +x ./scripts/generate_cipher_key.sh
+           ./scripts/generate_cipher_key.sh
 
            cp ./container_scripts/mqtt_server/mosquitto.conf /mosquitto_files/etc/mosquitto/mosquitto.conf
            cp ./container_scripts/mqtt_server/pw.txt /mosquitto_files/etc/mosquitto/pw.txt
@@ -133,9 +136,6 @@ scp ./load_env.py root@your_app_machine.org:/app_code/src/global_config/load_env
 Once this is done, press enter to continue: " ready
            chmod 755 $output_file
            sed -i "s/{APP_HOST}/$dname/g" $output_file
-
-           chmod +x ./scripts/generate_cipher_key.sh
-           ./scripts/generate_cipher_key.sh
 
            read -p "
 Run the contents of this script over on the service machine:

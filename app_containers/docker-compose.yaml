@@ -38,7 +38,7 @@ services:
       pip install -r requirements.txt &&
       python3 -m scripts.run_event_archive"
     networks:
-      - upstage-network    
+      - upstage-network
 
   upstage_stats:
     image: registry.access.redhat.com/ubi9/python-312:latest
@@ -55,7 +55,7 @@ services:
       pip install -r requirements.txt &&
       python3 -m scripts.run_upstage_stats"
     networks:
-      - upstage-network   
+      - upstage-network
 
   # For Upstage internal use. Maybe some clients will need this as well.
   # Backups happen on a conventional mounted disk, because all image disks are SSD.
@@ -78,7 +78,7 @@ services:
   #    pip install --no-cache-dir -r requirements.txt &&
   #    python3 -m scripts.backup_to_local_drive"
   #  networks:
-  #    - upstage-network   
+  #    - upstage-network
 
   # For Upstage internal use. Maybe some clients will need this as well.
   #upstage_emails:
@@ -96,7 +96,8 @@ services:
   #    pip install -r requirements.txt &&
   #    python3 -m scripts.run_upstage_email"
   #  networks:
-  #    - upstage-network   
+  #    - upstage-network
 
 networks:
   upstage-network:
+    name: upstage-network

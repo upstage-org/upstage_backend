@@ -13,7 +13,7 @@ services:
       POSTGRES_DB: upstage
       PGDATA: /data/postgres
     networks:
-     - upstage-network
+      - upstage-network
 
   mongodb:
     image: mongo:latest
@@ -27,7 +27,7 @@ services:
       - /mongodb_data_volume:/data
     restart: unless-stopped
     networks:
-    - upstage-network
+      - upstage-network
 
   mosquitto:
     image: eclipse-mosquitto:latest
@@ -41,12 +41,12 @@ services:
       - /mosquitto_files/var/lib/mosquitto:/var/lib/mosquitto
       - /etc/letsencrypt:/etc/letsencrypt
     networks:
-     - upstage-network
+      - upstage-network
     command:
       /bin/sh -c "cp /etc/mosquitto/pw.backup /etc/mosquitto/pw.txt &&
       chmod 0700 /etc/mosquitto/pw.txt &&
       chown root:root /etc/mosquitto/pw.txt &&
-      mosquitto_passwd -U /etc/mosquitto/pw.txt && 
+      mosquitto_passwd -U /etc/mosquitto/pw.txt &&
       chown mosquitto:mosquitto /etc/mosquitto/pw.txt &&
       chown mosquitto:mosquitto /var/lib/mosquitto &&
       /etc/mosquitto/cron/add_mqtt_cert_crontab.sh &&
@@ -57,6 +57,7 @@ services:
 
 networks:
   upstage-network:
+    name: upstage-network
 volumes:
   postgresql_files:
   mongodb_data_volume:
