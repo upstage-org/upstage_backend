@@ -41,7 +41,7 @@ set -a
 export PYTHONPATH=$(pwd)/src
 
 
-container=`docker ps | grep upstage_container| awk '{print $1}'`
+container=`docker ps | grep upstage_backend| awk '{print $1}'`
 
 docker cp  $SQL_FILE $container:/usr/app/
 
