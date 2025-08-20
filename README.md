@@ -2,13 +2,14 @@ This guide will help you set up and run the UpStage application using Docker fro
 
 Installation starts [here](#upstage-setup-guide-from-git-repo-to-local-docker-images) but please read the [Prerequisites](#prerequisites) section below first.
 
-It is recommended that you run three Debian docker machines/virtual machines with three separate subdomains. 
+It is recommended that you run three Debian docker machines/virtual machines with three separate subdomains.
 
 For example: streaming.myupstage.org, service.myupstage.org, app.myupstage.org
 
-It is possible to install our front end, back end and streaming service all on one instance/machine, but it is not recommended. 
+It is possible to install our front end, back end and streaming service all on one instance/machine, but it is not recommended.
 
 # Prerequisites:
+
 ### A working email address such as "support@your-domain" or "admins@your-domain", used for LetsEncrypt and UpStage admin emails:
 
 Examples: support@your_upstage.org, admins@your_upstage.org
@@ -20,25 +21,28 @@ Wherever your email registry was purchased, in your email service provider dashb
 Example: mydomain.org (application), svc.mydomain.org (data and networking), streaming.mydomain.org and auth.streaming.mydomain.org (jitsi videobridge).
 
 Be sure that you have a domain name registered with a DNS registrar like namecheap, gandi, etc.
-Also ensure that in your DNS records: 
+Also ensure that in your DNS records:
 
 1. an 'A' record points to the IP address of your app server.
 1. an 'A' record points to the IP address of your svc server.
 1. Two 'A' records pointing to (a) the IP address of your streaming server, and (b) 'auth.' prefix pointing to the same IP of your streaming server as shown above. This is necessary even if users won't be logging into your jitsi streaming instance.
 
 ### Cloudflare Turnstyle Account (free).
+
 This is used for captcha handling. Turning this off is not recommended, since bots already exist which try to flood UpStage with new user request attempts. We use the non-interactive, no-pre-clearance captcha configuration.
 
 # Dependencies that are configured on your behalf, and should remain "hands-free": This is provided for your information only, and requires no action from you other than following the interactive installation instructions:
 
 1. MQTT: mosquitto: Uses SSL for websocket connections only. TCP backend connections do not use SSL.
-1. MQTT, MongoDB, Postgresql are all password protected. Passwords are auto-generated, and UFW rules ensure that remote access is only granted to the app server. 
-1. All code, data and configuration exists on the physical/virtual machines in the '/' directory, and these corresponding directories are mounted into the individual instances as needed. This means that if a docker instance inside the physical/virtual fails for some reason, data will not be lost. 
-1. Rerunning certain scripts will cause auto-generated passwords for DBs and such to be reset, and may cause data loss. See the [Restarting](#restarting-instances-in-case-of-problems) section for details on scripts which can be re-executed without harm. 
+1. MQTT, MongoDB, Postgresql are all password protected. Passwords are auto-generated, and UFW rules ensure that remote access is only granted to the app server.
+1. All code, data and configuration exists on the physical/virtual machines in the '/' directory, and these corresponding directories are mounted into the individual instances as needed. This means that if a docker instance inside the physical/virtual fails for some reason, data will not be lost.
+1. Rerunning certain scripts will cause auto-generated passwords for DBs and such to be reset, and may cause data loss. See the [Restarting](#restarting-instances-in-case-of-problems) section for details on scripts which can be re-executed without harm.
 1. You may want to take snapshots of the above mentioned directories in each virtual/physical machine, or have them mounted from one shared, backed-up drive. See the [Restarting](#restarting-instances-in-case-of-problem) scripts to see how to stop and restart MongoDB and Postgresql for backups.
 
 # Directories which contain all configuration and data (you may want to take snapshots of these):
+
 ### In app machine: configuration and all user static content uploads:
+
 ```
 /app_code
 alembic  demo  requirements.txt  scripts  src  uploads
@@ -48,6 +52,7 @@ build  dist
 ```
 
 ### In svc machine: all databases and network/db utility configuration:
+
 ```
 In / :
 /mongodb_data_volume
@@ -56,6 +61,7 @@ In / :
 ```
 
 ### In streaming machine: docker is not used here. Local jitsi videobridge installation/configuration happens via script:
+
 ```
 In /etc/jitsi:
 jicofo	meet  videobridge
@@ -69,35 +75,46 @@ README	certs  conf.avail  conf.d  migrator.cfg.lua  prosody.cfg.lua
 The following scripts will retain auto-generated passwords, and can be rerun safely at any time:
 
 ### App Instance:
+
 The app instance can be restarted by running this script, which shuts down and restarts docker:
+
 ```
 cd /root/upstage_backend/app_containers
 ./run_docker_compose.sh
 ```
-This is a harmless script that runs docker compose to "bounce" the app instance. 
+
+This is a harmless script that runs docker compose to "bounce" the app instance.
 It can be re-executed at any time.
 
 ### Service Instance:
+
 The svc instance can be restarted by running this script, which shuts down and restarts docker:
+
 ```
 cd /root/upstage_backend/service_containers
 ./run_docker_compose.sh
 ```
-This shell script can harmlessly be restarted at any time. 
+
+This shell script can harmlessly be restarted at any time.
 It sets the Postgresql and MongoDB passwords used by docker-compose.
 Inside the docker-compose file, you'll see how the Mosquitto password is reset upon restart, from a password backup file:
+
 ```
-cat /mosquitto_files/etc/mosquitto/pw.backup 
+cat /mosquitto_files/etc/mosquitto/pw.backup
 performance:mmmmmmmmmmm
 admin:nnnnnnnnnnnnn
 ```
+
 ### Streaming Instance:
+
 Jitsi-videobridge is installed directly in Debian. To restart it, run the following as root:
+
 ```
 systemctl restart jicofo.service prosody.service jitsi-videobridge2.service nginx
 ```
 
 ### Rerunning Other Scripts:
+
 Please note that rerunning setup-os.sh, setup-your-domain.sh, or any scripts other than the docker-compose scripts in the service machine, there is a risk of data loss. That being said, there should be no reason to have to rerun these scripts once things are running successfully.
 
 # Handling Upgrades
@@ -108,11 +125,12 @@ Please note that rerunning setup-os.sh, setup-your-domain.sh, or any scripts oth
 
 Run everything as root, preferably using ssh keys instead of login/password, for better security.
 
-## Setup OS-level services in Debian: 
+## Setup OS-level services in Debian:
 
 Spin up three of the latest Debian images in three separate instances.
 
 We recommend doing this right after image spin-up of each image, to protect your instances:
+
 ```sh
 apt install git ufw
 ufw allow 22
@@ -130,28 +148,41 @@ Then git clone this repo and 'cd' into the topmost directory of that repo copy.
 ## Specific to the Back End, Front End, or Streaming Service:
 
 You will run this once on each machine, selecting the menu option 1,2,or 3 based on which machine you are establishing:
+
 ```sh
 ./initial_scripts/setup-your-domain.sh
 ```
+
 This uses LetsEncrypt and will also run the script to configure the service environment and set default passwords.
 
 If you don't wish to use LetsEncrypt, you can replace its keys with your own, and uninstall it after this entire installation process is complete. Note that nginx runs on each instance, managing the SSL layer on all instances. SSL is never handled or expected within docker instance configuration or code.
 
 ## Start with the Back End Service Server: Your Foundational Services Installed and Configured:
+
 Choose option 1 to set up the Service Back End.
 
 This will auto-generate passwords for various applications, and will store them in a local config file. It will also configure nginx for the specific type of machine you are setting up. Note that nginx, LetsEncrypt and ufw all run on the machine itself, not in the instances.
 
 It will start three docker containers: MongoDB, Postgresql, Mosquitto.
 
+### Important: Same Machine Setup Configuration
+
+**If you are setting up the service backend and application server on the same machine**, you must read and follow the firewall configuration guide before proceeding to the app setup:
+
+1. Read the complete [Docker Firewall Configuration Guide](docker-firewall-config.md)
+2. Follow the steps to configure UFW rules and Docker network access
+3. Restart the service containers after applying the configuration
+4. Then continue with the app setup below
+
 ## Next is the Application Server: UpStage, UpStage Event Capture, Optional UpStage Email
 
 ```sh
 ./initial_scripts/setup-your-domain.sh
 ```
+
 Choose option 2 to set up the App server, which serves UpStage-specific Back End and Front End code.
 
-This will configure and start three "app" containers: UpStage, UpStage-Event, UpStage-Stats. Note that  this script is interactive, and will prompt you to copy certain things.
+This will configure and start three "app" containers: UpStage, UpStage-Event, UpStage-Stats. Note that this script is interactive, and will prompt you to copy certain things.
 
 ## The Same Application Server also runs the Front End:
 
@@ -169,10 +200,11 @@ cd upstage_frontend
 ./run_front_end.sh
 ```
 
-Note that this script is also interactive. 
+Note that this script is also interactive.
 
 ## Last is the Streaming Server:
-Choose option 3, and then _carefully_ follow the instructions. 
+
+Choose option 3, and then _carefully_ follow the instructions.
 Jitsi will interactively prompt you for domain and SSL certificate information. If this isn't filled out correctly, jitsi will fail.
 If it is filled out correctly, it just works, and requires no additional attention on your part.
 
