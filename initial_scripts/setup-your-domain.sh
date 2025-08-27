@@ -80,6 +80,10 @@ case $machinetype in
            chmod +x ./scripts/generate_cipher_key.sh
            ./scripts/generate_cipher_key.sh
 
+	   # Let's encrypt renewal hook to update mosquitto certs as well.
+	   # This runs in this server, not in the mosquitto container.
+	   cp ./container_scripts/mqtt_server/mosquitto_renewal.sh /etc/letsencrypt/renewal-hooks/deploy/mosquitto_renewal.sh
+
            cp ./container_scripts/mqtt_server/mosquitto.conf /mosquitto_files/etc/mosquitto/mosquitto.conf
            cp ./container_scripts/mqtt_server/pw.txt /mosquitto_files/etc/mosquitto/pw.txt
            cp ./container_scripts/mqtt_server/pw.txt /mosquitto_files/etc/mosquitto/pw.backup

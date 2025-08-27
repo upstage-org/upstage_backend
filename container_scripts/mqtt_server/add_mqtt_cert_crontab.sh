@@ -8,7 +8,10 @@ chown mosquitto:mosquitto /etc/mosquitto/ca_certificates/
 cp /etc/letsencrypt/live/*/* /etc/mosquitto/ca_certificates/
 chown mosquitto:mosquitto /etc/mosquitto/ca_certificates/*
 
-echo '0 0 * * * "cp /etc/letsencrypt/live/*/* /etc/mosquitto/ca_certificates/ && chown mosquitto:mosquitto /etc/mosquitto/ca_certificates/*"' > /tmp/mqttcron
-crontab /tmp/mqttcron
-rm -rf /tmp/mqttcron
+# crontab does not run in the mosquitto docker container.
+# Instead, we update mosquitto certs in a Let's Encrypt renenwal hook 
+# script on the server itself.
+#echo '0 0 * * * "cp /etc/letsencrypt/live/*/* /etc/mosquitto/ca_certificates/ && chown mosquitto:mosquitto /etc/mosquitto/ca_certificates/*"' > /tmp/mqttcron
+#crontab /tmp/mqttcron
+#rm -rf /tmp/mqttcron
 
