@@ -12,8 +12,9 @@ if projdir not in sys.path:
     sys.path.append(projdir)
     sys.path.append(projdir2)
 
+import json
 import shutil
-from graphql_server import json_encode
+#from graphql_server import json_encode
 from PIL import Image
 
 from assets.db_models.asset_type import AssetTypeModel
@@ -137,7 +138,7 @@ def create_media(type, path):
                 attributes["w"], attributes["h"] = detect_size(type, src_path)
             attributes["frames"].append(dest_path)
 
-    asset.description = json_encode(attributes)
+    asset.description = json.dumps(attributes)
     asset.size = size
     DBSession.add(asset)
     DBSession.commit()
@@ -179,7 +180,7 @@ def create_demo_stage():
     all_users = [x.id for x in DBSession.query(UserModel.id).all()]
     accesses = [[], all_users]
     player_access = StageAttributeModel(
-        name="playerAccess", description=json_encode(accesses), stage=stage
+        name="playerAccess", description=json.dumps(accesses), stage=stage
     )
     stage.attributes.append(player_access)
 
