@@ -175,6 +175,10 @@ Run the contents of this script over on the service machine:
 
            apt update -y
            apt upgrade -y
+	   # We need the older libs and v17 for Jitsi. We remove these afterward. See below.
+	   echo "deb http://deb.debian.org/debian bookworm main" > /etc/apt/sources.list.d/bookworm.list && \
+           apt-get update && \
+           apt-get install -y openjdk-17-jre-headless
            read -p "In the next two prompts, Jitsi will ask for your full domain name (not the 'auth.' domain). 
 
 It will then ask you about SSL keys. Choose 'I want to use my own certificate'. 
@@ -209,6 +213,11 @@ Once you've copy-pasted these two paths to another screen/location, press enter 
            chmod 640 /etc/prosody/certs/*key
            chmod 644 /etc/prosody/certs/*crt
            chown prosody:prosody /etc/prosody/certs/*
+
+	   # Cleanup older dependent libs
+	   rm /etc/apt/sources.list.d/bookworm.list && \
+           apt-get update && \
+           apt-get clean
 
                 ;;
         *) echo "No match for machine type $machinetype, exiting."
