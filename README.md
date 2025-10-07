@@ -2,7 +2,7 @@ This guide will help you set up and run the UpStage application using Docker fro
 
 Installation starts [here](#upstage-setup-guide-from-git-repo-to-local-docker-images) but please read the [Prerequisites](#prerequisites) section below first.
 
-Internal/additional configureation and data restoration is documented [here](https://github.com/upstage-org/upstage_frontend/blob/main/UpstageInternal.md "Internal Notes"){:target="_blank"}
+Internal/additional configureation and data restoration is documented [here](https://github.com/upstage-org/upstage_frontend/blob/main/UpstageInternal.md "Internal Notes")
 
 It is recommended that you run three Debian docker machines/virtual machines with three separate subdomains.
 
