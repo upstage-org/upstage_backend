@@ -4,6 +4,8 @@ services:
     container_name: upstage_backend
     ports:
       - "3000:3000"
+    extra_hosts:
+      - "dev.upstage.live:10.116.0.8"
     volumes:
       - /app_code/alembic:/usr/app/alembic
       - /app_code/src:/usr/app/src
