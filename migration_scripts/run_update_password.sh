@@ -1,7 +1,7 @@
 #!/bin/bash
 set -a
 
-container=`docker ps | grep upstage_container| awk '{print $1}'`
+container=`docker ps | grep upstage_backend| awk '{print $1}'`
 
 docker exec -it $container sh -c '
   cd /usr/app
