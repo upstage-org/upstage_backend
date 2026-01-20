@@ -1,9 +1,10 @@
-FROM fedora:41
+FROM fedora:43
 
 USER root
 
-RUN dnf install -y https://download.postgresql.org/pub/repos/yum/reporpms/F-41-x86_64/pgdg-fedora-repo-latest.noarch.rpm && \
-    dnf install -y postgresql17 python3-pip && \
-    dnf clean all
+RUN dnf install -y https://download.postgresql.org/pub/repos/yum/reporpms/F-$(rpm -E %fedora)-x86_64/pgdg-fedora-repo-latest.noarch.rpm && \
+    dnf install -y postgresql18 postgresql18-server python3-pip && \
+    dnf clean all && \
+    rm -rf /var/cache/dnf/*
 
 RUN /usr/bin/pg_dump --version
