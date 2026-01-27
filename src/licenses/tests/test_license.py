@@ -17,7 +17,7 @@ from assets.tests.asset_test import TestAssetController
 from assets.db_models.asset_license import AssetLicenseModel
 from main import app
 from licenses.http.schema import license_graphql_app
-from global_config.database import DBSession
+from global_config.database import ScopedSession
 
 test_AssetController = TestAssetController()
 
@@ -25,7 +25,8 @@ test_AssetController = TestAssetController()
 class TestLicenseController:
     async def test_01_create_license(self, client):
         await test_AssetController.test_03_save_media_successfully(client)
-        asset = DBSession.query(AssetModel).first()
+        with ScopedSession() as local_db_session:
+            asset = local_db_session.query(AssetModel).first()
         query = """
         mutation ($input: LicenseInput!) {
           createLicense(input: $input) {
@@ -54,7 +55,8 @@ class TestLicenseController:
         assert response.json()["data"]["createLicense"]["assetPath"] is not None
 
     async def test_02_revoke_license(self, client):
-        license = DBSession.query(AssetLicenseModel).first()
+        with ScopedSession() as local_db_session:
+            license = local_db_session.query(AssetLicenseModel).first()
         query = """
             mutation($id: ID!) {
                 revokeLicense(id: $id)
@@ -78,5 +80,6 @@ class TestLicenseController:
         assert response.json()["data"][
             "revokeLicense"
         ] == "Failed to revoke license {}".format(license.id)
-        license = DBSession.query(AssetLicenseModel).filter_by(id=license.id).first()
-        assert license is None
+        with ScopedSession() as local_db_session:
+            license = local_db_session.query(AssetLicenseModel).filter_by(id=license.id).first()
+            assert license is None

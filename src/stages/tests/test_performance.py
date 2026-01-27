@@ -12,7 +12,7 @@ if projdir not in sys.path:
 
 import pytest
 from authentication.tests.auth_test import TestAuthenticationController
-from global_config.database import DBSession, ScopedSession
+from global_config.database import ScopedSession
 from event_archive.db_models.event import EventModel
 from main import app
 from performance_config.db_models.performance import PerformanceModel
@@ -172,14 +172,15 @@ class TestPerformanceController:
         assert "errors" in data
         assert data["errors"][0]["message"] == "Performance not found"
 
-        performance = DBSession.query(PerformanceModel).first()
-        variables = {
-            "input": {
-                "id": performance.id,
-                "name": "Test",
-                "description": "Test",
+        with ScopedSession() as local_db_session:
+            performance = local_db_session.query(PerformanceModel).first()
+            variables = {
+                "input": {
+                    "id": performance.id,
+                    "name": "Test",
+                    "description": "Test",
+                }
             }
-        }
 
         headers = test_AuthenticationController.get_headers(client, PLAYER)
         response = client.post(
@@ -197,8 +198,9 @@ class TestPerformanceController:
 
     async def test_05_save_recording(self, client):
         headers = test_AuthenticationController.get_headers(client, SUPER_ADMIN)
-        performance = DBSession.query(PerformanceModel).first()
-        variables = {"id": performance.id}
+        with ScopedSession() as local_db_session:
+            performance = local_db_session.query(PerformanceModel).first()
+            variables = {"id": performance.id}
 
         query = """
             mutation saveRecording($id: ID!) {
@@ -218,7 +220,8 @@ class TestPerformanceController:
         assert "errors" in data
         assert data["errors"][0]["message"] == "Nothing to record!"
 
-        stage = DBSession.query(StageModel).filter_by(id=performance.stage_id).first()
+        with ScopedSession() as local_db_session:
+            stage = local_db_session.query(StageModel).filter_by(id=performance.stage_id).first()
         with ScopedSession() as session:
             event = EventModel(
                 topic="/{}/".format(stage.file_location),
@@ -262,8 +265,9 @@ class TestPerformanceController:
         assert "errors" in data
         assert data["errors"][0]["message"] == "Performance not found"
 
-        performance = DBSession.query(PerformanceModel).first()
-        variables = {"id": performance.id}
+        with ScopedSession() as local_db_session:
+            performance = local_db_session.query(PerformanceModel).first()
+            variables = {"id": performance.id}
 
         headers = test_AuthenticationController.get_headers(client, PLAYER)
         response = client.post(
@@ -281,8 +285,9 @@ class TestPerformanceController:
 
     async def test_07_delete_performance(self, client):
         headers = test_AuthenticationController.get_headers(client, SUPER_ADMIN)
-        performance = DBSession.query(PerformanceModel).first()
-        variables = {"id": performance.id}
+        with ScopedSession() as local_db_session:
+            performance = local_db_session.query(PerformanceModel).first()
+            variables = {"id": performance.id}
 
         query = """
             mutation deletePerformance($id: ID!) {
@@ -326,8 +331,9 @@ class TestPerformanceController:
         assert "errors" in data
         assert data["errors"][0]["message"] == "Performance not found"
 
-        performance = DBSession.query(PerformanceModel).first()
-        variables = {"id": performance.id}
+        with ScopedSession() as local_db_session:
+            performance = local_db_session.query(PerformanceModel).first()
+            variables = {"id": performance.id}
 
         headers = test_AuthenticationController.get_headers(client, PLAYER)
         response = client.post(
@@ -418,8 +424,9 @@ class TestPerformanceController:
 
     async def test_10_delete_scene(self, client):
         headers = test_AuthenticationController.get_headers(client, SUPER_ADMIN)
-        scene = DBSession.query(SceneModel).first()
-        variables = {"id": scene.id}
+        with ScopedSession() as local_db_session:
+            scene = local_db_session.query(SceneModel).first()
+            variables = {"id": scene.id}
 
         query = """
             mutation deleteScene($id: ID!) {
@@ -462,8 +469,9 @@ class TestPerformanceController:
         assert "errors" in data
         assert data["errors"][0]["message"] == "Scene not found"
 
-        scene = DBSession.query(SceneModel).first()
-        variables = {"id": scene.id}
+        with ScopedSession() as local_db_session:
+            scene = local_db_session.query(SceneModel).first()
+            variables = {"id": scene.id}
 
         headers = test_AuthenticationController.get_headers(client, PLAYER)
         response = client.post(

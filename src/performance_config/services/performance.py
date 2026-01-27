@@ -12,7 +12,7 @@ if projdir not in sys.path:
 
 from datetime import datetime
 from graphql import GraphQLError
-from global_config.database import DBSession, ScopedSession
+from global_config.database import ScopedSession
 from global_config.helpers.object import convert_keys_to_camel_case
 from event_archive.db_models.event import EventModel
 from performance_config.db_models.performance import PerformanceModel
@@ -31,16 +31,18 @@ class PerformanceService:
         pass
 
     def get_performance_communication(self):
-        return [
-            convert_keys_to_camel_case(performance.to_dict())
-            for performance in DBSession.query(PerformanceMQTTConfigModel).all()
-        ]
+        with ScopedSession() as local_db_session:
+            return [
+                convert_keys_to_camel_case(performance.to_dict())
+                for performance in local_db_session.query(PerformanceMQTTConfigModel).all()
+            ]
 
     def get_performance_config(self):
-        return [
-            convert_keys_to_camel_case(performance.to_dict())
-            for performance in DBSession.query(PerformanceConfigModel).all()
-        ]
+        with ScopedSession() as local_db_session:
+            return [
+                convert_keys_to_camel_case(performance.to_dict())
+                for performance in local_db_session.query(PerformanceConfigModel).all()
+            ]
 
     def create_performance(self, user: UserModel, input: RecordInput):
         with ScopedSession() as local_db_session:
@@ -64,7 +66,7 @@ class PerformanceService:
             local_db_session.commit()
             local_db_session.flush()
             performance = (
-                DBSession.query(PerformanceModel).filter_by(id=performance.id).first()
+                local_db_session.query(PerformanceModel).filter_by(id=performance.id).first()
             )
             return convert_keys_to_camel_case(performance)
 
@@ -150,7 +152,7 @@ class PerformanceService:
             local_db_session.flush()
 
             return (
-                DBSession.query(PerformanceModel)
+                local_db_session.query(PerformanceModel)
                 .filter_by(id=performance.id)
                 .first()
                 .to_dict()

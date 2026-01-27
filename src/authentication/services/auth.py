@@ -27,7 +27,7 @@ from global_config.env import (
     SECRET_KEY,
     ALGORITHM,
 )
-from global_config.database import ScopedSession, DBSession
+from global_config.database import ScopedSession
 from authentication.db_models.user_session import UserSessionModel
 
 
@@ -159,32 +159,32 @@ class AuthenticationService:
         if not current_refresh_token:
             raise GraphQLError("Invalid refresh token")
 
-        session = (
-            DBSession.query(UserSessionModel)
-            .filter(UserSessionModel.refresh_token == current_refresh_token)
-            .first()
-        )
-
-        if not session:
-            raise GraphQLError("Invalid refresh token")
-
-        user = (
-            DBSession.query(UserModel).filter(UserModel.id == session.user_id).first()
-        )
-
-        access_token = self.create_token(
-            {"user_id": session.user_id},
-            timedelta(minutes=int(JWT_ACCESS_TOKEN_MINUTES)),
-        )
-
-        refresh_token = self.create_token(
-            {"user_id": user.id, "type": "refresh"},
-            timedelta(
-                days=int(JWT_REFRESH_TOKEN_DAYS) if user.role == SUPER_ADMIN else 1
-            ),
-        )
-
         with ScopedSession() as local_db_session:
+            session = (
+                local_db_session.query(UserSessionModel)
+                .filter(UserSessionModel.refresh_token == current_refresh_token)
+                .first()
+            )
+
+            if not session:
+                raise GraphQLError("Invalid refresh token")
+
+            user = (
+                local_db_session.query(UserModel).filter(UserModel.id == session.user_id).first()
+            )
+
+            access_token = self.create_token(
+                {"user_id": session.user_id},
+                timedelta(minutes=int(JWT_ACCESS_TOKEN_MINUTES)),
+            )
+
+            refresh_token = self.create_token(
+                {"user_id": user.id, "type": "refresh"},
+                timedelta(
+                    days=int(JWT_REFRESH_TOKEN_DAYS) if user.role == SUPER_ADMIN else 1
+                ),
+            )
+
             local_db_session.query(UserSessionModel).filter(
                 UserSessionModel.refresh_token == current_refresh_token
             ).delete()
@@ -206,14 +206,15 @@ class AuthenticationService:
             )
             local_db_session.commit()
 
-        return {"access_token": access_token, "refresh_token": refresh_token}
+            return {"access_token": access_token, "refresh_token": refresh_token}
 
     def get_session(self, token: str, user_id: int):
-        return (
-            DBSession.query(UserSessionModel)
-            .filter(
-                UserSessionModel.user_id == user_id,
-                UserSessionModel.access_token == token,
+        with ScopedSession() as local_db_session:
+            return (
+                local_db_session.query(UserSessionModel)
+                .filter(
+                    UserSessionModel.user_id == user_id,
+                    UserSessionModel.access_token == token,
+                )
+                .first()
             )
-            .first()
-        )

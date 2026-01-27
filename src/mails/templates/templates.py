@@ -13,7 +13,6 @@ if projdir not in sys.path:
 
 
 from global_config.env import EMAIL_HOST_USER
-from global_config.database import DBSession
 
 
 def get_footer():
@@ -22,19 +21,21 @@ def get_footer():
         ADDING_EMAIL_SIGNATURE,
         EMAIL_SIGNATURE,
     )
+    from global_config.database import ScopedSession
 
-    addingSignatureEmail = (
-        DBSession.query(ConfigModel)
-        .filter(ConfigModel.name == ADDING_EMAIL_SIGNATURE)
-        .first()
-    )
-    if addingSignatureEmail and addingSignatureEmail.value != "true":
-        return ""
+    with ScopedSession() as local_db_session:
+        addingSignatureEmail = (
+            local_db_session.query(ConfigModel)
+            .filter(ConfigModel.name == ADDING_EMAIL_SIGNATURE)
+            .first()
+        )
+        if addingSignatureEmail and addingSignatureEmail.value != "true":
+            return ""
 
-    signature = (
-        DBSession.query(ConfigModel).filter(ConfigModel.name == EMAIL_SIGNATURE).first()
-    )
-    return signature.value
+        signature = (
+            local_db_session.query(ConfigModel).filter(ConfigModel.name == EMAIL_SIGNATURE).first()
+        )
+        return signature.value
 
 
 def display_user(user):

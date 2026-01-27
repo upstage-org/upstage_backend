@@ -21,7 +21,7 @@ from sqlalchemy import and_, or_, nulls_last
 from assets.db_models.asset_usage import AssetUsageModel
 from authentication.db_models.user_session import UserSessionModel
 from global_config.helpers.object import convert_keys_to_camel_case
-from global_config.database import ScopedSession, DBSession
+from global_config.database import ScopedSession
 from global_config.env import (
     UPLOAD_USER_CONTENT_FOLDER,
     HOSTNAME,
@@ -62,56 +62,57 @@ class StudioService:
         pass
 
     def admin_players(self, params):
-        query = DBSession.query(UserModel)
+        with ScopedSession() as local_db_session:
+            query = local_db_session.query(UserModel)
 
-        if "usernameLike" in params:
-            query = query.filter(
-                or_(
-                    UserModel.username.ilike(f"%{params['usernameLike']}%"),
-                    UserModel.display_name.ilike(f"%{params['usernameLike']}%"),
-                    UserModel.last_name.ilike(f"%{params['usernameLike']}%"),
-                    UserModel.first_name.ilike(f"%{params['usernameLike']}%"),
-                    UserModel.bin_name.ilike(f"%{params['usernameLike']}%"),
+            if "usernameLike" in params:
+                query = query.filter(
+                    or_(
+                        UserModel.username.ilike(f"%{params['usernameLike']}%"),
+                        UserModel.display_name.ilike(f"%{params['usernameLike']}%"),
+                        UserModel.last_name.ilike(f"%{params['usernameLike']}%"),
+                        UserModel.first_name.ilike(f"%{params['usernameLike']}%"),
+                        UserModel.bin_name.ilike(f"%{params['usernameLike']}%"),
+                    )
                 )
+
+            if "createdBetween" in params:
+                start_date = datetime.strptime(params["createdBetween"][0], "%Y-%m-%d")
+                end_date = datetime.strptime(params["createdBetween"][1], "%Y-%m-%d")
+                query = query.filter(UserModel.created_on.between(start_date, end_date))
+
+            if "sort" in params:
+                for sort_param in params["sort"]:
+                    field, direction = sort_param.rsplit("_", 1)
+                    if field == "USERNAME":
+                        sort_field = UserModel.username
+                    elif field == "ROLE":
+                        sort_field = UserModel.role
+                    elif field == "CREATED_ON":
+                        sort_field = UserModel.created_on
+                    elif field == "EMAIL":
+                        sort_field = UserModel.email
+                    elif field == "LAST_LOGIN":
+                        sort_field = UserModel.last_login
+
+                    if direction == "ASC":
+                        query = query.order_by(nulls_last(sort_field.asc()))
+                    elif direction == "DESC":
+                        query = query.order_by(nulls_last(sort_field.desc()))
+
+            total_count = query.count()
+
+            if "limit" in params:
+                limit = params["limit"] or 10
+                page = 0 if "page" not in params else (params["page"] - 1)
+                offset = page * limit
+                query = query.limit(limit).offset(offset)
+
+            results = query.all()
+
+            return convert_keys_to_camel_case(
+                {"totalCount": total_count, "edges": [user.to_dict() for user in results]}
             )
-
-        if "createdBetween" in params:
-            start_date = datetime.strptime(params["createdBetween"][0], "%Y-%m-%d")
-            end_date = datetime.strptime(params["createdBetween"][1], "%Y-%m-%d")
-            query = query.filter(UserModel.created_on.between(start_date, end_date))
-
-        if "sort" in params:
-            for sort_param in params["sort"]:
-                field, direction = sort_param.rsplit("_", 1)
-                if field == "USERNAME":
-                    sort_field = UserModel.username
-                elif field == "ROLE":
-                    sort_field = UserModel.role
-                elif field == "CREATED_ON":
-                    sort_field = UserModel.created_on
-                elif field == "EMAIL":
-                    sort_field = UserModel.email
-                elif field == "LAST_LOGIN":
-                    sort_field = UserModel.last_login
-
-                if direction == "ASC":
-                    query = query.order_by(nulls_last(sort_field.asc()))
-                elif direction == "DESC":
-                    query = query.order_by(nulls_last(sort_field.desc()))
-
-        total_count = query.count()
-
-        if "limit" in params:
-            limit = params["limit"] or 10
-            page = 0 if "page" not in params else (params["page"] - 1)
-            offset = page * limit
-            query = query.limit(limit).offset(offset)
-
-        results = query.all()
-
-        return convert_keys_to_camel_case(
-            {"totalCount": total_count, "edges": [user.to_dict() for user in results]}
-        )
 
     def create_users(self, users: List[BatchUserInput]):
         with ScopedSession() as session:
@@ -126,18 +127,19 @@ class StudioService:
                     password=encrypt(user["password"]),
                 )
                 session.add(user)
+            session.flush()
 
-        users = (
-            DBSession.query(UserModel)
-            .filter(UserModel.email.in_([user["email"] for user in users]))
-            .all()
-        )
+            users = (
+                session.query(UserModel)
+                .filter(UserModel.email.in_([user["email"] for user in users]))
+                .all()
+            )
 
-        self.stage_operation_service.assign_user_to_default_stage(
-            [user.id for user in users]
-        )
+            self.stage_operation_service.assign_user_to_default_stage(
+                [user.id for user in users]
+            )
 
-        return convert_keys_to_camel_case({"users": [user.to_dict() for user in users]})
+            return convert_keys_to_camel_case({"users": [user.to_dict() for user in users]})
 
     def validate_user_information(self, users: List[BatchUserInput], session):
         for user in users:
@@ -199,13 +201,14 @@ class StudioService:
         return user
 
     def _check_existing_email(self, input: UpdateUserInput):
-        existing_email = (
-            DBSession.query(UserModel)
-            .filter(and_(UserModel.email == input.email, UserModel.id != input.id))
-            .first()
-        )
-        if existing_email:
-            raise GraphQLError("This email address already belongs to another user!")
+        with ScopedSession() as local_db_session:
+            existing_email = (
+                local_db_session.query(UserModel)
+                .filter(and_(UserModel.email == input.email, UserModel.id != input.id))
+                .first()
+            )
+            if existing_email:
+                raise GraphQLError("This email address already belongs to another user!")
 
     async def _update_user_fields(self, user: UserModel, input: UpdateUserInput):
         if input.password:
@@ -457,23 +460,25 @@ class StudioService:
         return {"success": True}
 
     def get_users(self, active: bool):
-        return [
-            convert_keys_to_camel_case(user.to_dict())
-            for user in DBSession.query(UserModel)
-            .filter(UserModel.active == active)
-            .order_by(UserModel.username.asc())
-            .all()
-        ]
+        with ScopedSession() as local_db_session:
+            return [
+                convert_keys_to_camel_case(user.to_dict())
+                for user in local_db_session.query(UserModel)
+                .filter(UserModel.active == active)
+                .order_by(UserModel.username.asc())
+                .all()
+            ]
 
     def stages(self, user: UserModel):
-        return [
-            convert_keys_to_camel_case(
-                {
-                    **stage.to_dict(),
-                    "permission": self.stage_operation_service.resolve_permission(
-                        user.id, stage
-                    ),
-                }
-            )
-            for stage in DBSession.query(StageModel).order_by(StageModel.name.asc()).all()
-        ]
+        with ScopedSession() as local_db_session:
+            return [
+                convert_keys_to_camel_case(
+                    {
+                        **stage.to_dict(),
+                        "permission": self.stage_operation_service.resolve_permission(
+                            user.id, stage
+                        ),
+                    }
+                )
+                for stage in local_db_session.query(StageModel).order_by(StageModel.name.asc()).all()
+            ]

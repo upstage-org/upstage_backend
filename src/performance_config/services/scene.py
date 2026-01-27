@@ -11,7 +11,7 @@ if projdir not in sys.path:
     sys.path.append(projdir2)
 
 from graphql import GraphQLError
-from global_config.database import DBSession, ScopedSession
+from global_config.database import ScopedSession
 from global_config.helpers.object import convert_keys_to_camel_case
 from performance_config.db_models.scene import SceneModel
 from stages.http.validation import SceneInput
@@ -23,10 +23,11 @@ class SceneService:
         pass
 
     def get_scene(self):
-        return [
-            convert_keys_to_camel_case(scene.to_dict())
-            for scene in DBSession.query(SceneModel).all()
-        ]
+        with ScopedSession() as local_db_session:
+            return [
+                convert_keys_to_camel_case(scene.to_dict())
+                for scene in local_db_session.query(SceneModel).all()
+            ]
 
     def create_scene(self, user: UserModel, input: SceneInput):
         with ScopedSession() as local_db_session:
@@ -67,7 +68,7 @@ class SceneService:
             local_db_session.add(scene)
             local_db_session.commit()
             local_db_session.flush()
-            scene = DBSession.query(SceneModel).filter_by(id=scene.id).first()
+            scene = local_db_session.query(SceneModel).filter_by(id=scene.id).first()
             return convert_keys_to_camel_case(scene)
 
     def delete_scene(self, user: UserModel, id: int):

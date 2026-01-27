@@ -17,7 +17,6 @@ import jwt
 from requests import Request
 from sqlalchemy import and_, nulls_last
 from global_config.database import (
-    DBSession,
     ScopedSession,
 )
 from global_config.env import ALGORITHM, SECRET_KEY
@@ -49,98 +48,99 @@ class StageService:
         self.stage_operation_service = StageOperationService()
 
     def get_all_stages(self, user: UserModel, input: SearchStageInput):
-        query = (
-            DBSession.query(StageModel)
-            .outerjoin(UserModel)
-            .outerjoin(ParentStageModel)
-            .outerjoin(AssetModel)
-            .group_by(StageModel.id)
-        )
-
-        if input.name:
-            query = query.filter(StageModel.name.ilike(f"%{input.name}%"))
-
-        if input.owners:
-            query = query.filter(UserModel.username.in_(input.owners))
-
-        if input.createdBetween:
-            query = query.filter(
-                StageModel.created_on.between(
-                    input.createdBetween[0], input.createdBetween[1]
-                )
+        with ScopedSession() as local_db_session:
+            query = (
+                local_db_session.query(StageModel)
+                .outerjoin(UserModel)
+                .outerjoin(ParentStageModel)
+                .outerjoin(AssetModel)
+                .group_by(StageModel.id)
             )
 
-        total_count = query.count()
+            if input.name:
+                query = query.filter(StageModel.name.ilike(f"%{input.name}%"))
 
-        if input.sort:
-            sort = input.sort
-            for sort_option in sort:
-                field, direction = sort_option.rsplit("_", 1)
+            if input.owners:
+                query = query.filter(UserModel.username.in_(input.owners))
 
-                if field == "ACCESS":
-                    continue
-
-                if field == "OWNER_ID":
-                    sort_field = StageModel.owner_id
-                elif field == "NAME":
-                    sort_field = StageModel.name
-                elif field == "CREATED_ON":
-                    sort_field = StageModel.created_on
-                elif field == "LAST_ACCESS":
-                    sort_field = StageModel.last_access
-
-                if direction == "ASC":
-                    query = query.order_by(nulls_last(sort_field.asc()))
-                elif direction == "DESC":
-                    query = query.order_by(nulls_last(sort_field.desc()))
-
-        else:
-            query = query.order_by(StageModel.name.asc())
-
-        data = query.all()
-
-        access = input.access if input.access and len(input.access) else ['owner', 'editor', 'player']
-
-        stages = []
-        for stage in data:
-            permission = self.stage_operation_service.resolve_permission(user.id, stage)
-            if permission in access:
-                stages.append(
-                    convert_keys_to_camel_case(
-                        {
-                            **stage.to_dict(),
-                            "cover": stage.cover,
-                            "visibility": stage.visibility,
-                            "status": stage.status,
-                            "permission": permission,
-                        }
+            if input.createdBetween:
+                query = query.filter(
+                    StageModel.created_on.between(
+                        input.createdBetween[0], input.createdBetween[1]
                     )
                 )
 
-        total_count = len(stages)
+            total_count = query.count()
 
-        if input.sort is not None and input.sort[0] in ["ACCESS_DESC", "ACCESS_ASC"]:
-            field, direction = input.sort[0].rsplit("_", 1)
-            stages.sort(key=lambda s: s["permission"], reverse=(direction == "DESC"))
+            if input.sort:
+                sort = input.sort
+                for sort_option in sort:
+                    field, direction = sort_option.rsplit("_", 1)
 
-        limit = input.limit if input.limit else 10
-        page = input.page if input.page else 1
-        start = (page - 1) * limit
-        end = start + limit
-        paginated_stages = stages[start:end]
+                    if field == "ACCESS":
+                        continue
 
-        return {
-            "edges": [
-                {
-                    **stage,
-                    "assets": [
-                        asset.child_asset.to_dict() for asset in stage["assets"]
-                    ],
-                }
-                for stage in paginated_stages
-            ],
-            "totalCount": total_count,
-        }
+                    if field == "OWNER_ID":
+                        sort_field = StageModel.owner_id
+                    elif field == "NAME":
+                        sort_field = StageModel.name
+                    elif field == "CREATED_ON":
+                        sort_field = StageModel.created_on
+                    elif field == "LAST_ACCESS":
+                        sort_field = StageModel.last_access
+
+                    if direction == "ASC":
+                        query = query.order_by(nulls_last(sort_field.asc()))
+                    elif direction == "DESC":
+                        query = query.order_by(nulls_last(sort_field.desc()))
+
+            else:
+                query = query.order_by(StageModel.name.asc())
+
+            data = query.all()
+
+            access = input.access if input.access and len(input.access) else ['owner', 'editor', 'player']
+
+            stages = []
+            for stage in data:
+                permission = self.stage_operation_service.resolve_permission(user.id, stage)
+                if permission in access:
+                    stages.append(
+                        convert_keys_to_camel_case(
+                            {
+                                **stage.to_dict(),
+                                "cover": stage.cover,
+                                "visibility": stage.visibility,
+                                "status": stage.status,
+                                "permission": permission,
+                            }
+                        )
+                    )
+
+            total_count = len(stages)
+
+            if input.sort is not None and input.sort[0] in ["ACCESS_DESC", "ACCESS_ASC"]:
+                field, direction = input.sort[0].rsplit("_", 1)
+                stages.sort(key=lambda s: s["permission"], reverse=(direction == "DESC"))
+
+            limit = input.limit if input.limit else 10
+            page = input.page if input.page else 1
+            start = (page - 1) * limit
+            end = start + limit
+            paginated_stages = stages[start:end]
+
+            return {
+                "edges": [
+                    {
+                        **stage,
+                        "assets": [
+                            asset.child_asset.to_dict() for asset in stage["assets"]
+                        ],
+                    }
+                    for stage in paginated_stages
+                ],
+                "totalCount": total_count,
+            }
 
     def get_stage_list(self, info, input: StageStreamInput):
         request: Request = info.context["request"]
@@ -152,36 +152,78 @@ class StageService:
             payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
             current_user_id = payload.get("user_id")
 
-        query = (
-            DBSession.query(StageModel)
-            .outerjoin(UserModel)
-            .outerjoin(StageAttributeModel)
-            .outerjoin(ParentStageModel)
-            .outerjoin(AssetModel)
-            .group_by(StageModel.id)
-        )
+        with ScopedSession() as local_db_session:
+            query = (
+                local_db_session.query(StageModel)
+                .outerjoin(UserModel)
+                .outerjoin(StageAttributeModel)
+                .outerjoin(ParentStageModel)
+                .outerjoin(AssetModel)
+                .group_by(StageModel.id)
+            )
 
-        if input.fileLocation:
-            query = query.filter(StageModel.file_location == input.fileLocation)
+            if input.fileLocation:
+                query = query.filter(StageModel.file_location == input.fileLocation)
 
-        query = query.order_by(StageModel.id)
-        stages = query.all()
+            query = query.order_by(StageModel.id)
+            stages = query.all()
 
-        return [
-            convert_keys_to_camel_case(
+            return [
+                convert_keys_to_camel_case(
+                    {
+                        **stage.to_dict(),
+                        "assets": [asset.child_asset.to_dict() for asset in stage.assets],
+                        "scenes": self.stage_operation_service.get_scene_list(
+                            input, stage.id
+                        ),
+                        "events": self.stage_operation_service.get_event_list(input, stage),
+                        "cover": stage.cover,
+                        "visibility": stage.visibility,
+                        "status": stage.status,
+                        "permission": self.stage_operation_service.resolve_permission(
+                            current_user_id, stage
+                        ),
+                        "performances": [
+                            convert_keys_to_camel_case(pf.to_dict())
+                            for pf in self.stage_operation_service.resolve_performances(
+                                stage.id
+                            )
+                        ],
+                        "chats": [
+                            convert_keys_to_camel_case(chat.to_dict())
+                            for chat in self.stage_operation_service.resolve_chats(
+                                stage.file_location
+                            )
+                        ],
+                    }
+                )
+                for stage in stages
+            ]
+
+    def get_stage_by_id(self, user: UserModel, id: int):
+        with ScopedSession() as local_db_session:
+            stage = (
+                local_db_session.query(StageModel)
+                .outerjoin(UserModel)
+                .outerjoin(ParentStageModel)
+                .outerjoin(AssetModel)
+                .outerjoin(PerformanceModel)
+                .outerjoin(SceneModel, SceneModel.stage_id == StageModel.id)
+                .outerjoin(EventModel, EventModel.performance_id == PerformanceModel.id)
+                .filter(StageModel.id == id)
+                .first()
+            )
+
+            permission = self.extract_permission(user, stage)
+
+            return convert_keys_to_camel_case(
                 {
                     **stage.to_dict(),
                     "assets": [asset.child_asset.to_dict() for asset in stage.assets],
-                    "scenes": self.stage_operation_service.get_scene_list(
-                        input, stage.id
-                    ),
-                    "events": self.stage_operation_service.get_event_list(input, stage),
                     "cover": stage.cover,
                     "visibility": stage.visibility,
                     "status": stage.status,
-                    "permission": self.stage_operation_service.resolve_permission(
-                        current_user_id, stage
-                    ),
+                    "permission": permission,
                     "performances": [
                         convert_keys_to_camel_case(pf.to_dict())
                         for pf in self.stage_operation_service.resolve_performances(
@@ -196,46 +238,6 @@ class StageService:
                     ],
                 }
             )
-            for stage in stages
-        ]
-
-    def get_stage_by_id(self, user: UserModel, id: int):
-        stage = (
-            DBSession.query(StageModel)
-            .outerjoin(UserModel)
-            .outerjoin(ParentStageModel)
-            .outerjoin(AssetModel)
-            .outerjoin(PerformanceModel)
-            .outerjoin(SceneModel, SceneModel.stage_id == StageModel.id)
-            .outerjoin(EventModel, EventModel.performance_id == PerformanceModel.id)
-            .filter(StageModel.id == id)
-            .first()
-        )
-
-        permission = self.extract_permission(user, stage)
-
-        return convert_keys_to_camel_case(
-            {
-                **stage.to_dict(),
-                "assets": [asset.child_asset.to_dict() for asset in stage.assets],
-                "cover": stage.cover,
-                "visibility": stage.visibility,
-                "status": stage.status,
-                "permission": permission,
-                "performances": [
-                    convert_keys_to_camel_case(pf.to_dict())
-                    for pf in self.stage_operation_service.resolve_performances(
-                        stage.id
-                    )
-                ],
-                "chats": [
-                    convert_keys_to_camel_case(chat.to_dict())
-                    for chat in self.stage_operation_service.resolve_chats(
-                        stage.file_location
-                    )
-                ],
-            }
-        )
 
     def extract_permission(self, user, stage):
         permission = self.stage_operation_service.resolve_permission(user.id, stage)
@@ -518,15 +520,7 @@ class StageService:
             local_db_session.add(attribute)
             local_db_session.commit()
 
-        attribute = (
-            local_db_session.query(StageAttributeModel)
-            .filter(
-                StageAttributeModel.stage_id == id,
-                StageAttributeModel.name == "status",
-            )
-            .first()
-        )
-        return {"result": attribute.description}
+            return {"result": attribute.description}
 
     def update_visibility(self, user: UserModel, id: int):
         with ScopedSession() as local_db_session:
@@ -557,17 +551,9 @@ class StageService:
                 )
 
             local_db_session.add(attribute)
+            local_db_session.commit()
 
-        attribute = (
-            DBSession.query(StageAttributeModel)
-            .filter(
-                StageAttributeModel.stage_id == id,
-                StageAttributeModel.name == "visibility",
-            )
-            .first()
-        )
-
-        return {"result": attribute.description}
+            return {"result": attribute.description}
 
     def update_last_access(self, id: int):
         with ScopedSession() as local_db_session:
@@ -582,30 +568,33 @@ class StageService:
             return {"result": stage.last_access}
 
     def get_parent_stage(self):
-        return [
-            convert_keys_to_camel_case(stage.to_dict())
-            for stage in DBSession.query(ParentStageModel).all()
-        ]
+        with ScopedSession() as local_db_session:
+            return [
+                convert_keys_to_camel_case(stage.to_dict())
+                for stage in local_db_session.query(ParentStageModel).all()
+            ]
 
     def get_foyer_stage_list(self):
-        return [
-            {
-                **convert_keys_to_camel_case(stage.to_dict()),
-                "cover": stage.cover,
-            }
-            for stage in DBSession.query(StageModel)
-            .filter(StageModel.attributes.any(name="visibility", description="true"))
-            .order_by(nulls_last(StageModel.last_access.desc()))
-            .all()
-        ]
+        with ScopedSession() as local_db_session:
+            return [
+                {
+                    **convert_keys_to_camel_case(stage.to_dict()),
+                    "cover": stage.cover,
+                }
+                for stage in local_db_session.query(StageModel)
+                .filter(StageModel.attributes.any(name="visibility", description="true"))
+                .order_by(nulls_last(StageModel.last_access.desc()))
+                .all()
+            ]
 
     def get_notifications(self, user: UserModel):
-        return [
-            convert_keys_to_camel_case(
-                {"type": NotificationType.MEDIA_USAGE.value, "mediaUsage": x.to_dict()}
-            )
-            for x in DBSession.query(AssetUsageModel)
-            .filter(AssetUsageModel.approved == False)
-            .filter(AssetUsageModel.asset.has(owner_id=user.id))
-            .all()
-        ]
+        with ScopedSession() as local_db_session:
+            return [
+                convert_keys_to_camel_case(
+                    {"type": NotificationType.MEDIA_USAGE.value, "mediaUsage": x.to_dict()}
+                )
+                for x in local_db_session.query(AssetUsageModel)
+                .filter(AssetUsageModel.approved == False)
+                .filter(AssetUsageModel.asset.has(owner_id=user.id))
+                .all()
+            ]

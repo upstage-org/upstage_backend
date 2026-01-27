@@ -26,9 +26,7 @@ from users.db_models.user import UserModel, ADMIN, GUEST
 from upstage_options.db_models.config import ConfigModel
 from global_config.helpers.fernet_crypto import encrypt
 from global_config.env import UPLOAD_USER_CONTENT_FOLDER, DEMO_MEDIA_FOLDER
-from global_config.database import global_session
-
-DBSession = global_session
+from global_config.database import ScopedSession
 
 
 class bcolors:
@@ -51,8 +49,10 @@ if ENV_TYPE == 'Production':
 
 owner_id = 0
 
-owner = DBSession.query(UserModel).filter(UserModel.username == "admin").first()
-owner_id = owner.id
+with ScopedSession() as local_db_session:
+    owner = local_db_session.query(UserModel).filter(UserModel.username == "admin").first()
+    if owner:
+        owner_id = owner.id
 
 
 def scan_demo_folder():
@@ -102,52 +102,53 @@ def down_size(size):
 
 
 def create_media(type, path):
-    asset_type = (
-        DBSession.query(AssetTypeModel).filter(AssetTypeModel.name == type).first()
-    )
-    if not asset_type:
-        asset_type = AssetTypeModel(name=type, file_location="")
-        DBSession.add(asset_type)
-        DBSession.commit()
-
-    asset = AssetModel(asset_type=asset_type, owner_id=owner_id, file_location="")
-    attributes = {}
-    size = 0
-    if "." in path:
-        asset.name = os.path.basename(path).split(".")[0]
-        # copy asset to uploads folder
-        src_path = os.path.join(DEMO_MEDIA_FOLDER, type, path)
-        dest_path = os.path.join(type, path)
-        logger.warning(src_path, dest_path)
-        copy_file(src_path, dest_path, type)
-        asset.file_location = dest_path
-        size += os.path.getsize(src_path)
-        if type != "audio" and path[0] != ".":
-            attributes["w"], attributes["h"] = detect_size(type, src_path)
-    else:
-        attributes["multi"] = True
-        asset.name = path
-        for frame in os.listdir(os.path.join(DEMO_MEDIA_FOLDER, type, path)):
-            src_path = os.path.join(DEMO_MEDIA_FOLDER, type, path, frame)
-            dest_path = os.path.join(type, "{}_{}".format(path, frame))
-            copy_file(src_path, dest_path, type)
-            size += os.path.getsize(src_path)
-            if not asset.file_location:
-                asset.file_location = dest_path
-                attributes["frames"] = []
-                attributes["w"], attributes["h"] = detect_size(type, src_path)
-            attributes["frames"].append(dest_path)
-
-    asset.description = json.dumps(attributes)
-    asset.size = size
-    DBSession.add(asset)
-    DBSession.commit()
-    created_media_ids.append(asset.id)
-    logger.warning(
-        "✅ Created{} {} {}".format(
-            " multi-frame" if "multi" in attributes else "", type, path
+    with ScopedSession() as local_db_session:
+        asset_type = (
+            local_db_session.query(AssetTypeModel).filter(AssetTypeModel.name == type).first()
         )
-    )
+        if not asset_type:
+            asset_type = AssetTypeModel(name=type, file_location="")
+            local_db_session.add(asset_type)
+            local_db_session.commit()
+
+        asset = AssetModel(asset_type=asset_type, owner_id=owner_id, file_location="")
+        attributes = {}
+        size = 0
+        if "." in path:
+            asset.name = os.path.basename(path).split(".")[0]
+            # copy asset to uploads folder
+            src_path = os.path.join(DEMO_MEDIA_FOLDER, type, path)
+            dest_path = os.path.join(type, path)
+            logger.warning(src_path, dest_path)
+            copy_file(src_path, dest_path, type)
+            asset.file_location = dest_path
+            size += os.path.getsize(src_path)
+            if type != "audio" and path[0] != ".":
+                attributes["w"], attributes["h"] = detect_size(type, src_path)
+        else:
+            attributes["multi"] = True
+            asset.name = path
+            for frame in os.listdir(os.path.join(DEMO_MEDIA_FOLDER, type, path)):
+                src_path = os.path.join(DEMO_MEDIA_FOLDER, type, path, frame)
+                dest_path = os.path.join(type, "{}_{}".format(path, frame))
+                copy_file(src_path, dest_path, type)
+                size += os.path.getsize(src_path)
+                if not asset.file_location:
+                    asset.file_location = dest_path
+                    attributes["frames"] = []
+                    attributes["w"], attributes["h"] = detect_size(type, src_path)
+                attributes["frames"].append(dest_path)
+
+        asset.description = json.dumps(attributes)
+        asset.size = size
+        local_db_session.add(asset)
+        local_db_session.commit()
+        created_media_ids.append(asset.id)
+        logger.warning(
+            "✅ Created{} {} {}".format(
+                " multi-frame" if "multi" in attributes else "", type, path
+            )
+        )
 
 
 def create_demo_media():
@@ -156,40 +157,41 @@ def create_demo_media():
 
 
 def create_demo_stage():
-    if DBSession.query(StageModel).filter(StageModel.name == "Demo").first():
-        logger.warning('⏩ A stage named "Demo" already exists.')
-        return
-    stage = StageModel(
-        name="Demo Stage",
-        owner_id=owner_id,
-        description="This is a demo stage to help you learn how to use and customise UpStage for your own performances.",
-        file_location="demo",
-    )
-    status = StageAttributeModel(name="status", description="live", stage=stage)
-    stage.attributes.append(status)
+    with ScopedSession() as local_db_session:
+        if local_db_session.query(StageModel).filter(StageModel.name == "Demo").first():
+            logger.warning('⏩ A stage named "Demo" already exists.')
+            return
+        stage = StageModel(
+            name="Demo Stage",
+            owner_id=owner_id,
+            description="This is a demo stage to help you learn how to use and customise UpStage for your own performances.",
+            file_location="demo",
+        )
+        status = StageAttributeModel(name="status", description="live", stage=stage)
+        stage.attributes.append(status)
 
-    visibility = StageAttributeModel(name="visibility", description="true", stage=stage)
-    stage.attributes.append(visibility)
+        visibility = StageAttributeModel(name="visibility", description="true", stage=stage)
+        stage.attributes.append(visibility)
 
-    cover_src = os.path.join(DEMO_MEDIA_FOLDER, "demo-stage-cover.jpg")
-    cover_path = os.path.join("media", "demo-stage-cover.jpg")
-    copy_file(cover_src, cover_path, "media")
-    cover = StageAttributeModel(name="cover", description=cover_path, stage=stage)
-    stage.attributes.append(cover)
+        cover_src = os.path.join(DEMO_MEDIA_FOLDER, "demo-stage-cover.jpg")
+        cover_path = os.path.join("media", "demo-stage-cover.jpg")
+        copy_file(cover_src, cover_path, "media")
+        cover = StageAttributeModel(name="cover", description=cover_path, stage=stage)
+        stage.attributes.append(cover)
 
-    all_users = [x.id for x in DBSession.query(UserModel.id).all()]
-    accesses = [[], all_users]
-    player_access = StageAttributeModel(
-        name="playerAccess", description=json.dumps(accesses), stage=stage
-    )
-    stage.attributes.append(player_access)
+        all_users = [x.id for x in local_db_session.query(UserModel.id).all()]
+        accesses = [[], all_users]
+        player_access = StageAttributeModel(
+            name="playerAccess", description=json.dumps(accesses), stage=stage
+        )
+        stage.attributes.append(player_access)
 
-    DBSession.add(stage)
-    DBSession.commit()
-    for media_id in created_media_ids:
-        DBSession.add(ParentStageModel(stage_id=stage.id, child_asset_id=media_id))
-    DBSession.commit()
-    logger.warning("✅ Created demo stage")
+        local_db_session.add(stage)
+        local_db_session.commit()
+        for media_id in created_media_ids:
+            local_db_session.add(ParentStageModel(stage_id=stage.id, child_asset_id=media_id))
+        local_db_session.commit()
+        logger.warning("✅ Created demo stage")
 
 
 def create_demo_users():
@@ -202,59 +204,61 @@ def create_demo_users():
     guest_email = "guest@upstage.live"
     test_user_password = "12345678"
 
-    if (
-        DBSession.query(UserModel).filter(UserModel.username == admin_username).first()
-        or DBSession.query(UserModel).filter(UserModel.email == admin_email).first()
-    ):
-        logger.warning(
-            '⏩ An admin user with email "{}" already exists.'.format(admin_email)
-        )
-    else:
-        admin = UserModel()
-        admin.username = admin_username
-        admin.password = encrypt(test_user_password)
-        admin.email = admin_email
-        admin.role = ADMIN
-        admin.active = True
-        DBSession.add(admin)
-        logger.warning(
-            '✅ Created admin account with credentials: "{}" and password "{}"'.format(
-                admin_username, test_user_password
+    with ScopedSession() as local_db_session:
+        if (
+            local_db_session.query(UserModel).filter(UserModel.username == admin_username).first()
+            or local_db_session.query(UserModel).filter(UserModel.email == admin_email).first()
+        ):
+            logger.warning(
+                '⏩ An admin user with email "{}" already exists.'.format(admin_email)
             )
-        )
-
-    if (
-        DBSession.query(UserModel).filter(UserModel.username == guest_username).first()
-        or DBSession.query(UserModel).filter(UserModel.email == guest_email).first()
-    ):
-        logger.warning(
-            '⏩ A guest user with email "{}" already exists.'.format(guest_username)
-        )
-    else:
-        guest = UserModel()
-        guest.username = guest_username
-        guest.password = encrypt(test_user_password)
-        guest.email = guest_email
-        guest.role = GUEST
-        guest.active = True
-        DBSession.add(guest)
-        logger.warning(
-            '✅ Created guest account with credentials: "{}" and password "{}"'.format(
-                guest_username, test_user_password
+        else:
+            admin = UserModel()
+            admin.username = admin_username
+            admin.password = encrypt(test_user_password)
+            admin.email = admin_email
+            admin.role = ADMIN
+            admin.active = True
+            local_db_session.add(admin)
+            logger.warning(
+                '✅ Created admin account with credentials: "{}" and password "{}"'.format(
+                    admin_username, test_user_password
+                )
             )
-        )
 
-    DBSession.commit()
+        if (
+            local_db_session.query(UserModel).filter(UserModel.username == guest_username).first()
+            or local_db_session.query(UserModel).filter(UserModel.email == guest_email).first()
+        ):
+            logger.warning(
+                '⏩ A guest user with email "{}" already exists.'.format(guest_username)
+            )
+        else:
+            guest = UserModel()
+            guest.username = guest_username
+            guest.password = encrypt(test_user_password)
+            guest.email = guest_email
+            guest.role = GUEST
+            guest.active = True
+            local_db_session.add(guest)
+            logger.warning(
+                '✅ Created guest account with credentials: "{}" and password "{}"'.format(
+                    guest_username, test_user_password
+                )
+            )
+
+        local_db_session.commit()
 
 
 def save_config(name, value):
-    config = DBSession.query(ConfigModel).filter(ConfigModel.name == name).first()
-    if config:
-        config.value = value
-    else:
-        config = ConfigModel(name=name, value=value)
-        DBSession.add(config)
-    DBSession.commit()
+    with ScopedSession() as local_db_session:
+        config = local_db_session.query(ConfigModel).filter(ConfigModel.name == name).first()
+        if config:
+            config.value = value
+        else:
+            config = ConfigModel(name=name, value=value)
+            local_db_session.add(config)
+        local_db_session.commit()
 
 
 def scaffold_foyer():

@@ -19,8 +19,6 @@ from graphql import GraphQLError
 import pyotp
 import requests
 from global_config.database import (
-   
-    DBSession,
     ScopedSession,
 )
 from global_config.env import (ENV_TYPE,
@@ -46,18 +44,20 @@ class UserService:
         self.stage_operation_service = StageOperationService()
 
     def find_one(self, username: str, email: str):
-        return (
-            DBSession.query(UserModel)
-            .filter(or_(UserModel.username == username, UserModel.email == email))
-            .first()
-        )
+        with ScopedSession() as local_db_session:
+            return (
+                local_db_session.query(UserModel)
+                .filter(or_(UserModel.username == username, UserModel.email == email))
+                .first()
+            )
 
     def find_by_id(self, user_id: int):
-        return (
-            DBSession.query(UserModel)
-            .filter(UserModel.id == user_id, UserModel.active.is_(True))
-            .first()
-        )
+        with ScopedSession() as local_db_session:
+            return (
+                local_db_session.query(UserModel)
+                .filter(UserModel.id == user_id, UserModel.active.is_(True))
+                .first()
+            )
 
     async def create(self, data: CreateUserInput, request: Request):
         self.verify_captcha(data["token"], request)
@@ -82,12 +82,11 @@ class UserService:
             user.intro = data.get("intro", "")
             local_db_session.add(user)
             local_db_session.flush()
-
-        user = (
-            DBSession.query(UserModel)
-            .filter(UserModel.username == data["username"])
-            .first()
-        )
+            user = (
+                local_db_session.query(UserModel)
+                .filter(UserModel.username == data["username"])
+                .first()
+            )
 
         asyncio.create_task(
             send([user.email], f"Welcome to UpStage!", user_registration(user))
@@ -132,11 +131,12 @@ class UserService:
             )
 
     def update(self, user: UserModel):
-        DBSession.query(UserModel).filter(UserModel.id == user.id).update(
-            {**user.to_dict()}
-        )
-        DBSession.commit()
-        DBSession.flush()
+        with ScopedSession() as local_db_session:
+            local_db_session.query(UserModel).filter(UserModel.id == user.id).update(
+                {**user.to_dict()}
+            )
+            local_db_session.commit()
+            local_db_session.flush()
 
     async def request_password_reset(self, email: str):
         with ScopedSession() as local_db_session:

@@ -13,7 +13,7 @@ if projdir not in sys.path:
 from secrets import token_urlsafe
 
 from graphql import GraphQLError
-from global_config.database import ScopedSession, DBSession
+from global_config.database import ScopedSession
 from global_config.helpers.object import convert_keys_to_camel_case
 from licenses.http.validation import LicenseInput
 from assets.db_models.asset_license import AssetLicenseModel
@@ -36,7 +36,7 @@ class LicenseService:
             session.commit()
             session.flush()
             license = (
-                DBSession.query(AssetLicenseModel).filter_by(id=license.id).first()
+                session.query(AssetLicenseModel).filter_by(id=license.id).first()
             )
 
             return {
@@ -44,7 +44,10 @@ class LicenseService:
                 "assetPath": asset_path,
             }
 
-    def get_license(self, l_id, session=DBSession):
+    def get_license(self, l_id, session=None):
+        if session is None:
+            with ScopedSession() as local_db_session:
+                return local_db_session.query(AssetLicenseModel).filter_by(id=l_id).first()
         return session.query(AssetLicenseModel).filter_by(id=l_id).first()
 
     async def revoke_license(self, license_id: int):

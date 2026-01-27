@@ -21,7 +21,7 @@ import time
 from graphql import GraphQLError
 
 
-from global_config.database import ScopedSession, DBSession
+from global_config.database import ScopedSession
 from global_config.env import (
     UPLOAD_USER_CONTENT_FOLDER,
     STREAM_EXPIRY_DAYS,
@@ -57,120 +57,122 @@ class AssetService:
         pass
 
     def get_all_medias(self, user: UserModel, filter: dict = None):
-        query = (
-            DBSession.query(AssetModel)
-            .join(AssetTypeModel)
-            .join(UserModel)
-            .outerjoin(AssetLicenseModel)
-            .outerjoin(
-                ParentStageModel, AssetModel.id == ParentStageModel.child_asset_id
+        with ScopedSession() as local_db_session:
+            query = (
+                local_db_session.query(AssetModel)
+                .join(AssetTypeModel)
+                .join(UserModel)
+                .outerjoin(AssetLicenseModel)
+                .outerjoin(
+                    ParentStageModel, AssetModel.id == ParentStageModel.child_asset_id
+                )
+                .outerjoin(StageModel, ParentStageModel.stage_id == AssetModel.id)
+                .filter(AssetModel.dormant.is_not(True))
+                .order_by(AssetModel.created_on.desc())
             )
-            .outerjoin(StageModel, ParentStageModel.stage_id == AssetModel.id)
-            .filter(AssetModel.dormant.is_not(True))
-            .order_by(AssetModel.created_on.desc())
-        )
 
-        if "mediaType" in filter:
-            query = query.filter(AssetTypeModel.name == filter["mediaType"])
+            if "mediaType" in filter:
+                query = query.filter(AssetTypeModel.name == filter["mediaType"])
 
-        if "owner" in filter:
-            query = query.filter(UserModel.username == filter["owner"])
+            if "owner" in filter:
+                query = query.filter(UserModel.username == filter["owner"])
 
-        assets = query.all()
+            assets = query.all()
 
-        return [self.resolve_fields(asset, user) for asset in assets]
+            return [self.resolve_fields(asset, user) for asset in assets]
 
     def search_assets(self, user: UserModel, search_assets: MediaTableInput):
-        query = (
-            DBSession.query(AssetModel)
-            .join(UserModel)
-            .join(AssetTypeModel)
-            .outerjoin(AssetLicenseModel)
-            .outerjoin(
-                ParentStageModel, AssetModel.id == ParentStageModel.child_asset_id
-            )
-            .outerjoin(StageModel, ParentStageModel.stage_id == AssetModel.id)
-            .group_by(AssetModel.id)
-        )
-
-        if user.role not in [SUPER_ADMIN, ADMIN]:
-            query = query.filter(AssetModel.dormant.is_not(True))
-        elif search_assets.dormant is not None:
-            query = query.filter(AssetModel.dormant.is_(search_assets.dormant))
-
-        if search_assets.name:
-            query = query.filter(AssetModel.name.ilike(f"%{search_assets.name}%"))
-        if search_assets.mediaTypes:
-            query = query.filter(AssetTypeModel.name.in_(search_assets.mediaTypes))
-        if search_assets.owners:
-            query = query.filter(UserModel.username.in_(search_assets.owners))
-
-        if search_assets.stages:
-            query = query.filter(
-                AssetModel.stages.any(
-                    ParentStageModel.stage_id.in_(search_assets.stages)
-                )
-            )
-        if search_assets.tags:
+        with ScopedSession() as local_db_session:
             query = (
-                query.join(MediaTagModel)
-                .join(TagModel)
-                .filter(TagModel.name.in_(search_assets.tags))
-            )
-        if search_assets.createdBetween:
-            query = query.filter(
-                AssetModel.created_on.between(
-                    search_assets.createdBetween[0], search_assets.createdBetween[1]
+                local_db_session.query(AssetModel)
+                .join(UserModel)
+                .join(AssetTypeModel)
+                .outerjoin(AssetLicenseModel)
+                .outerjoin(
+                    ParentStageModel, AssetModel.id == ParentStageModel.child_asset_id
                 )
+                .outerjoin(StageModel, ParentStageModel.stage_id == AssetModel.id)
+                .group_by(AssetModel.id)
             )
 
-        total_count = query.count()
+            if user.role not in [SUPER_ADMIN, ADMIN]:
+                query = query.filter(AssetModel.dormant.is_not(True))
+            elif search_assets.dormant is not None:
+                query = query.filter(AssetModel.dormant.is_(search_assets.dormant))
 
-        if search_assets.sort:
-            sort_option = search_assets.sort[-1]
-            field, direction = sort_option.rsplit("_", 1)
-            if field == "ASSET_TYPE_ID":
-                sort_field = AssetModel.asset_type_id
-            elif field == "OWNER_ID":
-                sort_field = AssetModel.owner_id
-            elif field == "NAME":
-                sort_field = AssetModel.name
-            elif field == "CREATED_ON":
-                sort_field = AssetModel.created_on
-            elif field == "SIZE":
-                sort_field = AssetModel.size
-            elif field == "COPYRIGHT_LEVEL":
-                sort_field = AssetModel.copyright_level
+            if search_assets.name:
+                query = query.filter(AssetModel.name.ilike(f"%{search_assets.name}%"))
+            if search_assets.mediaTypes:
+                query = query.filter(AssetTypeModel.name.in_(search_assets.mediaTypes))
+            if search_assets.owners:
+                query = query.filter(UserModel.username.in_(search_assets.owners))
 
-            if direction == "ASC":
-                query = query.order_by(sort_field.asc())
-            elif direction == "DESC":
-                query = query.order_by(sort_field.desc())
+            if search_assets.stages:
+                query = query.filter(
+                    AssetModel.stages.any(
+                        ParentStageModel.stage_id.in_(search_assets.stages)
+                    )
+                )
+            if search_assets.tags:
+                query = (
+                    query.join(MediaTagModel)
+                    .join(TagModel)
+                    .filter(TagModel.name.in_(search_assets.tags))
+                )
+            if search_assets.createdBetween:
+                query = query.filter(
+                    AssetModel.created_on.between(
+                        search_assets.createdBetween[0], search_assets.createdBetween[1]
+                    )
+                )
 
-        if search_assets.page and search_assets.limit:
-            query = query.limit(search_assets.limit).offset(
-                (search_assets.page - 1) * search_assets.limit
-            )
-        assets = query.all()
+            total_count = query.count()
 
-        return {
-            "totalCount": total_count,
-            "edges": [
-                {
-                    **convert_keys_to_camel_case(asset.to_dict()),
-                    "privilege": self.resolve_privilege(user.id, asset),
-                    "stages": [
-                        convert_keys_to_camel_case(item.stage.to_dict())
-                        for item in asset.stages
-                    ],
-                    "permissions": [
-                        convert_keys_to_camel_case(permission.to_dict())
-                        for permission in self.resolve_permissions(asset.id)
-                    ],
-                }
-                for asset in assets
-            ],
-        }
+            if search_assets.sort:
+                sort_option = search_assets.sort[-1]
+                field, direction = sort_option.rsplit("_", 1)
+                if field == "ASSET_TYPE_ID":
+                    sort_field = AssetModel.asset_type_id
+                elif field == "OWNER_ID":
+                    sort_field = AssetModel.owner_id
+                elif field == "NAME":
+                    sort_field = AssetModel.name
+                elif field == "CREATED_ON":
+                    sort_field = AssetModel.created_on
+                elif field == "SIZE":
+                    sort_field = AssetModel.size
+                elif field == "COPYRIGHT_LEVEL":
+                    sort_field = AssetModel.copyright_level
+
+                if direction == "ASC":
+                    query = query.order_by(sort_field.asc())
+                elif direction == "DESC":
+                    query = query.order_by(sort_field.desc())
+
+            if search_assets.page and search_assets.limit:
+                query = query.limit(search_assets.limit).offset(
+                    (search_assets.page - 1) * search_assets.limit
+                )
+            assets = query.all()
+
+            return {
+                "totalCount": total_count,
+                "edges": [
+                    {
+                        **convert_keys_to_camel_case(asset.to_dict()),
+                        "privilege": self.resolve_privilege(user.id, asset),
+                        "stages": [
+                            convert_keys_to_camel_case(item.stage.to_dict())
+                            for item in asset.stages
+                        ],
+                        "permissions": [
+                            convert_keys_to_camel_case(permission.to_dict())
+                            for permission in self.resolve_permissions(asset.id)
+                        ],
+                    }
+                    for asset in assets
+                ],
+            }
 
     def upload_file(self, user: UserModel, base64: str, filename: str):
         file_size = self.file_handing.get_file_size(base64)
@@ -594,44 +596,47 @@ class AssetService:
         }
 
     def get_media_types(self):
-        return [
-            convert_keys_to_camel_case(type.to_dict())
-            for type in DBSession.query(AssetTypeModel)
-            .order_by(AssetTypeModel.name.asc())
-            .all()
-        ]
+        with ScopedSession() as local_db_session:
+            return [
+                convert_keys_to_camel_case(type.to_dict())
+                for type in local_db_session.query(AssetTypeModel)
+                .order_by(AssetTypeModel.name.asc())
+                .all()
+            ]
 
     def get_tags(self):
-        return [
-            convert_keys_to_camel_case(tag.to_dict())
-            for tag in DBSession.query(TagModel).order_by(TagModel.name.asc()).all()
-        ]
+        with ScopedSession() as local_db_session:
+            return [
+                convert_keys_to_camel_case(tag.to_dict())
+                for tag in local_db_session.query(TagModel).order_by(TagModel.name.asc()).all()
+            ]
 
     def get_voices(self):
-        voices = []
-        for media in (
-            DBSession.query(AssetModel)
-            .filter(AssetModel.asset_type.has(AssetTypeModel.name == "avatar"))
-            .all()
-        ):
-            if media.description:
-                attributes = json.loads(media.description)
-                if "voice" in attributes:
-                    voice = attributes["voice"]
-                    if voice and voice["voice"]:
-                        av = AvatarVoice()
-                        av.voice = voice["voice"]
-                        av.variant = voice["variant"]
-                        for key in ["pitch", "speed", "amplitude"]:
-                            if key in voice:
-                                setattr(av, key, int(voice[key]))
-                            else:
-                                if key == "speed":
-                                    setattr(av, key, 175)
+        with ScopedSession() as local_db_session:
+            voices = []
+            for media in (
+                local_db_session.query(AssetModel)
+                .filter(AssetModel.asset_type.has(AssetTypeModel.name == "avatar"))
+                .all()
+            ):
+                if media.description:
+                    attributes = json.loads(media.description)
+                    if "voice" in attributes:
+                        voice = attributes["voice"]
+                        if voice and voice["voice"]:
+                            av = AvatarVoice()
+                            av.voice = voice["voice"]
+                            av.variant = voice["variant"]
+                            for key in ["pitch", "speed", "amplitude"]:
+                                if key in voice:
+                                    setattr(av, key, int(voice[key]))
                                 else:
-                                    setattr(av, key, 50)
-                        voices.append(Voice(avatar=media, voice=av))
-        return [convert_keys_to_camel_case(voice) for voice in voices]
+                                    if key == "speed":
+                                        setattr(av, key, 175)
+                                    else:
+                                        setattr(av, key, 50)
+                            voices.append(Voice(avatar=media, voice=av))
+            return [convert_keys_to_camel_case(voice) for voice in voices]
 
     def resolve_privilege(self, user_id: int, asset: AssetModel):
         if not user_id:
@@ -642,24 +647,26 @@ class AssetService:
             return Previlege.APPROVED.value
         if asset.copyright_level == 3:
             return Previlege.NONE.value
-        usage = (
-            DBSession.query(AssetUsageModel)
-            .filter(AssetUsageModel.asset_id == asset.id)
-            .filter(AssetUsageModel.user_id == user_id)
-            .first()
-        )
-        if usage:
-            if not usage.approved and asset.copyright_level == 2:
-                return Previlege.PENDING_APPROVAL.value
+        with ScopedSession() as local_db_session:
+            usage = (
+                local_db_session.query(AssetUsageModel)
+                .filter(AssetUsageModel.asset_id == asset.id)
+                .filter(AssetUsageModel.user_id == user_id)
+                .first()
+            )
+            if usage:
+                if not usage.approved and asset.copyright_level == 2:
+                    return Previlege.PENDING_APPROVAL.value
+                else:
+                    return Previlege.APPROVED.value
             else:
-                return Previlege.APPROVED.value
-        else:
-            return Previlege.REQUIRE_APPROVAL.value
+                return Previlege.REQUIRE_APPROVAL.value
 
     def resolve_permissions(self, asset_id: int):
-        return (
-            DBSession.query(AssetUsageModel)
-            .filter(AssetUsageModel.asset_id == asset_id)
-            .order_by(AssetUsageModel.created_on.desc())
-            .all()
-        )
+        with ScopedSession() as local_db_session:
+            return (
+                local_db_session.query(AssetUsageModel)
+                .filter(AssetUsageModel.asset_id == asset_id)
+                .order_by(AssetUsageModel.created_on.desc())
+                .all()
+            )

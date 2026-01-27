@@ -16,7 +16,7 @@ import base64
 import pytest
 from main import app
 from global_config.env import JWT_HEADER_NAME
-from global_config.database import DBSession
+from global_config.database import ScopedSession
 from assets.http.schema import asset_graphql_app
 from authentication.tests.auth_test import TestAuthenticationController
 from assets.db_models.asset import AssetModel
@@ -145,8 +145,9 @@ class TestAssetController:
             }
         """
 
-        stages = DBSession.query(StageModel).all()
-        users = DBSession.query(UserModel).all()
+        with ScopedSession() as local_db_session:
+            stages = local_db_session.query(StageModel).all()
+            users = local_db_session.query(UserModel).all()
 
         variables = {
             "input": {
@@ -174,7 +175,8 @@ class TestAssetController:
 
     async def test_05_search_assets(self, client):
         data = await test_AuthenticationController.test_02_login_successfully(client)
-        asset = DBSession.query(AssetModel).join(UserModel).first()
+        with ScopedSession() as local_db_session:
+            asset = local_db_session.query(AssetModel).join(UserModel).first()
         headers = {
             "Authorization": f"Bearer {data['data']['login']['access_token']}",
             JWT_HEADER_NAME: data["data"]["login"]["refresh_token"],
@@ -192,8 +194,9 @@ class TestAssetController:
             }
         """
 
-        users = DBSession.query(UserModel).all()
-        stages = DBSession.query(StageModel).all()
+        with ScopedSession() as local_db_session:
+            users = local_db_session.query(UserModel).all()
+            stages = local_db_session.query(StageModel).all()
 
         response = client.post(
             "/api/studio_graphql",
@@ -230,7 +233,8 @@ class TestAssetController:
 
     async def test_06_get_all_medias(self, client):
         data = await test_AuthenticationController.test_02_login_successfully(client)
-        asset = DBSession.query(AssetModel).join(UserModel).first()
+        with ScopedSession() as local_db_session:
+            asset = local_db_session.query(AssetModel).join(UserModel).first()
         headers = {
             "Authorization": f"Bearer {data['data']['login']['access_token']}",
             JWT_HEADER_NAME: data["data"]["login"]["refresh_token"],
@@ -269,7 +273,8 @@ class TestAssetController:
 
     async def test_07_update_media(self, client):
         data = await test_AuthenticationController.test_02_login_successfully(client)
-        asset = DBSession.query(AssetModel).join(UserModel).first()
+        with ScopedSession() as local_db_session:
+            asset = local_db_session.query(AssetModel).join(UserModel).first()
 
         headers = {
             "Authorization": f"Bearer {data['data']['login']['access_token']}",
@@ -313,7 +318,8 @@ class TestAssetController:
         data = await test_AuthenticationController.test_player_login_successfully(
             client
         )
-        asset = DBSession.query(AssetModel).join(UserModel).first()
+        with ScopedSession() as local_db_session:
+            asset = local_db_session.query(AssetModel).join(UserModel).first()
 
         headers = {
             "Authorization": f"Bearer {data['data']['login']['access_token']}",
@@ -354,7 +360,8 @@ class TestAssetController:
         assert response.status_code == 200
 
     async def test_09_delete_media_failed(self, client):
-        asset = DBSession.query(AssetModel).first()
+        with ScopedSession() as local_db_session:
+            asset = local_db_session.query(AssetModel).first()
         data = await test_AuthenticationController.test_player_login_successfully(
             client
         )
@@ -394,7 +401,8 @@ class TestAssetController:
         assert response.status_code == 200
 
     async def test_10_delete_media(self, client):
-        asset = DBSession.query(AssetModel).first()
+        with ScopedSession() as local_db_session:
+            asset = local_db_session.query(AssetModel).first()
         data = await test_AuthenticationController.test_02_login_successfully(client)
         headers = {
             "Authorization": f"Bearer {data['data']['login']['access_token']}",
@@ -417,8 +425,9 @@ class TestAssetController:
         )
         assert response.status_code == 200
 
-        asset = DBSession.query(AssetModel).filter_by(id=asset.id).first()
-        assert asset is None
+        with ScopedSession() as local_db_session:
+            asset = local_db_session.query(AssetModel).filter_by(id=asset.id).first()
+            assert asset is None
 
     async def test_11_upload_file_with_large_file(self, client):
         data = await test_AuthenticationController.test_02_login_successfully(client)

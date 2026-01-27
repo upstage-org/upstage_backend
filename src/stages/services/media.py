@@ -24,7 +24,6 @@ from assets.db_models.media_tag import MediaTagModel
 from assets.services.asset import AssetService
 from assets.services.asset_license import AssetLicenseService
 from global_config.database import (
-    DBSession,
     ScopedSession,
 )
 from global_config.env import UPLOAD_USER_CONTENT_FOLDER
@@ -122,7 +121,7 @@ class MediaService:
             asset.description = self.process_uploaded_frames(input, asset, asset_type)
             local_db_session.commit()
             local_db_session.flush()
-            asset = DBSession.query(AssetModel).filter_by(id=asset.id).first()
+            asset = local_db_session.query(AssetModel).filter_by(id=asset.id).first()
             return convert_keys_to_camel_case(asset.to_dict())
 
     def retrieve_asset(self, input, local_db_session):

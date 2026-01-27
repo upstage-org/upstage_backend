@@ -18,7 +18,7 @@ from global_config.database import ScopedSession
 from assets.db_models.asset import AssetModel
 from main import app
 from global_config.env import JWT_HEADER_NAME
-from global_config.database import DBSession
+from global_config.database import ScopedSession
 from stages.db_models.parent_stage import ParentStageModel
 from stages.db_models.stage_attribute import StageAttributeModel
 from users.db_models.user import PLAYER, SUPER_ADMIN
@@ -117,8 +117,9 @@ class TestStageController:
 
     async def test_02_update_stage(self, client):
         data = await test_AuthenticationController.test_02_login_successfully(client)
-        stage = DBSession.query(StageModel).first()
-        response = self.update_stage(client, stage.id, data)
+        with ScopedSession() as local_db_session:
+            stage = local_db_session.query(StageModel).first()
+            response = self.update_stage(client, stage.id, data)
         print(response)
         assert "errors" not in response
         return response
