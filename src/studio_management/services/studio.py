@@ -135,11 +135,13 @@ class StudioService:
                 .all()
             )
 
-            self.stage_operation_service.assign_user_to_default_stage(
-                [user.id for user in users]
-            )
+            # Convert to dicts while objects are still attached to session
+            users_dict = [user.to_dict() for user in users]
+            user_ids = [user.id for user in users]
 
-            return convert_keys_to_camel_case({"users": [user.to_dict() for user in users]})
+            self.stage_operation_service.assign_user_to_default_stage(user_ids)
+
+            return convert_keys_to_camel_case({"users": users_dict})
 
     def validate_user_information(self, users: List[BatchUserInput], session):
         for user in users:

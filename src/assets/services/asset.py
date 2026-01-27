@@ -78,7 +78,8 @@ class AssetService:
                 query = query.filter(UserModel.username == filter["owner"])
 
             assets = query.all()
-
+            
+            # Process all assets while still in session context to access relationships
             return [self.resolve_fields(asset, user) for asset in assets]
 
     def search_assets(self, user: UserModel, search_assets: MediaTableInput):
@@ -155,23 +156,29 @@ class AssetService:
                 )
             assets = query.all()
 
+            # Process all assets while still in session context
+            edges = []
+            for asset in assets:
+                asset_dict = asset.to_dict()
+                # Access relationships while object is still attached to session
+                stages_list = [
+                    convert_keys_to_camel_case(item.stage.to_dict())
+                    for item in asset.stages
+                ]
+                permissions_list = [
+                    convert_keys_to_camel_case(permission.to_dict())
+                    for permission in self.resolve_permissions(asset.id)
+                ]
+                edges.append({
+                    **convert_keys_to_camel_case(asset_dict),
+                    "privilege": self.resolve_privilege(user.id, asset),
+                    "stages": stages_list,
+                    "permissions": permissions_list,
+                })
+
             return {
                 "totalCount": total_count,
-                "edges": [
-                    {
-                        **convert_keys_to_camel_case(asset.to_dict()),
-                        "privilege": self.resolve_privilege(user.id, asset),
-                        "stages": [
-                            convert_keys_to_camel_case(item.stage.to_dict())
-                            for item in asset.stages
-                        ],
-                        "permissions": [
-                            convert_keys_to_camel_case(permission.to_dict())
-                            for permission in self.resolve_permissions(asset.id)
-                        ],
-                    }
-                    for asset in assets
-                ],
+                "edges": edges,
             }
 
     def upload_file(self, user: UserModel, base64: str, filename: str):
@@ -575,24 +582,45 @@ class AssetService:
         return "none"
 
     def resolve_fields(self, asset: AssetModel, user: Optional[UserModel] = None):
+        # Access all data while asset might still be attached to session
+        # If asset is detached, we'll reload it in a new session
+        from sqlalchemy.orm import object_session
+        
+        session = object_session(asset)
+        if session is None:
+            # Asset is detached, reload in new session
+            with ScopedSession() as local_db_session:
+                asset = local_db_session.query(AssetModel).filter_by(id=asset.id).first()
+                asset_dict = asset.to_dict()
+                stages_list = [
+                    convert_keys_to_camel_case(item.stage.to_dict())
+                    for item in asset.stages
+                ]
+        else:
+            # Asset is still attached, access relationships now
+            asset_dict = asset.to_dict()
+            stages_list = [
+                convert_keys_to_camel_case(item.stage.to_dict())
+                for item in asset.stages
+            ]
+        
         src = self.resolve_src(asset)
         sign = self.resolve_sign(asset.owner, asset)
         user_id = user.id if user else asset.owner_id
         permission = self.resolve_permission(user_id, asset)
+        permissions_list = [
+            convert_keys_to_camel_case(permission.to_dict())
+            for permission in self.resolve_permissions(asset.id)
+        ]
+        
         return {
-            **convert_keys_to_camel_case(asset.to_dict()),
+            **convert_keys_to_camel_case(asset_dict),
             "src": src,
             "sign": sign,
             "permission": permission,
             "privilege": self.resolve_privilege(user.id if user else None, asset),
-            "stages": [
-                convert_keys_to_camel_case(item.stage.to_dict())
-                for item in asset.stages
-            ],
-            "permissions": [
-                convert_keys_to_camel_case(permission.to_dict())
-                for permission in self.resolve_permissions(asset.id)
-            ],
+            "stages": stages_list,
+            "permissions": permissions_list,
         }
 
     def get_media_types(self):

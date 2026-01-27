@@ -87,6 +87,8 @@ class UserService:
                 .filter(UserModel.username == data["username"])
                 .first()
             )
+            # Convert to dict while object is still attached to session
+            user_dict = user.to_dict()
 
         asyncio.create_task(
             send([user.email], f"Welcome to UpStage!", user_registration(user))
@@ -103,7 +105,7 @@ class UserService:
 
         self.stage_operation_service.assign_user_to_default_stage([user.id])
 
-        return {"user": user.to_dict()}
+        return {"user": user_dict}
 
     def verify_captcha(self, token: str, request: Request):
         if ENV_TYPE != "Production":
@@ -132,8 +134,18 @@ class UserService:
 
     def update(self, user: UserModel):
         with ScopedSession() as local_db_session:
+            # Reload user in session to ensure it's attached
+            from sqlalchemy.orm import object_session
+            session = object_session(user)
+            if session is None:
+                # User is detached, reload it
+                user = local_db_session.query(UserModel).filter_by(id=user.id).first()
+            
+            # Get dict while user is attached to a session
+            user_dict = user.to_dict()
+            
             local_db_session.query(UserModel).filter(UserModel.id == user.id).update(
-                {**user.to_dict()}
+                user_dict
             )
             local_db_session.commit()
             local_db_session.flush()

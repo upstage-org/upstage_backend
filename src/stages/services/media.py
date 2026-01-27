@@ -66,7 +66,9 @@ class MediaService:
                 local_db_session.add(media)
 
             local_db_session.flush()
-            return convert_keys_to_camel_case(stage.to_dict())
+            # Convert to dict while object is still attached to session
+            stage_dict = stage.to_dict()
+            return convert_keys_to_camel_case(stage_dict)
 
     def upload_media(self, user: UserModel, input: UploadMediaInput):
         with ScopedSession() as local_db_session:
@@ -122,7 +124,9 @@ class MediaService:
             local_db_session.commit()
             local_db_session.flush()
             asset = local_db_session.query(AssetModel).filter_by(id=asset.id).first()
-            return convert_keys_to_camel_case(asset.to_dict())
+            # Convert to dict while object is still attached to session
+            asset_dict = asset.to_dict()
+            return convert_keys_to_camel_case(asset_dict)
 
     def retrieve_asset(self, input, local_db_session):
         if input.id:

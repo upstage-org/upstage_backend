@@ -69,7 +69,9 @@ class SceneService:
             local_db_session.commit()
             local_db_session.flush()
             scene = local_db_session.query(SceneModel).filter_by(id=scene.id).first()
-            return convert_keys_to_camel_case(scene)
+            # Convert to dict while object is still attached to session
+            scene_dict = scene.to_dict()
+            return convert_keys_to_camel_case(scene_dict)
 
     def delete_scene(self, user: UserModel, id: int):
         with ScopedSession() as local_db_session:

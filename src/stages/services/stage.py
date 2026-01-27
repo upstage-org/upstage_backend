@@ -105,14 +105,22 @@ class StageService:
             for stage in data:
                 permission = self.stage_operation_service.resolve_permission(user.id, stage)
                 if permission in access:
+                    # Access properties and relationships while object is still attached to session
+                    stage_dict = stage.to_dict()
+                    cover = stage.cover
+                    visibility = stage.visibility
+                    status = stage.status
+                    # Access assets relationship while still in session
+                    assets_list = [asset.child_asset.to_dict() for asset in stage.assets]
                     stages.append(
                         convert_keys_to_camel_case(
                             {
-                                **stage.to_dict(),
-                                "cover": stage.cover,
-                                "visibility": stage.visibility,
-                                "status": stage.status,
+                                **stage_dict,
+                                "cover": cover,
+                                "visibility": visibility,
+                                "status": status,
                                 "permission": permission,
+                                "assets": assets_list,
                             }
                         )
                     )
@@ -130,15 +138,7 @@ class StageService:
             paginated_stages = stages[start:end]
 
             return {
-                "edges": [
-                    {
-                        **stage,
-                        "assets": [
-                            asset.child_asset.to_dict() for asset in stage["assets"]
-                        ],
-                    }
-                    for stage in paginated_stages
-                ],
+                "edges": paginated_stages,
                 "totalCount": total_count,
             }
 
@@ -168,37 +168,48 @@ class StageService:
             query = query.order_by(StageModel.id)
             stages = query.all()
 
-            return [
-                convert_keys_to_camel_case(
-                    {
-                        **stage.to_dict(),
-                        "assets": [asset.child_asset.to_dict() for asset in stage.assets],
-                        "scenes": self.stage_operation_service.get_scene_list(
-                            input, stage.id
-                        ),
-                        "events": self.stage_operation_service.get_event_list(input, stage),
-                        "cover": stage.cover,
-                        "visibility": stage.visibility,
-                        "status": stage.status,
-                        "permission": self.stage_operation_service.resolve_permission(
-                            current_user_id, stage
-                        ),
-                        "performances": [
-                            convert_keys_to_camel_case(pf.to_dict())
-                            for pf in self.stage_operation_service.resolve_performances(
-                                stage.id
-                            )
-                        ],
-                        "chats": [
-                            convert_keys_to_camel_case(chat.to_dict())
-                            for chat in self.stage_operation_service.resolve_chats(
-                                stage.file_location
-                            )
-                        ],
-                    }
+            # Process all stages while still in session context to access relationships
+            result = []
+            for stage in stages:
+                stage_dict = stage.to_dict()
+                # Access relationships while object is still attached to session
+                assets_list = [asset.child_asset.to_dict() for asset in stage.assets]
+                cover = stage.cover
+                visibility = stage.visibility
+                status = stage.status
+                
+                result.append(
+                    convert_keys_to_camel_case(
+                        {
+                            **stage_dict,
+                            "assets": assets_list,
+                            "scenes": self.stage_operation_service.get_scene_list(
+                                input, stage.id
+                            ),
+                            "events": self.stage_operation_service.get_event_list(input, stage),
+                            "cover": cover,
+                            "visibility": visibility,
+                            "status": status,
+                            "permission": self.stage_operation_service.resolve_permission(
+                                current_user_id, stage
+                            ),
+                            "performances": [
+                                convert_keys_to_camel_case(pf.to_dict())
+                                for pf in self.stage_operation_service.resolve_performances(
+                                    stage.id
+                                )
+                            ],
+                            "chats": [
+                                convert_keys_to_camel_case(chat.to_dict())
+                                for chat in self.stage_operation_service.resolve_chats(
+                                    stage.file_location
+                                )
+                            ],
+                        }
+                    )
                 )
-                for stage in stages
-            ]
+            
+            return result
 
     def get_stage_by_id(self, user: UserModel, id: int):
         with ScopedSession() as local_db_session:
@@ -216,26 +227,35 @@ class StageService:
 
             permission = self.extract_permission(user, stage)
 
+            # Convert to dict and access relationships while object is still attached to session
+            stage_dict = stage.to_dict()
+            assets_list = [asset.child_asset.to_dict() for asset in stage.assets]
+            cover = stage.cover
+            visibility = stage.visibility
+            status = stage.status
+            performances = [
+                convert_keys_to_camel_case(pf.to_dict())
+                for pf in self.stage_operation_service.resolve_performances(
+                    stage.id
+                )
+            ]
+            chats = [
+                convert_keys_to_camel_case(chat.to_dict())
+                for chat in self.stage_operation_service.resolve_chats(
+                    stage.file_location
+                )
+            ]
+
             return convert_keys_to_camel_case(
                 {
-                    **stage.to_dict(),
-                    "assets": [asset.child_asset.to_dict() for asset in stage.assets],
-                    "cover": stage.cover,
-                    "visibility": stage.visibility,
-                    "status": stage.status,
+                    **stage_dict,
+                    "assets": assets_list,
+                    "cover": cover,
+                    "visibility": visibility,
+                    "status": status,
                     "permission": permission,
-                    "performances": [
-                        convert_keys_to_camel_case(pf.to_dict())
-                        for pf in self.stage_operation_service.resolve_performances(
-                            stage.id
-                        )
-                    ],
-                    "chats": [
-                        convert_keys_to_camel_case(chat.to_dict())
-                        for chat in self.stage_operation_service.resolve_chats(
-                            stage.file_location
-                        )
-                    ],
+                    "performances": performances,
+                    "chats": chats,
                 }
             )
 
@@ -279,7 +299,9 @@ class StageService:
             self.update_stage_attribute(
                 stage.id, "playerAccess", input.playerAccess, local_db_session
             )
-            return convert_keys_to_camel_case(stage.to_dict())
+            # Convert to dict while object is still attached to session
+            stage_dict = stage.to_dict()
+            return convert_keys_to_camel_case(stage_dict)
 
     def update_stage(self, user: UserModel, input: UpdateStageInput):
         with ScopedSession() as local_db_session:
@@ -323,7 +345,9 @@ class StageService:
             self.update_stage_attribute(
                 stage.id, "config", input.config, local_db_session
             )
-            return convert_keys_to_camel_case(stage.to_dict())
+            # Convert to dict while object is still attached to session
+            stage_dict = stage.to_dict()
+            return convert_keys_to_camel_case(stage_dict)
 
     def update_stage_attribute(
         self, stage_id: int, name: str, value: str, local_db_session
@@ -411,7 +435,9 @@ class StageService:
             self.copy_data(input, local_db_session, new_stage)
 
             local_db_session.flush()
-            return convert_keys_to_camel_case(new_stage.to_dict())
+            # Convert to dict while object is still attached to session
+            new_stage_dict = new_stage.to_dict()
+            return convert_keys_to_camel_case(new_stage_dict)
 
     def copy_data(
         self, input: DuplicateStageInput, local_db_session, new_stage: StageModel
@@ -486,8 +512,9 @@ class StageService:
             else:
                 raise GraphQLError("The stage is already sweeped!")
 
+            performance_id = performance.id
             return convert_keys_to_camel_case(
-                {"success": True, "performanceId": performance.id}
+                {"success": True, "performanceId": performance_id}
             )
 
     def update_status(self, user: UserModel, id: int):
@@ -519,8 +546,9 @@ class StageService:
                 )
             local_db_session.add(attribute)
             local_db_session.commit()
-
-            return {"result": attribute.description}
+            # Get description while object is still attached to session
+            result = attribute.description
+            return {"result": result}
 
     def update_visibility(self, user: UserModel, id: int):
         with ScopedSession() as local_db_session:
@@ -552,8 +580,9 @@ class StageService:
 
             local_db_session.add(attribute)
             local_db_session.commit()
-
-            return {"result": attribute.description}
+            # Get description while object is still attached to session
+            result = attribute.description
+            return {"result": result}
 
     def update_last_access(self, id: int):
         with ScopedSession() as local_db_session:
@@ -565,36 +594,48 @@ class StageService:
 
             stage.last_access = datetime.now()
             local_db_session.commit()
-            return {"result": stage.last_access}
+            # Get last_access while object is still attached to session
+            result = stage.last_access
+            return {"result": result}
 
     def get_parent_stage(self):
         with ScopedSession() as local_db_session:
+            stages = local_db_session.query(ParentStageModel).all()
+            # Convert to dicts while objects are still attached to session
             return [
                 convert_keys_to_camel_case(stage.to_dict())
-                for stage in local_db_session.query(ParentStageModel).all()
+                for stage in stages
             ]
 
     def get_foyer_stage_list(self):
         with ScopedSession() as local_db_session:
+            stages = (
+                local_db_session.query(StageModel)
+                .filter(StageModel.attributes.any(name="visibility", description="true"))
+                .order_by(nulls_last(StageModel.last_access.desc()))
+                .all()
+            )
+            # Convert to dicts and access properties while objects are still attached to session
             return [
                 {
                     **convert_keys_to_camel_case(stage.to_dict()),
                     "cover": stage.cover,
                 }
-                for stage in local_db_session.query(StageModel)
-                .filter(StageModel.attributes.any(name="visibility", description="true"))
-                .order_by(nulls_last(StageModel.last_access.desc()))
-                .all()
+                for stage in stages
             ]
 
     def get_notifications(self, user: UserModel):
         with ScopedSession() as local_db_session:
+            usages = (
+                local_db_session.query(AssetUsageModel)
+                .filter(AssetUsageModel.approved == False)
+                .filter(AssetUsageModel.asset.has(owner_id=user.id))
+                .all()
+            )
+            # Convert to dicts while objects are still attached to session
             return [
                 convert_keys_to_camel_case(
                     {"type": NotificationType.MEDIA_USAGE.value, "mediaUsage": x.to_dict()}
                 )
-                for x in local_db_session.query(AssetUsageModel)
-                .filter(AssetUsageModel.approved == False)
-                .filter(AssetUsageModel.asset.has(owner_id=user.id))
-                .all()
+                for x in usages
             ]

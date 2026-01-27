@@ -68,7 +68,9 @@ class PerformanceService:
             performance = (
                 local_db_session.query(PerformanceModel).filter_by(id=performance.id).first()
             )
-            return convert_keys_to_camel_case(performance)
+            # Convert to dict while object is still attached to session
+            performance_dict = performance.to_dict()
+            return convert_keys_to_camel_case(performance_dict)
 
     def update_performance(self, user: UserModel, input: PerformanceInput):
         with ScopedSession() as local_db_session:
