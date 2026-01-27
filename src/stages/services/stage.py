@@ -15,7 +15,7 @@ from datetime import datetime
 from graphql import GraphQLError
 import jwt
 from requests import Request
-from sqlalchemy import and_, nulls_last
+from sqlalchemy import and_, nulls_last, exists
 from global_config.database import (
     DBSession,
     ScopedSession,
@@ -47,6 +47,22 @@ from assets.db_models.asset import AssetModel
 class StageService:
     def __init__(self):
         self.stage_operation_service = StageOperationService()
+
+    def _safe_db_query(self, query_func):
+        """
+        Safely execute a DBSession query with automatic rollback on error.
+        This prevents "current transaction is aborted" errors.
+        """
+        try:
+            return query_func()
+        except Exception as e:
+            # Rollback the transaction if it's in a failed state
+            try:
+                DBSession.rollback()
+            except:
+                pass
+            # Re-raise the original error
+            raise
 
     def get_all_stages(self, user: UserModel, input: SearchStageInput):
         query = (
@@ -588,24 +604,59 @@ class StageService:
         ]
 
     def get_foyer_stage_list(self):
-        return [
-            {
-                **convert_keys_to_camel_case(stage.to_dict()),
-                "cover": stage.cover,
-            }
-            for stage in DBSession.query(StageModel)
-            .filter(StageModel.attributes.any(name="visibility", description="true"))
-            .order_by(nulls_last(StageModel.last_access.desc()))
-            .all()
-        ]
+        try:
+            # Use explicit EXISTS subquery instead of .any() to avoid transaction issues
+            visibility_filter = exists().where(
+                and_(
+                    StageAttributeModel.stage_id == StageModel.id,
+                    StageAttributeModel.name == "visibility",
+                    StageAttributeModel.description == "true"
+                )
+            )
+            
+            stages = (
+                DBSession.query(StageModel)
+                .filter(visibility_filter)
+                .order_by(nulls_last(StageModel.last_access.desc()))
+                .all()
+            )
+            
+            return [
+                {
+                    **convert_keys_to_camel_case(stage.to_dict()),
+                    "cover": stage.cover,
+                }
+                for stage in stages
+            ]
+        except Exception as e:
+            # Rollback the transaction if it's in a failed state
+            try:
+                DBSession.rollback()
+            except:
+                pass
+            # Re-raise the original error
+            raise
 
     def get_notifications(self, user: UserModel):
-        return [
-            convert_keys_to_camel_case(
-                {"type": NotificationType.MEDIA_USAGE.value, "mediaUsage": x.to_dict()}
+        try:
+            notifications = (
+                DBSession.query(AssetUsageModel)
+                .filter(AssetUsageModel.approved == False)
+                .filter(AssetUsageModel.asset.has(owner_id=user.id))
+                .all()
             )
-            for x in DBSession.query(AssetUsageModel)
-            .filter(AssetUsageModel.approved == False)
-            .filter(AssetUsageModel.asset.has(owner_id=user.id))
-            .all()
-        ]
+            
+            return [
+                convert_keys_to_camel_case(
+                    {"type": NotificationType.MEDIA_USAGE.value, "mediaUsage": x.to_dict()}
+                )
+                for x in notifications
+            ]
+        except Exception as e:
+            # Rollback the transaction if it's in a failed state
+            try:
+                DBSession.rollback()
+            except:
+                pass
+            # Re-raise the original error
+            raise
