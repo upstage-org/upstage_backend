@@ -42,15 +42,27 @@ def authenticated(allowed_roles=None):
                 if not session:
                     raise GraphQLError("Authenticated Failed")
 
-                current_user = UserService().find_by_id(user_id)
+                # Load user and convert to dict within session context
+                from global_config.database import ScopedSession
+                from users.db_models.user import UserModel
+                
+                with ScopedSession() as local_db_session:
+                    current_user = (
+                        local_db_session.query(UserModel)
+                        .filter(UserModel.id == user_id, UserModel.active.is_(True))
+                        .first()
+                    )
+                    
+                    if not current_user:
+                        raise GraphQLError("Authenticated Failed")
 
-                if not current_user:
-                    raise GraphQLError("Authenticated Failed")
+                    if allowed_roles and current_user.role not in allowed_roles:
+                        raise GraphQLError("Permission denied")
 
-                if allowed_roles and current_user.role not in allowed_roles:
-                    raise GraphQLError("Permission denied")
-
-                request.state.current_user = current_user.to_dict()
+                    # Convert to dict while object is still attached to session
+                    user_dict = current_user.to_dict()
+                
+                request.state.current_user = user_dict
 
             except jwt.ExpiredSignatureError:
                 raise GraphQLError("Signature has expired")
