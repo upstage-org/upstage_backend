@@ -89,21 +89,25 @@ class UserService:
             )
             # Convert to dict while object is still attached to session
             user_dict = user.to_dict()
+            # Extract user attributes for async tasks before session closes
+            user_email = user.email
+            user_username = user.username
+            user_id = user.id
 
         asyncio.create_task(
-            send([user.email], f"Welcome to UpStage!", user_registration(user))
+            send([user_email], f"Welcome to UpStage!", user_registration(user_dict))
         )
         admin_emails = SUPPORT_EMAILS
         approval_url = f"https://{HOSTNAME}/admin/player?sortByCreated=true"
         asyncio.create_task(
             send(
                 admin_emails,
-                f"Approval required for {user.username}'s registration",
-                admin_registration_notification(user, approval_url),
+                f"Approval required for {user_username}'s registration",
+                admin_registration_notification(user_dict, approval_url),
             )
         )
 
-        self.stage_operation_service.assign_user_to_default_stage([user.id])
+        self.stage_operation_service.assign_user_to_default_stage([user_id])
 
         return {"user": user_dict}
 
@@ -170,12 +174,17 @@ class UserService:
             local_db_session.flush()
             local_db_session.add(OneTimeTOTPModel(user_id=user.id, code=otp))
             local_db_session.flush()
+            
+            # Extract user attributes for async task before session closes
+            user_email = user.email
+            user_username = user.username
+            user_dict = user.to_dict()
 
             asyncio.create_task(
                 send(
-                    [user.email],
-                    f"Password reset for account {user.username}",
-                    password_reset(user, otp),
+                    [user_email],
+                    f"Password reset for account {user_username}",
+                    password_reset(user_dict, otp),
                 )
             )
 

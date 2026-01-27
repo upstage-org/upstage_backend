@@ -39,6 +39,9 @@ def get_footer():
 
 
 def display_user(user):
+    # Support both dict and object access
+    if isinstance(user, dict):
+        return user.get("display_name") if user.get("display_name") else user.get("username", "")
     return user.display_name if user.display_name else user.username
 
 
@@ -81,6 +84,8 @@ If you have any questions, please contact us at <a href="mailto:{EMAIL_HOST_USER
 
 
 def user_approved(user):
+    # Support both dict and object access
+    username = user.get("username", "") if isinstance(user, dict) else user.username
     return f"""
 <p>
 Hi <b>{display_user(user)}</b>,
@@ -92,7 +97,7 @@ Thank you for registering with us. Your account has been approved! You can now l
 Here is your account information:
 <br>
 <br>
-<b>Username:</b> {user.username}
+<b>Username:</b> {username}
 <br>
 <b>Password:</b> <i>the one you used to register</i>. If you forgot your password, click on the "Forgot Password" link on the login page.
 <br>
@@ -102,6 +107,19 @@ Here is your account information:
 
 
 def admin_registration_notification(user, approval_url):
+    # Support both dict and object access
+    if isinstance(user, dict):
+        username = user.get("username", "")
+        first_name = user.get("first_name", "")
+        last_name = user.get("last_name", "")
+        email = user.get("email", "")
+        intro = user.get("intro", "")
+    else:
+        username = user.username
+        first_name = user.first_name
+        last_name = user.last_name
+        email = user.email
+        intro = user.intro
     return f"""
 <p>
 Dear Admins,
@@ -116,13 +134,13 @@ A new user has registered with UpStage. Please approve the user by clicking on t
 The user's information is:
 <br>
 <br>
-<b>Username:</b> {user.username}
+<b>Username:</b> {username}
 <br>
-<b>Full Name:</b> {user.first_name} {user.last_name}
+<b>Full Name:</b> {first_name} {last_name}
 <br>
-<b>Email:</b> {user.email}
+<b>Email:</b> {email}
 <br>
-<b>Introduction:</b> {user.intro}
+<b>Introduction:</b> {intro}
 <br>
 <br>
 {get_footer()}
@@ -130,12 +148,19 @@ The user's information is:
 
 
 def request_permission_for_media(user, media, note, studio_url):
+    # Support both dict and object access
+    if isinstance(media, dict):
+        media_owner = media.get("owner", {})
+        media_name = media.get("name", "")
+    else:
+        media_owner = media.owner
+        media_name = media.name
     return f"""
 <p>
-Hi <b>{display_user(media.owner)}</b>,
+Hi <b>{display_user(media_owner)}</b>,
 <br>
 <br>
-{display_user(user)} has requested permission to use your media <b>{media.name}</b>. Please go to the <a href="{studio_url}">Studio</a> and click on the Notification icon to approve or deny the request.
+{display_user(user)} has requested permission to use your media <b>{media_name}</b>. Please go to the <a href="{studio_url}">Studio</a> and click on the Notification icon to approve or deny the request.
 <br>
 Purpose: {note}
 <br>
@@ -147,12 +172,14 @@ Purpose: {note}
 
 
 def waiting_request_media_approve(user, media):
+    # Support both dict and object access
+    media_name = media.get("name", "") if isinstance(media, dict) else media.name
     return f"""
 <p>
 Hi <b>{display_user(user)}</b>,
 <br>
 <br>
-Your permission request to use media <b>{media.name}</b> has been sent to the owner. Please wait for a response.
+Your permission request to use media <b>{media_name}</b> has been sent to the owner. Please wait for a response.
 <br>
 <br>
 <br>
@@ -162,12 +189,14 @@ Your permission request to use media <b>{media.name}</b> has been sent to the ow
 
 
 def request_permission_acknowledgement(user, media, note="", description=""):
+    # Support both dict and object access
+    media_name = media.get("name", "") if isinstance(media, dict) else media.name
     return f"""
 <p>
 Hi <b>{display_user(user)}</b>,
 <br>
 <br>
-You have agreed to acknowledge use of <b>{media.name}</b>.
+You have agreed to acknowledge use of <b>{media_name}</b>.
 <br>
 <br>
 Additional notes: {note}
@@ -181,12 +210,14 @@ Additional notes: {note}
 
 
 def permission_response_for_media(user, media, note, approved, studio_url):
+    # Support both dict and object access
+    media_name = media.get("name", "") if isinstance(media, dict) else media.name
     return f"""
 <p>
 Hi <b>{display_user(user)}</b>,
 <br>
 <br>
-Your permission request for <b>{media.name}</b> with purpose \"{note}\" has been {"approved" if approved else "denied"} by the owner.
+Your permission request for <b>{media_name}</b> with purpose \"{note}\" has been {"approved" if approved else "denied"} by the owner.
 {f'<br><br>You can now use the media in the <a href="{studio_url}">Studio</a>.' if approved else ""}
 <br>
 <br>
@@ -197,12 +228,19 @@ Your permission request for <b>{media.name}</b> with purpose \"{note}\" has been
 
 
 def notify_owner_of_media_request(user, media):
+    # Support both dict and object access
+    if isinstance(media, dict):
+        media_owner = media.get("owner", {})
+        media_name = media.get("name", "")
+    else:
+        media_owner = media.owner
+        media_name = media.name
     return f"""
 <p>
-Hi <b>{display_user(media.owner)}</b>,
+Hi <b>{display_user(media_owner)}</b>,
 <br>
 <br>
-{display_user(user)} is using your media {media.name} and has agreed to acknowledge it as you require.
+{display_user(user)} is using your media {media_name} and has agreed to acknowledge it as you require.
 <br>
 <br>
 {get_footer()}
@@ -210,12 +248,19 @@ Hi <b>{display_user(media.owner)}</b>,
 
 
 def notify_mark_media_active(media):
+    # Support both dict and object access
+    if isinstance(media, dict):
+        media_owner = media.get("owner", {})
+        media_name = media.get("name", "")
+    else:
+        media_owner = media.owner
+        media_name = media.name
     return f"""
 <p>
-Hi <b>{display_user(media.owner)}</b>,
+Hi <b>{display_user(media_owner)}</b>,
 <br>
 <br>
-Your dormant media item  {media.name} has been reactivated. You will find it in your Media list and can now edit and assign it to stages
+Your dormant media item  {media_name} has been reactivated. You will find it in your Media list and can now edit and assign it to stages
 <br>
 <br>
 {get_footer()}

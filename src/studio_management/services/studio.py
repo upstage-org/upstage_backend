@@ -239,11 +239,19 @@ class StudioService:
 
     async def _handle_active_status(self, user: UserModel, value):
         if value and not user.active and not user.deactivated_on:
+            # Extract user attributes before potential session close
+            user_email = user.email
+            user_username = user.username
+            user_dict = user.to_dict() if hasattr(user, 'to_dict') else {
+                "email": user_email,
+                "username": user_username,
+                "display_name": user.display_name if hasattr(user, 'display_name') else None,
+            }
             asyncio.create_task(
                 send(
-                    [user.email],
-                    f"Registration approved for user {user.username}",
-                    user_approved(user),
+                    [user_email],
+                    f"Registration approved for user {user_username}",
+                    user_approved(user_dict),
                 )
             )
         if not value and user.active:
@@ -327,37 +335,46 @@ class StudioService:
                 seen=False,
             )
 
+            # Extract all data needed for async tasks while objects are still attached to session
+            asset_owner_email = asset.owner.email if asset.owner else None
+            asset_name = asset.name
+            asset_dict = asset.to_dict()
+            user_dict = user.to_dict() if hasattr(user, 'to_dict') else {
+                "email": user.email,
+                "username": user.username,
+                "display_name": user.display_name if hasattr(user, 'display_name') else None,
+            }
+            description = json.loads(asset.description) if asset.description else {}
+            
             if asset.copyright_level == 2:
                 asset_usage.approved = False
                 studio_url = f"https://{HOSTNAME}/media"
                 asyncio.create_task(
                     send(
-                        [asset.owner.email],
-                        f"{display_user(user)} wants to use your media {asset.name}",
+                        [asset_owner_email],
+                        f"{display_user(user_dict)} wants to use your media {asset_name}",
                         request_permission_for_media(
-                            user, asset, note if note else "", studio_url
+                            user_dict, asset_dict, note if note else "", studio_url
                         ),
                     )
                 )
                 asyncio.create_task(
                     send(
-                        [user.email],
+                        [user_dict.get("email")],
                         "Your permission request is waiting for approval",
-                        waiting_request_media_approve(user, asset),
+                        waiting_request_media_approve(user_dict, asset_dict),
                     )
                 )
             else:
                 asset_usage.approved = True
 
-                description = json.loads(asset.description)
-
                 asyncio.create_task(
                     send(
-                        [user.email],
+                        [user_dict.get("email")],
                         f"Media acknowledgement",
                         request_permission_acknowledgement(
-                            user,
-                            asset,
+                            user_dict,
+                            asset_dict,
                             note if note else "",
                             description.get("note", ""),
                         ),
@@ -366,9 +383,9 @@ class StudioService:
 
                 asyncio.create_task(
                     send(
-                        [asset.owner.email],
-                        f"{display_user(user)} is using your media {asset.name}",
-                        notify_owner_of_media_request(user, asset),
+                        [asset_owner_email],
+                        f"{display_user(user_dict)} is using your media {asset_name}",
+                        notify_owner_of_media_request(user_dict, asset_dict),
                     )
                 )
             local_db_session.add(asset_usage)
@@ -396,17 +413,30 @@ class StudioService:
             else:
                 local_db_session.delete(asset_usage)
 
+            # Extract data for async task while objects are still attached to session
+            asset_usage_user_email = asset_usage.user.email if asset_usage.user else None
+            asset_usage_asset_name = asset_usage.asset.name if asset_usage.asset else ""
+            asset_usage_user_dict = asset_usage.user.to_dict() if asset_usage.user and hasattr(asset_usage.user, 'to_dict') else {
+                "email": asset_usage_user_email,
+                "username": asset_usage.user.username if asset_usage.user else "",
+                "display_name": asset_usage.user.display_name if asset_usage.user and hasattr(asset_usage.user, 'display_name') else None,
+            }
+            asset_usage_asset_dict = asset_usage.asset.to_dict() if asset_usage.asset and hasattr(asset_usage.asset, 'to_dict') else {
+                "name": asset_usage_asset_name,
+            }
+            asset_usage_note = asset_usage.note
+            
             studio_url = f"https://{HOSTNAME}/media"
             asyncio.create_task(
                 send(
-                    [asset_usage.user.email],
-                    f"Permission approved for media {asset_usage.asset.name}"
+                    [asset_usage_user_email],
+                    f"Permission approved for media {asset_usage_asset_name}"
                     if approved
-                    else f"Permission denied for media {asset_usage.asset.name}",
+                    else f"Permission denied for media {asset_usage_asset_name}",
                     permission_response_for_media(
-                        asset_usage.user,
-                        asset_usage.asset,
-                        asset_usage.note,
+                        asset_usage_user_dict,
+                        asset_usage_asset_dict,
+                        asset_usage_note,
                         approved,
                         studio_url,
                     ),

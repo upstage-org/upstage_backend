@@ -79,9 +79,21 @@ class StageOperationService:
 
         user_id = str(user_id)
 
-        player_access = stage.attributes.filter(
-            StageAttributeModel.name == "playerAccess"
-        ).first()
+        # Check if stage is attached to a session, if not, reload it
+        from sqlalchemy.orm import object_session
+        session = object_session(stage)
+        if session is None:
+            # Stage is detached, reload in new session
+            with ScopedSession() as local_db_session:
+                stage = local_db_session.query(StageModel).filter_by(id=stage.id).first()
+                player_access = stage.attributes.filter(
+                    StageAttributeModel.name == "playerAccess"
+                ).first()
+        else:
+            # Stage is still attached, access attributes now
+            player_access = stage.attributes.filter(
+                StageAttributeModel.name == "playerAccess"
+            ).first()
 
         if player_access:
             accesses = json.loads(player_access.description)

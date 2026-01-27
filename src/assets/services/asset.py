@@ -83,6 +83,10 @@ class AssetService:
             return [self.resolve_fields(asset, user) for asset in assets]
 
     def search_assets(self, user: UserModel, search_assets: MediaTableInput):
+        # Extract user attributes early to avoid accessing detached user object
+        user_role = user.role if user else None
+        user_id_value = user.id if user else None
+        
         with ScopedSession() as local_db_session:
             query = (
                 local_db_session.query(AssetModel)
@@ -96,7 +100,7 @@ class AssetService:
                 .group_by(AssetModel.id)
             )
 
-            if user.role not in [SUPER_ADMIN, ADMIN]:
+            if user_role not in [SUPER_ADMIN, ADMIN]:
                 query = query.filter(AssetModel.dormant.is_not(True))
             elif search_assets.dormant is not None:
                 query = query.filter(AssetModel.dormant.is_(search_assets.dormant))
@@ -171,7 +175,7 @@ class AssetService:
                 ]
                 edges.append({
                     **convert_keys_to_camel_case(asset_dict),
-                    "privilege": self.resolve_privilege(user.id, asset),
+                    "privilege": self.resolve_privilege(user_id_value, asset),
                     "stages": stages_list,
                     "permissions": permissions_list,
                 })
@@ -182,11 +186,14 @@ class AssetService:
             }
 
     def upload_file(self, user: UserModel, base64: str, filename: str):
+        # Extract user attributes early to avoid accessing detached user object
+        upload_limit = user.upload_limit if user else None
+        
         file_size = self.file_handing.get_file_size(base64)
 
-        if file_size > user.upload_limit:
+        if file_size > upload_limit:
             raise GraphQLError(
-                f"File size must be under {self.file_handing.convert_KB_to_MB(user.upload_limit)}MB."
+                f"File size must be under {self.file_handing.convert_KB_to_MB(upload_limit)}MB."
             )
 
         file_location = self.file_handing.upload_file(
@@ -483,13 +490,20 @@ class AssetService:
                 local_db_session.flush()
 
                 if input.status.value == MediaStatusEnum.ACTIVE.value:
-                    asyncio.create_task(
-                        send(
-                            [asset.owner.email],
-                            "Your dormant media item has been reactivated",
-                            notify_mark_media_active(asset),
+                    # Extract all data needed for async task while asset is still attached to session
+                    owner_email = asset.owner.email if asset.owner else None
+                    asset_name = asset.name
+                    asset_owner_dict = asset.owner.to_dict() if asset.owner else {}
+                    asset_dict = asset.to_dict()
+                    asset_dict["owner"] = asset_owner_dict
+                    if owner_email:
+                        asyncio.create_task(
+                            send(
+                                [owner_email],
+                                "Your dormant media item has been reactivated",
+                                notify_mark_media_active(asset_dict),
+                            )
                         )
-                    )
 
             return {
                 "success": True,
@@ -557,9 +571,25 @@ class AssetService:
             return "{0}-{1}".format(timestamp, hashvalue)
         return ""
 
+    def resolve_sign_from_values(self, owner: UserModel, file_location: str, owner_id: int, user_id: Optional[int]):
+        if owner_id == user_id:
+            timestamp = int(
+                (datetime.now() + timedelta(days=STREAM_EXPIRY_DAYS)).timestamp()
+            )
+            payload = "/live/{0}-{1}-{2}".format(
+                file_location, timestamp, STREAM_KEY
+            )
+            hashvalue = hashlib.md5(payload.encode("utf-8")).hexdigest()
+            return "{0}-{1}".format(timestamp, hashvalue)
+        return ""
+
     def resolve_src(self, asset: AssetModel):
         timestamp = int(time.mktime(asset.updated_on.timetuple()))
         return asset.file_location + "?t=" + str(timestamp)
+
+    def resolve_src_from_values(self, file_location: str, updated_on):
+        timestamp = int(time.mktime(updated_on.timetuple()))
+        return file_location + "?t=" + str(timestamp)
 
     def resolve_permission(self, user_id: int, asset: AssetModel):
         if not user_id:
@@ -581,21 +611,53 @@ class AssetService:
                     return "editor"
         return "none"
 
+    def resolve_permission_from_values(self, user_id: int, owner_id: int, asset_license_level: Optional[int], asset_license_permissions: Optional[str], copyright_level: int):
+        if not user_id:
+            return "none"
+        if owner_id == user_id:
+            return "owner"
+        if asset_license_level is None or asset_license_level == 0:
+            return "editor"
+        if asset_license_level == 3:
+            return "none"
+
+        if asset_license_permissions:
+            accesses = json.loads(asset_license_permissions)
+            if len(accesses) == 2:
+                if user_id in accesses[0]:
+                    return "readonly"
+                elif user_id in accesses[1]:
+                    return "editor"
+        return "none"
+
     def resolve_fields(self, asset: AssetModel, user: Optional[UserModel] = None):
         # Access all data while asset might still be attached to session
         # If asset is detached, we'll reload it in a new session
         from sqlalchemy.orm import object_session
+        
+        # Extract user.id early to avoid accessing detached user object
+        user_id_value = user.id if user else None
         
         session = object_session(asset)
         if session is None:
             # Asset is detached, reload in new session
             with ScopedSession() as local_db_session:
                 asset = local_db_session.query(AssetModel).filter_by(id=asset.id).first()
+                # Extract all data while asset is attached to session
                 asset_dict = asset.to_dict()
                 stages_list = [
                     convert_keys_to_camel_case(item.stage.to_dict())
                     for item in asset.stages
                 ]
+                # Extract asset_license values to avoid accessing detached object
+                asset_license_level = asset.asset_license.level if asset.asset_license else None
+                asset_license_permissions = asset.asset_license.permissions if asset.asset_license else None
+                # Extract column values needed for resolve_src and other methods
+                updated_on = asset.updated_on
+                file_location = asset.file_location
+                owner_id = asset.owner_id
+                copyright_level = asset.copyright_level
+                asset_id = asset.id
         else:
             # Asset is still attached, access relationships now
             asset_dict = asset.to_dict()
@@ -603,14 +665,24 @@ class AssetService:
                 convert_keys_to_camel_case(item.stage.to_dict())
                 for item in asset.stages
             ]
+            # Extract asset_license values to avoid accessing detached object
+            asset_license_level = asset.asset_license.level if asset.asset_license else None
+            asset_license_permissions = asset.asset_license.permissions if asset.asset_license else None
+            # Extract column values needed for resolve_src and other methods
+            updated_on = asset.updated_on
+            file_location = asset.file_location
+            owner_id = asset.owner_id
+            copyright_level = asset.copyright_level
+            asset_id = asset.id
         
-        src = self.resolve_src(asset)
-        sign = self.resolve_sign(asset.owner, asset)
-        user_id = user.id if user else asset.owner_id
-        permission = self.resolve_permission(user_id, asset)
+        # Now use extracted values (no relationship access needed)
+        src = self.resolve_src_from_values(file_location, updated_on)
+        sign = self.resolve_sign_from_values(None, file_location, owner_id, user_id_value)
+        effective_user_id = user_id_value if user_id_value else owner_id
+        permission = self.resolve_permission_from_values(effective_user_id, owner_id, asset_license_level, asset_license_permissions, copyright_level)
         permissions_list = [
             convert_keys_to_camel_case(permission)
-            for permission in self.resolve_permissions(asset.id)
+            for permission in self.resolve_permissions(asset_id)
         ]
         
         return {
@@ -618,7 +690,7 @@ class AssetService:
             "src": src,
             "sign": sign,
             "permission": permission,
-            "privilege": self.resolve_privilege(user.id if user else None, asset),
+            "privilege": self.resolve_privilege_from_values(user_id_value, owner_id, copyright_level, asset_id),
             "stages": stages_list,
             "permissions": permissions_list,
         }
@@ -684,6 +756,30 @@ class AssetService:
             )
             if usage:
                 if not usage.approved and asset.copyright_level == 2:
+                    return Previlege.PENDING_APPROVAL.value
+                else:
+                    return Previlege.APPROVED.value
+            else:
+                return Previlege.REQUIRE_APPROVAL.value
+
+    def resolve_privilege_from_values(self, user_id: Optional[int], owner_id: int, copyright_level: int, asset_id: int):
+        if not user_id:
+            return Previlege.NONE.value
+        if owner_id == user_id:
+            return Previlege.OWNER.value
+        if not copyright_level:  # no copyright
+            return Previlege.APPROVED.value
+        if copyright_level == 3:
+            return Previlege.NONE.value
+        with ScopedSession() as local_db_session:
+            usage = (
+                local_db_session.query(AssetUsageModel)
+                .filter(AssetUsageModel.asset_id == asset_id)
+                .filter(AssetUsageModel.user_id == user_id)
+                .first()
+            )
+            if usage:
+                if not usage.approved and copyright_level == 2:
                     return Previlege.PENDING_APPROVAL.value
                 else:
                     return Previlege.APPROVED.value
