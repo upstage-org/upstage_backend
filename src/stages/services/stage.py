@@ -110,11 +110,14 @@ class StageService:
                     cover = stage.cover
                     visibility = stage.visibility
                     status = stage.status
-                    # Access assets relationship while still in session (order by id = assign order)
-                    assets_list = [
-                        asset.child_asset.to_dict()
-                        for asset in stage.assets.order_by(ParentStageModel.id)
-                    ]
+                    # Query assets by stage_id to avoid detached-instance on dynamic relationship (order by id = assign order)
+                    parent_stages = (
+                        local_db_session.query(ParentStageModel)
+                        .filter(ParentStageModel.stage_id == stage.id)
+                        .order_by(ParentStageModel.id)
+                        .all()
+                    )
+                    assets_list = [ps.child_asset.to_dict() for ps in parent_stages]
                     stages.append(
                         convert_keys_to_camel_case(
                             {
@@ -175,11 +178,14 @@ class StageService:
             result = []
             for stage in stages:
                 stage_dict = stage.to_dict()
-                # Access relationships while object is still attached to session (order by id = assign order)
-                assets_list = [
-                    asset.child_asset.to_dict()
-                    for asset in stage.assets.order_by(ParentStageModel.id)
-                ]
+                # Query assets by stage_id to avoid detached-instance on dynamic relationship (order by id = assign order)
+                parent_stages = (
+                    local_db_session.query(ParentStageModel)
+                    .filter(ParentStageModel.stage_id == stage.id)
+                    .order_by(ParentStageModel.id)
+                    .all()
+                )
+                assets_list = [ps.child_asset.to_dict() for ps in parent_stages]
                 cover = stage.cover
                 visibility = stage.visibility
                 status = stage.status
@@ -233,12 +239,15 @@ class StageService:
 
             permission = self.extract_permission(user, stage)
 
-            # Convert to dict and access relationships while object is still attached to session (order by id = assign order)
+            # Convert to dict; query assets by stage_id to avoid detached-instance on dynamic relationship (order by id = assign order)
             stage_dict = stage.to_dict()
-            assets_list = [
-                asset.child_asset.to_dict()
-                for asset in stage.assets.order_by(ParentStageModel.id)
-            ]
+            parent_stages = (
+                local_db_session.query(ParentStageModel)
+                .filter(ParentStageModel.stage_id == stage.id)
+                .order_by(ParentStageModel.id)
+                .all()
+            )
+            assets_list = [ps.child_asset.to_dict() for ps in parent_stages]
             cover = stage.cover
             visibility = stage.visibility
             status = stage.status
