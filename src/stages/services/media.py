@@ -188,7 +188,8 @@ class MediaService:
             if not asset:
                 raise GraphQLError("Media not found")
 
-            if asset.stages:
+            # Check if asset has any stages using count() to avoid detached instance warning
+            if asset.stages.count() > 0:
                 asset.dormant = True
                 local_db_session.flush()
                 return

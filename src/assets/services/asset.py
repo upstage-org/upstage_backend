@@ -165,9 +165,10 @@ class AssetService:
             for asset in assets:
                 asset_dict = asset.to_dict()
                 # Access relationships while object is still attached to session
+                # Materialize dynamic relationship by converting to list while session is active
                 stages_list = [
                     convert_keys_to_camel_case(item.stage.to_dict())
-                    for item in asset.stages
+                    for item in asset.stages.all()  # Use .all() to materialize the dynamic relationship
                 ]
                 permissions_list = [
                     convert_keys_to_camel_case(permission)
@@ -649,9 +650,10 @@ class AssetService:
                 asset = local_db_session.query(AssetModel).filter_by(id=asset.id).first()
                 # Extract all data while asset is attached to session
                 asset_dict = asset.to_dict()
+                # Materialize dynamic relationship by converting to list while session is active
                 stages_list = [
                     convert_keys_to_camel_case(item.stage.to_dict())
-                    for item in asset.stages
+                    for item in asset.stages.all()  # Use .all() to materialize the dynamic relationship
                 ]
                 # Extract asset_license values to avoid accessing detached object
                 asset_license_level = asset.asset_license.level if asset.asset_license else None
@@ -665,9 +667,10 @@ class AssetService:
         else:
             # Asset is still attached, access relationships now
             asset_dict = asset.to_dict()
+            # Materialize dynamic relationship by converting to list while session is active
             stages_list = [
                 convert_keys_to_camel_case(item.stage.to_dict())
-                for item in asset.stages
+                for item in asset.stages.all()  # Use .all() to materialize the dynamic relationship
             ]
             # Extract asset_license values to avoid accessing detached object
             asset_license_level = asset.asset_license.level if asset.asset_license else None
