@@ -194,13 +194,13 @@ class StageService:
                                 current_user_id, stage
                             ),
                             "performances": [
-                                convert_keys_to_camel_case(pf.to_dict())
+                                convert_keys_to_camel_case(pf)
                                 for pf in self.stage_operation_service.resolve_performances(
                                     stage.id
                                 )
                             ],
                             "chats": [
-                                convert_keys_to_camel_case(chat.to_dict())
+                                convert_keys_to_camel_case(chat)
                                 for chat in self.stage_operation_service.resolve_chats(
                                     stage.file_location
                                 )
@@ -234,13 +234,13 @@ class StageService:
             visibility = stage.visibility
             status = stage.status
             performances = [
-                convert_keys_to_camel_case(pf.to_dict())
+                convert_keys_to_camel_case(pf)
                 for pf in self.stage_operation_service.resolve_performances(
                     stage.id
                 )
             ]
             chats = [
-                convert_keys_to_camel_case(chat.to_dict())
+                convert_keys_to_camel_case(chat)
                 for chat in self.stage_operation_service.resolve_chats(
                     stage.file_location
                 )

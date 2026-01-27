@@ -166,7 +166,7 @@ class AssetService:
                     for item in asset.stages
                 ]
                 permissions_list = [
-                    convert_keys_to_camel_case(permission.to_dict())
+                    convert_keys_to_camel_case(permission)
                     for permission in self.resolve_permissions(asset.id)
                 ]
                 edges.append({
@@ -609,7 +609,7 @@ class AssetService:
         user_id = user.id if user else asset.owner_id
         permission = self.resolve_permission(user_id, asset)
         permissions_list = [
-            convert_keys_to_camel_case(permission.to_dict())
+            convert_keys_to_camel_case(permission)
             for permission in self.resolve_permissions(asset.id)
         ]
         
@@ -692,9 +692,11 @@ class AssetService:
 
     def resolve_permissions(self, asset_id: int):
         with ScopedSession() as local_db_session:
-            return (
+            permissions = (
                 local_db_session.query(AssetUsageModel)
                 .filter(AssetUsageModel.asset_id == asset_id)
                 .order_by(AssetUsageModel.created_on.desc())
                 .all()
             )
+            # Convert to dicts while objects are still attached to session
+            return [permission.to_dict() for permission in permissions]

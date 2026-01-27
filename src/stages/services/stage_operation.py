@@ -52,20 +52,24 @@ class StageOperationService:
 
     def resolve_performances(self, stage_id: int):
         with ScopedSession() as local_db_session:
-            return (
+            performances = (
                 local_db_session.query(PerformanceModel)
                 .filter(PerformanceModel.stage_id == stage_id)
                 .all()
             )
+            # Convert to dicts while objects are still attached to session
+            return [performance.to_dict() for performance in performances]
 
     def resolve_chats(self, file_location: str):
         with ScopedSession() as local_db_session:
-            return (
+            chats = (
                 local_db_session.query(EventModel)
                 .filter(EventModel.topic.like("%/{}/chat".format(file_location)))
                 .order_by(EventModel.mqtt_timestamp.asc())
                 .all()
             )
+            # Convert to dicts while objects are still attached to session
+            return [chat.to_dict() for chat in chats]
 
     def resolve_permission(self, user_id: int, stage: StageModel):
         if not user_id:
