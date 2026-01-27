@@ -66,8 +66,18 @@ class MediaService:
                 local_db_session.add(media)
 
             local_db_session.flush()
-            # Convert to dict while object is still attached to session
+            # Build assets via direct query; stage.to_dict() would put the dynamic
+            # "assets" AppenderQuery in the dict, and GraphQL later enumerates it
+            # after the session is closed -> detached-instance warning.
+            parent_stages = (
+                local_db_session.query(ParentStageModel)
+                .filter(ParentStageModel.stage_id == input.id)
+                .order_by(ParentStageModel.id)
+                .all()
+            )
+            assets_list = [ps.child_asset.to_dict() for ps in parent_stages]
             stage_dict = stage.to_dict()
+            stage_dict["assets"] = assets_list
             return convert_keys_to_camel_case(stage_dict)
 
     def upload_media(self, user: UserModel, input: UploadMediaInput):

@@ -54,10 +54,19 @@ class BaseModel(Base):
                             for item in value
                         ]
                     else:
-                        result[attr.key] = (
-                            value.to_dict(visited)
-                            if hasattr(value, "to_dict")
-                            else value
-                        )
+                        # Skip dynamic relationships (lazy="dynamic"): they return
+                        # query-like objects. Putting them in the dict causes
+                        # detached-instance when the result is later enumerated
+                        # (e.g. by GraphQL) after the session is closed.
+                        if callable(getattr(value, "all", None)) and not hasattr(
+                            value, "to_dict"
+                        ):
+                            result[attr.key] = []
+                        else:
+                            result[attr.key] = (
+                                value.to_dict(visited)
+                                if hasattr(value, "to_dict")
+                                else value
+                            )
 
         return result
