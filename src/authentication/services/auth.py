@@ -46,19 +46,31 @@ class AuthenticationService:
         if not user:
             return GraphQLError("Incorrect username or password. Please try again.")
 
-        self.validate_password(password, user)
+        # Validate password within a session context to ensure user is attached
+        with ScopedSession() as local_db_session:
+            # Reload user in this session to ensure it's attached
+            user = local_db_session.query(UserModel).filter_by(id=user.id).first()
+            if not user:
+                return GraphQLError("Incorrect username or password. Please try again.")
+            self.validate_password(password, user)
+            # Extract user attributes while still in session
+            user_id = user.id
+            user_role = user.role
+            user_first_name = user.first_name
+            user_username = user.username
+        
         access_token = self.create_token(
-            {"user_id": user.id}, timedelta(minutes=int(JWT_ACCESS_TOKEN_MINUTES))
+            {"user_id": user_id}, timedelta(minutes=int(JWT_ACCESS_TOKEN_MINUTES))
         )
         refresh_token = self.create_token(
-            {"user_id": user.id, "type": "refresh"},
+            {"user_id": user_id, "type": "refresh"},
             timedelta(
-                days=int(JWT_REFRESH_TOKEN_DAYS) if user.role == SUPER_ADMIN else 1
+                days=int(JWT_REFRESH_TOKEN_DAYS) if user_role == SUPER_ADMIN else 1
             ),
         )
 
         user_session = UserSessionModel(
-            user_id=user.id,
+            user_id=user_id,
             access_token=access_token,
             refresh_token=refresh_token,
             app_version=request.headers.get("X-Upstage-App-Version"),
@@ -67,16 +79,14 @@ class AuthenticationService:
             app_device=request.headers.get("X-Upstage-Device-Model"),
         )
 
-        user.last_login = datetime.now()
-
         with ScopedSession() as local_db_session:
             local_db_session.query(UserSessionModel).filter(
-                UserSessionModel.user_id == user.id
+                UserSessionModel.user_id == user_id
             ).delete()
             local_db_session.add(user_session)
             local_db_session.flush()
 
-            local_db_session.query(UserModel).filter(UserModel.id == user.id).update(
+            local_db_session.query(UserModel).filter(UserModel.id == user_id).update(
                 {"last_login": datetime.now()}
             )
             local_db_session.commit()
@@ -87,24 +97,24 @@ class AuthenticationService:
         groups = []
         group = None
 
-        if user.role == SUPER_ADMIN:
+        if user_role == SUPER_ADMIN:
             title = title_prefix + "Super Admin"
             group = {"id": 0, "name": "test"}
             groups = [group]
 
-        elif user.role in (PLAYER, GUEST, ADMIN) and not (group):
+        elif user_role in (PLAYER, GUEST, ADMIN) and not (group):
             group = {"id": 0, "name": "test"}
             groups = [group]
 
         return dict(
             {
-                "user_id": user.id,
+                "user_id": user_id,
                 "access_token": access_token,
                 "refresh_token": refresh_token,
-                "role": user.role,
-                "first_name": user.first_name,
+                "role": user_role,
+                "first_name": user_first_name,
                 "groups": groups,
-                "username": user.username,
+                "username": user_username,
                 "title": title,
             }
         )
