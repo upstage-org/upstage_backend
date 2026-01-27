@@ -15,6 +15,7 @@ from graphql import GraphQLError
 import jwt
 from fastapi import Request
 from email.utils import parseaddr
+from sqlalchemy import or_
 from authentication.http.validation import LoginInput
 from users.db_models.user import ADMIN, GUEST, PLAYER, SUPER_ADMIN, UserModel
 from users.services.user import UserService
@@ -46,10 +47,18 @@ class AuthenticationService:
         if not user:
             return GraphQLError("Incorrect username or password. Please try again.")
 
+        # Store username/email for reloading user in new session
+        # We can't access user.id on a detached object, so we'll reload by username/email
+        reload_username = username
+        reload_email = email
+
         # Validate password within a session context to ensure user is attached
         with ScopedSession() as local_db_session:
             # Reload user in this session to ensure it's attached
-            user = local_db_session.query(UserModel).filter_by(id=user.id).first()
+            # Reload by username/email since we can't safely access user.id on detached object
+            user = local_db_session.query(UserModel).filter(
+                or_(UserModel.username == reload_username, UserModel.email == reload_email)
+            ).first()
             if not user:
                 return GraphQLError("Incorrect username or password. Please try again.")
             self.validate_password(password, user)

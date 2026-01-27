@@ -173,9 +173,13 @@ class AssetService:
                     convert_keys_to_camel_case(permission)
                     for permission in self.resolve_permissions(asset.id)
                 ]
+                # Extract asset attributes for resolve_privilege while still in session
+                asset_owner_id = asset.owner_id
+                asset_copyright_level = asset.copyright_level
+                asset_id = asset.id
                 edges.append({
                     **convert_keys_to_camel_case(asset_dict),
-                    "privilege": self.resolve_privilege(user_id_value, asset),
+                    "privilege": self.resolve_privilege_from_values(user_id_value, asset_owner_id, asset_copyright_level, asset_id),
                     "stages": stages_list,
                     "permissions": permissions_list,
                 })

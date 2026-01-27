@@ -106,12 +106,24 @@ class StageOperationService:
         return "audience"
 
     def get_event_list(self, input: StageStreamInput, stage: StageModel):
+        # Extract stage.file_location early to avoid accessing detached stage object
+        from sqlalchemy.orm import object_session
+        session = object_session(stage)
+        if session is None:
+            # Stage is detached, extract file_location from stage.id
+            with ScopedSession() as local_db_session:
+                stage = local_db_session.query(StageModel).filter_by(id=stage.id).first()
+                stage_file_location = stage.file_location if stage else ""
+        else:
+            # Stage is still attached, extract file_location now
+            stage_file_location = stage.file_location
+        
         with ScopedSession() as local_db_session:
             cursor = input.cursor if input.cursor else 0
             events = (
                 local_db_session.query(EventModel)
                 .filter(EventModel.performance_id == input.performanceId)
-                .filter(EventModel.topic.like("%/{}/%".format(stage.file_location)))
+                .filter(EventModel.topic.like("%/{}/%".format(stage_file_location)))
                 .filter(EventModel.id > cursor)
                 .order_by(EventModel.mqtt_timestamp.asc())
                 .all()

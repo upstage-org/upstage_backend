@@ -393,6 +393,10 @@ class StudioService:
         return {"success": True}
 
     async def confirm_permission(self, user: UserModel, id: int, approved: bool):
+        # Extract user attributes early to avoid accessing detached user object
+        user_role = user.role if user else None
+        user_id = user.id if user else None
+        
         with ScopedSession() as local_db_session:
             asset_usage = (
                 local_db_session.query(AssetUsageModel)
@@ -401,9 +405,13 @@ class StudioService:
             )
             if not asset_usage:
                 raise GraphQLError("Asset not found!")
+            
+            # Extract asset owner_id while asset_usage.asset is still attached to session
+            asset_owner_id = asset_usage.asset.owner_id if asset_usage.asset else None
+            
             if (
-                user.role not in [SUPER_ADMIN, ADMIN]
-                and user.id != asset_usage.asset.owner_id
+                user_role not in [SUPER_ADMIN, ADMIN]
+                and user_id != asset_owner_id
             ):
                 raise GraphQLError("You are not authorized to perform this action!")
 
