@@ -28,6 +28,7 @@ from global_config.env import (
     STREAM_KEY,
 )
 from global_config.helpers.object import convert_keys_to_camel_case
+from sqlalchemy.orm import joinedload, selectinload, contains_eager
 from assets.db_models.asset import AssetModel, AvatarVoice, Voice, Previlege
 from assets.db_models.asset_license import AssetLicenseModel
 from assets.db_models.asset_type import AssetTypeModel
@@ -60,8 +61,9 @@ class AssetService:
         with ScopedSession() as local_db_session:
             query = (
                 local_db_session.query(AssetModel)
+                .join(UserModel, AssetModel.owner_id == UserModel.id)
+                .options(contains_eager(AssetModel.owner))
                 .join(AssetTypeModel)
-                .join(UserModel)
                 .outerjoin(AssetLicenseModel)
                 .outerjoin(
                     ParentStageModel, AssetModel.id == ParentStageModel.child_asset_id
@@ -79,6 +81,10 @@ class AssetService:
 
             assets = query.all()
             
+            # Materialize owner relationships while session is active
+            for asset in assets:
+                _ = asset.owner  # Access to materialize the relationship
+            
             # Process all assets while still in session context to access relationships
             return [self.resolve_fields(asset, user) for asset in assets]
 
@@ -90,7 +96,8 @@ class AssetService:
         with ScopedSession() as local_db_session:
             query = (
                 local_db_session.query(AssetModel)
-                .join(UserModel)
+                .join(UserModel, AssetModel.owner_id == UserModel.id)
+                .options(contains_eager(AssetModel.owner))
                 .join(AssetTypeModel)
                 .outerjoin(AssetLicenseModel)
                 .outerjoin(
@@ -160,6 +167,10 @@ class AssetService:
                 )
             assets = query.all()
 
+            # Materialize owner relationships while session is active
+            for asset in assets:
+                _ = asset.owner  # Access to materialize the relationship
+
             # Process all assets while still in session context
             edges = []
             for asset in assets:
@@ -174,6 +185,8 @@ class AssetService:
                     convert_keys_to_camel_case(permission)
                     for permission in self.resolve_permissions(asset.id)
                 ]
+                # Extract owner data while session is active
+                owner_dict = convert_keys_to_camel_case(asset.owner.to_dict()) if asset.owner else None
                 # Extract asset attributes for resolve_privilege while still in session
                 asset_owner_id = asset.owner_id
                 asset_copyright_level = asset.copyright_level
@@ -183,6 +196,7 @@ class AssetService:
                     "privilege": self.resolve_privilege_from_values(user_id_value, asset_owner_id, asset_copyright_level, asset_id),
                     "stages": stages_list,
                     "permissions": permissions_list,
+                    "owner": owner_dict,
                 })
 
             return {
@@ -647,7 +661,12 @@ class AssetService:
         if session is None:
             # Asset is detached, reload in new session
             with ScopedSession() as local_db_session:
-                asset = local_db_session.query(AssetModel).filter_by(id=asset.id).first()
+                asset = (
+                    local_db_session.query(AssetModel)
+                    .options(selectinload(AssetModel.owner))
+                    .filter_by(id=asset.id)
+                    .first()
+                )
                 # Extract all data while asset is attached to session
                 asset_dict = asset.to_dict()
                 # Materialize dynamic relationship by converting to list while session is active
@@ -655,6 +674,8 @@ class AssetService:
                     convert_keys_to_camel_case(item.stage.to_dict())
                     for item in asset.stages.all()  # Use .all() to materialize the dynamic relationship
                 ]
+                # Extract owner data while session is active
+                owner_dict = convert_keys_to_camel_case(asset.owner.to_dict()) if asset.owner else None
                 # Extract asset_license values to avoid accessing detached object
                 asset_license_level = asset.asset_license.level if asset.asset_license else None
                 asset_license_permissions = asset.asset_license.permissions if asset.asset_license else None
@@ -672,6 +693,8 @@ class AssetService:
                 convert_keys_to_camel_case(item.stage.to_dict())
                 for item in asset.stages.all()  # Use .all() to materialize the dynamic relationship
             ]
+            # Extract owner data while session is active
+            owner_dict = convert_keys_to_camel_case(asset.owner.to_dict()) if asset.owner else None
             # Extract asset_license values to avoid accessing detached object
             asset_license_level = asset.asset_license.level if asset.asset_license else None
             asset_license_permissions = asset.asset_license.permissions if asset.asset_license else None
@@ -700,6 +723,7 @@ class AssetService:
             "privilege": self.resolve_privilege_from_values(user_id_value, owner_id, copyright_level, asset_id),
             "stages": stages_list,
             "permissions": permissions_list,
+            "owner": owner_dict,
         }
 
     def get_media_types(self):
