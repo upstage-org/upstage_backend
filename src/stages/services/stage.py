@@ -110,8 +110,11 @@ class StageService:
                     cover = stage.cover
                     visibility = stage.visibility
                     status = stage.status
-                    # Access assets relationship while still in session
-                    assets_list = [asset.child_asset.to_dict() for asset in stage.assets]
+                    # Access assets relationship while still in session (order by id = assign order)
+                    assets_list = [
+                        asset.child_asset.to_dict()
+                        for asset in stage.assets.order_by(ParentStageModel.id)
+                    ]
                     stages.append(
                         convert_keys_to_camel_case(
                             {
@@ -172,8 +175,11 @@ class StageService:
             result = []
             for stage in stages:
                 stage_dict = stage.to_dict()
-                # Access relationships while object is still attached to session
-                assets_list = [asset.child_asset.to_dict() for asset in stage.assets]
+                # Access relationships while object is still attached to session (order by id = assign order)
+                assets_list = [
+                    asset.child_asset.to_dict()
+                    for asset in stage.assets.order_by(ParentStageModel.id)
+                ]
                 cover = stage.cover
                 visibility = stage.visibility
                 status = stage.status
@@ -227,9 +233,12 @@ class StageService:
 
             permission = self.extract_permission(user, stage)
 
-            # Convert to dict and access relationships while object is still attached to session
+            # Convert to dict and access relationships while object is still attached to session (order by id = assign order)
             stage_dict = stage.to_dict()
-            assets_list = [asset.child_asset.to_dict() for asset in stage.assets]
+            assets_list = [
+                asset.child_asset.to_dict()
+                for asset in stage.assets.order_by(ParentStageModel.id)
+            ]
             cover = stage.cover
             visibility = stage.visibility
             status = stage.status
