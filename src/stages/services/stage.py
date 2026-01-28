@@ -329,57 +329,59 @@ class StageService:
                 raise GraphQLError("Stage not found")
 
             self.extract_permission(user, stage)
-
+            
+            # Get which fields were actually provided in the GraphQL input
+            provided_fields = getattr(input, '_provided_fields', set())
+            
             # Update name if provided
-            if hasattr(input, "name") and input.name is not None:
+            if "name" in provided_fields and input.name is not None:
                 stage.name = input.name
             
             # Update description if provided
-            if hasattr(input, "description") and input.description is not None:
+            if "description" in provided_fields and input.description is not None:
                 stage.description = input.description
             
             # Update file_location if provided
-            if hasattr(input, "fileLocation") and input.fileLocation is not None:
+            if "fileLocation" in provided_fields and input.fileLocation is not None:
                 stage.file_location = input.fileLocation
 
             # Update owner_id if provided (owner_id cannot be null per DB schema)
-            if hasattr(input, "owner") and input.owner is not None and input.owner != "":
+            if "owner" in provided_fields and input.owner is not None and str(input.owner).strip() != "":
                 try:
                     stage.owner_id = int(input.owner)
                 except (ValueError, TypeError):
                     # Invalid owner ID, keep existing owner
                     pass
 
-            # Update attributes - check for None explicitly, not falsy values
-            if hasattr(input, "cover") and input.cover is not None:
+            # Update attributes - only if field was provided in the input
+            # Cover can be None, empty string, or URL
+            if "cover" in provided_fields and input.cover is not None:
                 self.update_stage_attribute(
-                    stage.id, "cover", input.cover, local_db_session
+                    stage.id, "cover", str(input.cover), local_db_session
                 )
             
-            if hasattr(input, "visibility") and input.visibility is not None:
+            # Visibility - bool can be False, so check if field was provided
+            if "visibility" in provided_fields and input.visibility is not None:
                 self.update_stage_attribute(
-                    stage.id, "visibility", str(input.visibility).lower(), local_db_session
+                    stage.id, "visibility", str(bool(input.visibility)).lower(), local_db_session
                 )
             
-            if hasattr(input, "description") and input.description is not None:
+            # Status - must be explicitly provided and not empty
+            if "status" in provided_fields and input.status is not None and str(input.status).strip() != "":
                 self.update_stage_attribute(
-                    stage.id, "description", input.description, local_db_session
+                    stage.id, "status", str(input.status).lower().strip(), local_db_session
                 )
             
-            # Update status - must be explicitly provided and not empty
-            if hasattr(input, "status") and input.status is not None and input.status != "":
+            # PlayerAccess - can be empty JSON array string "[]" or JSON string
+            if "playerAccess" in provided_fields and input.playerAccess is not None:
                 self.update_stage_attribute(
-                    stage.id, "status", str(input.status).lower(), local_db_session
+                    stage.id, "playerAccess", str(input.playerAccess), local_db_session
                 )
             
-            if hasattr(input, "playerAccess") and input.playerAccess is not None:
+            # Config - can be None or JSON string
+            if "config" in provided_fields and input.config is not None:
                 self.update_stage_attribute(
-                    stage.id, "playerAccess", input.playerAccess, local_db_session
-                )
-            
-            if hasattr(input, "config") and input.config is not None:
-                self.update_stage_attribute(
-                    stage.id, "config", input.config, local_db_session
+                    stage.id, "config", str(input.config), local_db_session
                 )
             
             local_db_session.commit()
@@ -394,24 +396,34 @@ class StageService:
         if value is None:
             return
 
-        if stage_id:
-            stage_attribute = (
-                local_db_session.query(StageAttributeModel)
-                .filter(
-                    and_(
-                        StageAttributeModel.stage_id == stage_id,
-                        StageAttributeModel.name == name,
-                    )
+        if not stage_id:
+            return
+
+        # Convert value to string to ensure consistency
+        value_str = str(value) if value is not None else ""
+        
+        stage_attribute = (
+            local_db_session.query(StageAttributeModel)
+            .filter(
+                and_(
+                    StageAttributeModel.stage_id == stage_id,
+                    StageAttributeModel.name == name,
                 )
-                .first()
             )
-            if stage_attribute:
-                stage_attribute.description = value
-            else:
-                local_db_session.add(
-                    StageAttributeModel(stage_id=stage_id, name=name, description=value)
-                )
-            local_db_session.flush()
+            .first()
+        )
+        
+        if stage_attribute:
+            # Update existing attribute
+            stage_attribute.description = value_str
+        else:
+            # Create new attribute
+            local_db_session.add(
+                StageAttributeModel(stage_id=stage_id, name=name, description=value_str)
+            )
+        
+        # Flush to ensure the change is in the session
+        local_db_session.flush()
 
     def delete_stage(self, user: UserModel, id: int):
         with ScopedSession() as local_db_session:

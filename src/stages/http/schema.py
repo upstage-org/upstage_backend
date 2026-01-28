@@ -85,9 +85,19 @@ def create_stage(_, info, input):
 @mutation.field("updateStage")
 @authenticated(allowed_roles=[SUPER_ADMIN, ADMIN, PLAYER])
 def update_stage(_, info, input):
+    # Check which fields were actually provided in the GraphQL input
+    # Fields not provided won't be in the input dict
+    provided_fields = set(input.keys())
+    
+    # Create the Pydantic model - it will set Optional fields to None if not provided
+    stage_input = UpdateStageInput(**input)
+    
+    # Store which fields were actually provided for the service to use
+    stage_input._provided_fields = provided_fields
+    
     return StageService().update_stage(
         UserModel(**info.context["request"].state.current_user),
-        UpdateStageInput(**input),
+        stage_input,
     )
 
 
