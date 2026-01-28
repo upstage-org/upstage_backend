@@ -419,9 +419,69 @@ class StageService:
                 )
             
             local_db_session.commit()
+            
+            # Expire the stage object to force reload of relationships and hybrid properties
+            local_db_session.expire(stage)
+            local_db_session.refresh(stage)
+            
+            # Get all stage attributes (to_dict() returns empty array for dynamic relationships)
+            # Query directly from DB to ensure we get the latest values
+            stage_attributes = (
+                local_db_session.query(StageAttributeModel)
+                .filter(StageAttributeModel.stage_id == stage.id)
+                .all()
+            )
+            attributes_list = [
+                {
+                    "id": attr.id,
+                    "name": attr.name,
+                    "description": attr.description,
+                }
+                for attr in stage_attributes
+            ]
+            
+            # Get parent stages for assets
+            parent_stages = (
+                local_db_session.query(ParentStageModel)
+                .filter(ParentStageModel.stage_id == stage.id)
+                .order_by(ParentStageModel.id)
+                .all()
+            )
+            assets_list = [ps.child_asset.to_dict() for ps in parent_stages]
+            
+            # Get attribute values - query directly from DB instead of using hybrid properties
+            # to ensure we get the latest values after update
+            cover_attr = next((attr for attr in stage_attributes if attr.name == "cover"), None)
+            cover = cover_attr.description if cover_attr else None
+            
+            visibility_attr = next((attr for attr in stage_attributes if attr.name == "visibility"), None)
+            visibility = visibility_attr.description == "true" if visibility_attr else False
+            
+            status_attr = next((attr for attr in stage_attributes if attr.name == "status"), None)
+            status = status_attr.description if status_attr else None
+            
+            player_access_attr = next((attr for attr in stage_attributes if attr.name == "playerAccess"), None)
+            player_access = player_access_attr.description if player_access_attr else None
+            
+            # Get permission
+            permission = self.extract_permission(user, stage)
+            
             # Convert to dict while object is still attached to session
             stage_dict = stage.to_dict()
-            return convert_keys_to_camel_case(stage_dict)
+            
+            # Return the same format as get_stage_by_id
+            return convert_keys_to_camel_case(
+                {
+                    **stage_dict,
+                    "assets": assets_list,
+                    "attributes": attributes_list,
+                    "cover": cover,
+                    "visibility": visibility,
+                    "status": status,
+                    "playerAccess": player_access,
+                    "permission": permission,
+                }
+            )
 
     def update_stage_attribute(
         self, stage_id: int, name: str, value: str, local_db_session
