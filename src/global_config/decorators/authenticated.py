@@ -10,12 +10,17 @@ if projdir not in sys.path:
     sys.path.append(projdir)
     sys.path.append(projdir2)
 
+from datetime import datetime, timedelta
 from functools import wraps
 from fastapi import Request
 import jwt
 from graphql import GraphQLError
 from global_config.env import ALGORITHM, SECRET_KEY
 from users.services.user import UserService
+
+# When validating the access token, update last_login at most this often per user
+# so the Player Management "Last Login" column reflects recent activity.
+LAST_LOGIN_UPDATE_THROTTLE = timedelta(hours=1)
 
 
 def authenticated(allowed_roles=None):
@@ -58,6 +63,17 @@ def authenticated(allowed_roles=None):
 
                     if allowed_roles and current_user.role not in allowed_roles:
                         raise GraphQLError("Permission denied")
+
+                    # Keep "Last Login" in Player Management accurate: update when we see
+                    # an authenticated request, throttled to avoid a write on every request.
+                    now = datetime.now()
+                    if (
+                        current_user.last_login is None
+                        or (now - current_user.last_login) > LAST_LOGIN_UPDATE_THROTTLE
+                    ):
+                        local_db_session.query(UserModel).filter(
+                            UserModel.id == user_id
+                        ).update({"last_login": now})
 
                     # Convert to dict while object is still attached to session
                     user_dict = current_user.to_dict()
