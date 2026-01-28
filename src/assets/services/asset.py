@@ -104,7 +104,7 @@ class AssetService:
                     ParentStageModel, AssetModel.id == ParentStageModel.child_asset_id
                 )
                 .outerjoin(StageModel, ParentStageModel.stage_id == AssetModel.id)
-                .group_by(AssetModel.id)
+                .group_by(AssetModel.id, UserModel.id)
             )
 
             if user_role not in [SUPER_ADMIN, ADMIN]:
