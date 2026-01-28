@@ -10,7 +10,7 @@ if projdir not in sys.path:
     sys.path.append(projdir)
     sys.path.append(projdir2)
 
-from datetime import datetime
+import arrow
 from enum import Enum
 from sqlalchemy import (
     TIMESTAMP,
@@ -48,8 +48,8 @@ class AssetModel(BaseModel):
     owner_id = Column(Integer, ForeignKey("upstage_user.id"), nullable=False, default=0)
     description = Column(Text, nullable=True)
     file_location = Column(Text, nullable=False)
-    created_on = Column(TIMESTAMP(timezone=True), default=datetime.now)
-    updated_on = Column(TIMESTAMP(timezone=True), default=datetime.now)
+    created_on = Column(TIMESTAMP(timezone=True), default=lambda: arrow.utcnow().datetime)
+    updated_on = Column(TIMESTAMP(timezone=True), default=lambda: arrow.utcnow().datetime)
     size = Column(BigInteger, nullable=False, default=0)
     copyright_level = Column(Integer, nullable=False, default=0)
     dormant = Column(Boolean, nullable=False, default=False)

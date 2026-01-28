@@ -11,7 +11,7 @@ if projdir not in sys.path:
     sys.path.append(projdir)
     sys.path.append(projdir2)
 
-from datetime import datetime, timedelta
+import arrow
 import hashlib
 import json
 from operator import or_
@@ -426,7 +426,7 @@ class AssetService:
                     asset.owner_id = new_owner.id
             else:
                 raise GraphQLError("Owner not found")
-        asset.updated_on = datetime.now()
+        asset.updated_on = arrow.utcnow().datetime
         local_db_session.flush()
 
     def process_file_location(self, input, local_db_session, asset):
@@ -581,7 +581,7 @@ class AssetService:
     def resolve_sign(self, user: UserModel, asset: AssetModel):
         if asset.owner_id == user.id:
             timestamp = int(
-                (datetime.now() + timedelta(days=STREAM_EXPIRY_DAYS)).timestamp()
+                arrow.utcnow().shift(days=STREAM_EXPIRY_DAYS).timestamp()
             )
             payload = "/live/{0}-{1}-{2}".format(
                 asset.file_location, timestamp, STREAM_KEY
@@ -593,7 +593,7 @@ class AssetService:
     def resolve_sign_from_values(self, owner: UserModel, file_location: str, owner_id: int, user_id: Optional[int]):
         if owner_id == user_id:
             timestamp = int(
-                (datetime.now() + timedelta(days=STREAM_EXPIRY_DAYS)).timestamp()
+                arrow.utcnow().shift(days=STREAM_EXPIRY_DAYS).timestamp()
             )
             payload = "/live/{0}-{1}-{2}".format(
                 file_location, timestamp, STREAM_KEY

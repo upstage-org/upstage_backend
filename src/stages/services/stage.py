@@ -11,7 +11,7 @@ if projdir not in sys.path:
     sys.path.append(projdir2)
 
 import re
-from datetime import datetime
+import arrow
 from graphql import GraphQLError
 import jwt
 from requests import Request
@@ -610,7 +610,7 @@ class StageService:
             if not stage:
                 raise GraphQLError("Stage not found")
 
-            stage.last_access = datetime.now()
+            stage.last_access = arrow.utcnow().datetime
             local_db_session.commit()
             # Get last_access while object is still attached to session
             result = stage.last_access

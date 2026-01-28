@@ -10,7 +10,7 @@ if projdir not in sys.path:
     sys.path.append(projdir)
     sys.path.append(projdir2)
 
-from datetime import datetime
+import arrow
 from global_config.db_models.base import BaseModel
 from sqlalchemy import Column, Integer, String, DateTime
 from sqlalchemy.dialects import postgresql
@@ -23,4 +23,4 @@ class ConnectionStatModel(BaseModel):
     mqtt_timestamp = Column(DateTime, index=True)
     topic = Column(String)
     payload = Column(postgresql.JSON)
-    created = Column(DateTime, default=datetime.now, index=True)
+    created = Column(DateTime, default=lambda: arrow.utcnow().datetime, index=True)

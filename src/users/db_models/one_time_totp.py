@@ -10,7 +10,7 @@ if projdir not in sys.path:
     sys.path.append(projdir)
     sys.path.append(projdir2)
 
-from datetime import datetime
+import arrow
 from sqlalchemy import BigInteger, Boolean, Column, DateTime, ForeignKey, Integer, Text
 from sqlalchemy.orm import relationship
 
@@ -28,6 +28,6 @@ class OneTimeTOTPModel(BaseModel):
     )
     url = Column(Text, nullable=False, default="")
     code = Column(Text, nullable=False, default="")
-    recorded_time = Column(DateTime, nullable=False, index=True, default=datetime.now())
+    recorded_time = Column(DateTime, nullable=False, index=True, default=lambda: arrow.utcnow().datetime)
     active = Column(Boolean, nullable=False, index=True, default=True)
     user = relationship("UserModel", foreign_keys=[user_id])

@@ -10,7 +10,7 @@ if projdir not in sys.path:
     sys.path.append(projdir)
     sys.path.append(projdir2)
 
-from datetime import datetime
+import arrow
 from sqlalchemy import BigInteger, Column, DateTime, ForeignKey, Integer, String, Text
 from sqlalchemy.orm import relationship
 from sqlalchemy.ext.hybrid import hybrid_property
@@ -31,7 +31,7 @@ class StageModel(BaseModel):
     description = Column(Text, nullable=True)
     owner_id = Column(Integer, ForeignKey("upstage_user.id"), nullable=False, default=0)
     file_location = Column(Text, nullable=False)
-    created_on = Column(DateTime, nullable=False, default=datetime.now)
+    created_on = Column(DateTime, nullable=False, default=lambda: arrow.utcnow().datetime)
     last_access = Column(DateTime, nullable=True)
     owner = relationship("UserModel", foreign_keys=[owner_id])
     attributes = relationship(

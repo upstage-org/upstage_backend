@@ -10,7 +10,7 @@ if projdir not in sys.path:
     sys.path.append(projdir)
     sys.path.append(projdir2)
 
-from datetime import datetime
+import arrow
 from sqlalchemy import BigInteger, Boolean, Column, DateTime, ForeignKey, Integer, Text
 from global_config.db_models.base import BaseModel
 from sqlalchemy.orm import relationship
@@ -26,7 +26,7 @@ class SceneModel(BaseModel):
     scene_order = Column(Integer, index=True, nullable=True, default=0)
     scene_preview = Column(Text, nullable=True)
     payload = Column(Text, nullable=False)
-    created_on = Column(DateTime, nullable=False, default=datetime.now)
+    created_on = Column(DateTime, nullable=False, default=lambda: arrow.utcnow().datetime)
     active = Column(Boolean, nullable=False, default=True)
     owner_id = Column(Integer, ForeignKey(UserModel.id), nullable=False, default=0)
     stage_id = Column(Integer, ForeignKey(StageModel.id), nullable=False, default=0)

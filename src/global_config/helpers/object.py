@@ -1,6 +1,5 @@
 import re
 from sqlalchemy.ext.declarative import DeclarativeMeta
-from datetime import datetime
 
 
 def snake_to_camel(snake_str):

@@ -10,7 +10,7 @@ if projdir not in sys.path:
     sys.path.append(projdir)
     sys.path.append(projdir2)
 
-from datetime import datetime
+import arrow
 from sqlalchemy import (
     BigInteger,
     Boolean,
@@ -31,7 +31,7 @@ class PerformanceModel(BaseModel):
     name = Column(String, nullable=True)
     description = Column(Text, nullable=True)
     stage_id = Column(Integer, ForeignKey("stage.id"), nullable=False, default=0)
-    created_on = Column(DateTime, nullable=False, default=datetime.now)
+    created_on = Column(DateTime, nullable=False, default=lambda: arrow.utcnow().datetime)
     saved_on = Column(DateTime, nullable=True)
     recording = Column(Boolean, nullable=False, default=False)
     stage = relationship("StageModel", foreign_keys=[stage_id])

@@ -10,7 +10,7 @@ if projdir not in sys.path:
     sys.path.append(projdir)
     sys.path.append(projdir2)
 
-from datetime import datetime
+import arrow
 from sqlalchemy import BigInteger, Column, Integer, Text, DateTime, ForeignKey
 from sqlalchemy.orm import relationship
 from global_config.db_models.base import BaseModel
@@ -29,7 +29,7 @@ class UserSessionModel(BaseModel):
     access_token = Column(Text, default=None)
     refresh_token = Column(Text, default=None)
     recorded_time = Column(
-        DateTime, nullable=False, index=True, default=datetime.utcnow
+        DateTime, nullable=False, index=True, default=lambda: arrow.utcnow().datetime
     )
     app_version = Column(Text, default=None)
     app_os_type = Column(Text, default=None)

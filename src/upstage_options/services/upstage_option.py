@@ -1,5 +1,4 @@
 # -*- coding: iso8859-15 -*-
-from datetime import datetime
 import os
 import sys
 

@@ -10,7 +10,7 @@ if projdir not in sys.path:
     sys.path.append(projdir)
     sys.path.append(projdir2)
 
-from datetime import datetime
+import arrow
 from sqlalchemy.orm import relationship
 from sqlalchemy import BigInteger, Column, DateTime, ForeignKey, Integer, Text
 from global_config.db_models.base import BaseModel
@@ -33,7 +33,7 @@ class PerformanceMQTTConfigModel(BaseModel):
     topic_name = Column(Text, unique=True, nullable=False)
     username = Column(Text, nullable=False)
     password = Column(Text, nullable=False)
-    created_on = Column(DateTime, nullable=False, default=datetime.now)
+    created_on = Column(DateTime, nullable=False, default=lambda: arrow.utcnow().datetime)
     expires_on = Column(DateTime, nullable=False, default=None)
     performance_id = Column(
         Integer, ForeignKey("performance_config.id"), nullable=False, default=0

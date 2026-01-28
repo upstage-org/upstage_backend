@@ -10,7 +10,7 @@ if projdir not in sys.path:
     sys.path.append(projdir)
     sys.path.append(projdir2)
 
-from datetime import datetime
+import arrow
 from enum import Enum
 from sqlalchemy import (
     BigInteger,
@@ -33,7 +33,7 @@ class AssetUsageModel(BaseModel):
     approved = Column(Boolean, nullable=False, default=False)
     seen = Column(Boolean, nullable=False, default=False)
     note = Column(String, nullable=True)
-    created_on = Column(DateTime, nullable=False, default=datetime.utcnow)
+    created_on = Column(DateTime, nullable=False, default=lambda: arrow.utcnow().datetime)
     user = relationship("UserModel", foreign_keys=[user_id])
     asset = relationship("AssetModel", foreign_keys=[asset_id])
 

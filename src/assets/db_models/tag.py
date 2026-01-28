@@ -10,7 +10,7 @@ if projdir not in sys.path:
     sys.path.append(projdir)
     sys.path.append(projdir2)
 
-from datetime import datetime
+import arrow
 from sqlalchemy import BigInteger, Column, DateTime, String
 from global_config.db_models.base import BaseModel
 
@@ -20,4 +20,4 @@ class TagModel(BaseModel):
     id = Column(BigInteger, primary_key=True)
     name = Column(String, nullable=False)
     color = Column(String, nullable=True)
-    created_on = Column(DateTime, nullable=False, default=datetime.now)
+    created_on = Column(DateTime, nullable=False, default=lambda: arrow.utcnow().datetime)

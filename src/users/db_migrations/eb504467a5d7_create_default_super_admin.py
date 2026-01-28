@@ -11,7 +11,7 @@ from typing import Sequence, Union
 from alembic import op
 from sqlalchemy.sql import table, column
 from sqlalchemy import String, Integer, Text, Boolean, TIMESTAMP
-from datetime import datetime
+import arrow
 
 from global_config.helpers.fernet_crypto import encrypt
 from users.db_models.user import SUPER_ADMIN
@@ -49,7 +49,7 @@ def upgrade() -> None:
                 "password": encrypt(f"Secret@123"),
                 "role": SUPER_ADMIN,
                 "active": True,
-                "created_on": datetime.now(),
+                "created_on": arrow.utcnow().datetime,
                 "last_login": None,
                 "bin_name": "admin",
                 "can_send_email": True,

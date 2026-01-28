@@ -11,7 +11,7 @@ if projdir not in sys.path:
     sys.path.append(projdir2)
 
 import asyncio
-from datetime import datetime
+import arrow
 import json
 import os
 from typing import List
@@ -77,8 +77,8 @@ class StudioService:
                 )
 
             if "createdBetween" in params:
-                start_date = datetime.strptime(params["createdBetween"][0], "%Y-%m-%d")
-                end_date = datetime.strptime(params["createdBetween"][1], "%Y-%m-%d")
+                start_date = arrow.get(params["createdBetween"][0], "YYYY-MM-DD").datetime
+                end_date = arrow.get(params["createdBetween"][1], "YYYY-MM-DD").datetime
                 query = query.filter(UserModel.created_on.between(start_date, end_date))
 
             if "sort" in params:
@@ -255,7 +255,7 @@ class StudioService:
                 )
             )
         if not value and user.active:
-            user.deactivated_on = datetime.now()
+            user.deactivated_on = arrow.utcnow().datetime
 
     def delete_user(self, id: int, current_user: UserModel):
         with ScopedSession() as local_db_session:

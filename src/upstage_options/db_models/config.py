@@ -11,7 +11,7 @@ if projdir not in sys.path:
     sys.path.append(projdir2)
 
 from sqlalchemy import Column, DateTime, String, BigInteger, Text
-from datetime import datetime
+import arrow
 from global_config.db_models.base import BaseModel
 
 
@@ -24,4 +24,4 @@ class ConfigModel(BaseModel):
     id = Column(BigInteger, primary_key=True)
     name = Column(String, nullable=False)
     value = Column(Text, nullable=True)
-    created_on = Column(DateTime, nullable=False, default=datetime.now())
+    created_on = Column(DateTime, nullable=False, default=lambda: arrow.utcnow().datetime)

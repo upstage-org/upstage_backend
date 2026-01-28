@@ -10,7 +10,8 @@ if projdir not in sys.path:
     sys.path.append(projdir)
     sys.path.append(projdir2)
 
-from datetime import datetime, timedelta
+import arrow
+from datetime import timedelta
 from graphql import GraphQLError
 import jwt
 from fastapi import Request
@@ -96,7 +97,7 @@ class AuthenticationService:
             local_db_session.flush()
 
             local_db_session.query(UserModel).filter(UserModel.id == user_id).update(
-                {"last_login": datetime.utcnow()}
+                {"last_login": arrow.utcnow().datetime}
             )
             local_db_session.commit()
 
@@ -150,7 +151,7 @@ class AuthenticationService:
         self, data: dict, exp=timedelta(minutes=int(JWT_ACCESS_TOKEN_MINUTES))
     ):
         to_encode = data.copy()
-        expire = datetime.now() + exp
+        expire = arrow.utcnow().shift(seconds=exp.total_seconds()).datetime
         to_encode.update({"exp": expire})
         encoded_jwt = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
         return encoded_jwt
@@ -221,7 +222,7 @@ class AuthenticationService:
             local_db_session.flush()
 
             local_db_session.query(UserModel).filter(UserModel.id == user.id).update(
-                {"last_login": datetime.utcnow()}
+                {"last_login": arrow.utcnow().datetime}
             )
             local_db_session.commit()
 

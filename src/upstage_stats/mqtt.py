@@ -12,7 +12,8 @@ if projdir not in sys.path:
 
 import json
 import secrets
-from datetime import datetime, timedelta
+import arrow
+from datetime import timedelta
 
 import paho.mqtt.client as mqtt
 
@@ -32,7 +33,7 @@ def on_connect(client: mqtt.Client, userdata, flags, rc):
         client.subscribe(CONNECTION_TOPIC)
         connection_payload = {
             "connected": client._client_id.decode("utf-8"),
-            "timestamp": datetime.now().isoformat(),
+            "timestamp": arrow.utcnow().isoformat(),
             "channel": CONNECTION_TOPIC,
         }
         client.publish(CONNECTION_TOPIC, payload=json.dumps(connection_payload))
@@ -77,7 +78,7 @@ def on_message(client: mqtt.Client, userdata, msg: mqtt.MQTTMessage):
                     if not receive_stat.first():
                         receive_stat = ReceiveStatModel(
                             received_id=client_id,
-                            mqtt_timestamp=datetime.now(),
+                            mqtt_timestamp=arrow.utcnow().datetime,
                             topic=LIVE_CLIENT_TOPIC,
                             payload=payload,
                         )
@@ -85,7 +86,7 @@ def on_message(client: mqtt.Client, userdata, msg: mqtt.MQTTMessage):
                     else:
                         receive_stat.update(
                             {
-                                ReceiveStatModel.mqtt_timestamp: datetime.now(),
+                                ReceiveStatModel.mqtt_timestamp: arrow.utcnow().datetime,
                                 ReceiveStatModel.payload: payload,
                             },
                             synchronize_session=False,
@@ -115,7 +116,7 @@ def build_client(client_id=get_client_id(), transport=MQTT_TRANSPORT):
 
 
 def get_not_alive_users():
-    two_minute_ago = datetime.now() - timedelta(minutes=2)
+    two_minute_ago = arrow.utcnow().shift(minutes=-2).datetime
     with ScopedSession() as local_db_session:
         not_alive_clients = (
             local_db_session.query(ReceiveStatModel)

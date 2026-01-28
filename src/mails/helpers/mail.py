@@ -12,7 +12,7 @@ if projdir not in sys.path:
 
 
 from asyncio import sleep
-from datetime import datetime
+import arrow
 from email.mime.application import MIMEApplication
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
@@ -116,7 +116,7 @@ def call_send_email_external_api(subject, body, recipients, cc, bcc, filenames):
 def save_email_token_client(token, _):
     client = get_mongo_token_collection()
     # client.delete_many({})
-    client.insert_one({"token": token, "expired_date": datetime.now()})
+    client.insert_one({"token": token, "expired_date": arrow.utcnow().datetime})
 
 
 def valid_token(token):
@@ -140,7 +140,7 @@ async def generate_email_token_clients():
                 {
                     "token": live_token,
                     "from_server": client_server,
-                    "expired_date": datetime.now(),
+                    "expired_date": arrow.utcnow().datetime,
                 }
             )
         await sleep(EMAIL_TIME_EXPIRED_TOKEN)

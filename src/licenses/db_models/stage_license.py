@@ -10,7 +10,7 @@ if projdir not in sys.path:
     sys.path.append(projdir)
     sys.path.append(projdir2)
 
-from datetime import datetime
+import arrow
 from sqlalchemy import (
     BigInteger,
     Boolean,
@@ -35,7 +35,7 @@ class StageLicenseModel(BaseModel):
     __tablename__ = "stage_license"
     id = Column(BigInteger, primary_key=True)
     stage_id = Column(Integer, ForeignKey(StageModel.id), nullable=False, default=0)
-    created_on = Column(DateTime, nullable=False, default=datetime.utcnow)
+    created_on = Column(DateTime, nullable=False, default=lambda: arrow.utcnow().datetime)
     expires_on = Column(DateTime, nullable=True)
     access_path = Column(String, nullable=False, unique=True)
     grant_recursively = Column(Boolean, nullable=False, default=False)

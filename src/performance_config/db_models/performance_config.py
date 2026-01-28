@@ -10,7 +10,7 @@ if projdir not in sys.path:
     sys.path.append(projdir)
     sys.path.append(projdir2)
 
-from datetime import datetime
+import arrow
 from sqlalchemy import BigInteger, Column, DateTime, ForeignKey, Integer, String, Text
 from global_config.db_models.base import BaseModel
 from sqlalchemy.orm import relationship
@@ -24,7 +24,7 @@ class PerformanceConfigModel(BaseModel):
     description = Column(Text, nullable=False)
     splash_screen_text = Column(Text, nullable=True, default=None)
     splash_screen_animation_urls = Column(Text, nullable=True, default=None)
-    created_on = Column(DateTime, nullable=False, default=datetime.now)
+    created_on = Column(DateTime, nullable=False, default=lambda: arrow.utcnow().datetime)
     expires_on = Column(DateTime, nullable=False, default=None)
 
     owner = relationship("UserModel", foreign_keys=[owner_id])

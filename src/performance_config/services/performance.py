@@ -10,7 +10,7 @@ if projdir not in sys.path:
     sys.path.append(projdir)
     sys.path.append(projdir2)
 
-from datetime import datetime
+import arrow
 from graphql import GraphQLError
 from global_config.database import ScopedSession
 from global_config.helpers.object import convert_keys_to_camel_case
@@ -126,7 +126,7 @@ class PerformanceService:
                 and user.id != performance.stage.owner_id
             ):
                 raise GraphQLError("Only stage owner or Admin can save a recording!")
-            saved_on = datetime.now()
+            saved_on = arrow.utcnow().datetime
 
             events = (
                 local_db_session.query(EventModel)

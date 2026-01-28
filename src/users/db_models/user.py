@@ -11,7 +11,7 @@ if projdir not in sys.path:
     sys.path.append(projdir2)
 
 from sqlalchemy import TIMESTAMP, BigInteger, Boolean, Column, Integer, String, Text
-from datetime import datetime
+import arrow
 from global_config.db_models.base import BaseModel
 
 
@@ -41,7 +41,7 @@ class UserModel(BaseModel):
     display_name = Column(String, default="")
     active = Column(Boolean, nullable=False, default=False)
     firebase_pushnot_id = Column(String, default=None)
-    created_on = Column(TIMESTAMP(timezone=True), default=datetime.now)
+    created_on = Column(TIMESTAMP(timezone=True), default=lambda: arrow.utcnow().datetime)
     deactivated_on = Column(TIMESTAMP(timezone=True), default=None)
     upload_limit = Column(Integer, default=1024 * 1024)
     intro = Column(Text, default=None)

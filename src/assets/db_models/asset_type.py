@@ -10,7 +10,7 @@ if projdir not in sys.path:
     sys.path.append(projdir)
     sys.path.append(projdir2)
 
-from datetime import datetime
+import arrow
 from sqlalchemy import BigInteger, Column, DateTime, String, Text
 from global_config.db_models.base import BaseModel
 
@@ -27,4 +27,4 @@ class AssetTypeModel(BaseModel):
     name = Column(String, nullable=False)
     description = Column(Text, nullable=True)
     file_location = Column(Text, nullable=False)
-    created_on = Column(DateTime, nullable=False, default=datetime.now)
+    created_on = Column(DateTime, nullable=False, default=lambda: arrow.utcnow().datetime)

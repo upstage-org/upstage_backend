@@ -10,7 +10,8 @@ if projdir not in sys.path:
     sys.path.append(projdir)
     sys.path.append(projdir2)
 
-from datetime import datetime, timedelta, timezone
+import arrow
+from datetime import timedelta
 from functools import wraps
 from fastapi import Request
 import jwt
@@ -67,12 +68,12 @@ def authenticated(allowed_roles=None):
                     # Keep "Last Login" in Player Management accurate: update when we see
                     # an authenticated request, throttled to avoid a write on every request.
                     # Use timezone-unaware UTC-0 datetime
-                    now = datetime.utcnow()
+                    now = arrow.utcnow().datetime
                     last_login = current_user.last_login
                     # Convert timezone-aware datetime to timezone-unaware UTC if needed
                     if last_login is not None and last_login.tzinfo is not None:
                         # Convert to UTC, then remove timezone info to get naive UTC
-                        last_login = last_login.astimezone(timezone.utc).replace(tzinfo=None)
+                        last_login = arrow.get(last_login).to('UTC').datetime.replace(tzinfo=None)
                     if (
                         last_login is None
                         or (now - last_login) > LAST_LOGIN_UPDATE_THROTTLE
