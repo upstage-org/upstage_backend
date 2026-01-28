@@ -13,6 +13,7 @@ if projdir not in sys.path:
 
 from asyncio import sleep
 import arrow
+from global_config.helpers.object import get_naive_utc_now
 from email.mime.application import MIMEApplication
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
@@ -116,7 +117,7 @@ def call_send_email_external_api(subject, body, recipients, cc, bcc, filenames):
 def save_email_token_client(token, _):
     client = get_mongo_token_collection()
     # client.delete_many({})
-    client.insert_one({"token": token, "expired_date": arrow.utcnow().datetime})
+    client.insert_one({"token": token, "expired_date": get_naive_utc_now()})
 
 
 def valid_token(token):
@@ -140,7 +141,7 @@ async def generate_email_token_clients():
                 {
                     "token": live_token,
                     "from_server": client_server,
-                    "expired_date": arrow.utcnow().datetime,
+                    "expired_date": get_naive_utc_now(),
                 }
             )
         await sleep(EMAIL_TIME_EXPIRED_TOKEN)

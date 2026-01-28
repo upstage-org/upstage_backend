@@ -12,6 +12,7 @@ if projdir not in sys.path:
 
 import arrow
 from datetime import timedelta
+from global_config.helpers.object import get_naive_utc_now
 from functools import wraps
 from fastapi import Request
 import jwt
@@ -68,7 +69,7 @@ def authenticated(allowed_roles=None):
                     # Keep "Last Login" in Player Management accurate: update when we see
                     # an authenticated request, throttled to avoid a write on every request.
                     # Use timezone-unaware UTC-0 datetime
-                    now = arrow.utcnow().datetime
+                    now = get_naive_utc_now()
                     last_login = current_user.last_login
                     # Convert timezone-aware datetime to timezone-unaware UTC if needed
                     if last_login is not None:

@@ -20,7 +20,7 @@ from global_config.database import (
     ScopedSession,
 )
 from global_config.env import ALGORITHM, SECRET_KEY
-from global_config.helpers.object import convert_keys_to_camel_case, normalize_datetime_to_naive_utc
+from global_config.helpers.object import convert_keys_to_camel_case, normalize_datetime_to_naive_utc, get_naive_utc_now
 
 from assets.db_models.asset_usage import AssetUsageModel, NotificationType
 from stages.services.stage_operation import StageOperationService
@@ -611,7 +611,7 @@ class StageService:
             if not stage:
                 raise GraphQLError("Stage not found")
 
-            stage.last_access = arrow.utcnow().datetime
+            stage.last_access = get_naive_utc_now()
             local_db_session.commit()
             # Get last_access while object is still attached to session
             result = stage.last_access

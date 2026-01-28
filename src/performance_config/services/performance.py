@@ -13,7 +13,7 @@ if projdir not in sys.path:
 import arrow
 from graphql import GraphQLError
 from global_config.database import ScopedSession
-from global_config.helpers.object import convert_keys_to_camel_case, normalize_datetime_to_naive_utc
+from global_config.helpers.object import convert_keys_to_camel_case, normalize_datetime_to_naive_utc, get_naive_utc_now
 from event_archive.db_models.event import EventModel
 from performance_config.db_models.performance import PerformanceModel
 from performance_config.db_models.performance_mqtt_config import (
@@ -126,7 +126,7 @@ class PerformanceService:
                 and user.id != performance.stage.owner_id
             ):
                 raise GraphQLError("Only stage owner or Admin can save a recording!")
-            saved_on = arrow.utcnow().datetime
+            saved_on = get_naive_utc_now()
             
             # Normalize datetimes to timezone-naive UTC for SQLAlchemy query comparison
             # SQLAlchemy can handle timezone-aware datetimes, but we ensure consistency

@@ -13,6 +13,7 @@ if projdir not in sys.path:
 from sqlalchemy import TIMESTAMP, BigInteger, Boolean, Column, Integer, String, Text
 import arrow
 from global_config.db_models.base import BaseModel
+from global_config.helpers.object import get_naive_utc_now
 
 
 PLAYER = 1
@@ -41,7 +42,7 @@ class UserModel(BaseModel):
     display_name = Column(String, default="")
     active = Column(Boolean, nullable=False, default=False)
     firebase_pushnot_id = Column(String, default=None)
-    created_on = Column(TIMESTAMP(timezone=True), default=lambda: arrow.utcnow().datetime)
+    created_on = Column(TIMESTAMP(timezone=True), default=lambda: get_naive_utc_now())
     deactivated_on = Column(TIMESTAMP(timezone=True), default=None)
     upload_limit = Column(Integer, default=1024 * 1024)
     intro = Column(Text, default=None)

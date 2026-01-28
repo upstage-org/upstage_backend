@@ -15,6 +15,7 @@ from sqlalchemy import BigInteger, Column, DateTime, ForeignKey, Integer, String
 from sqlalchemy.orm import relationship
 from sqlalchemy.ext.hybrid import hybrid_property
 from global_config.db_models.base import BaseModel
+from global_config.helpers.object import get_naive_utc_now
 from stages.db_models.stage_attribute import StageAttributeModel
 from stages.db_models.parent_stage import ParentStageModel
 
@@ -31,7 +32,7 @@ class StageModel(BaseModel):
     description = Column(Text, nullable=True)
     owner_id = Column(Integer, ForeignKey("upstage_user.id"), nullable=False, default=0)
     file_location = Column(Text, nullable=False)
-    created_on = Column(DateTime, nullable=False, default=lambda: arrow.utcnow().datetime)
+    created_on = Column(DateTime, nullable=False, default=lambda: get_naive_utc_now())
     last_access = Column(DateTime, nullable=True)
     owner = relationship("UserModel", foreign_keys=[owner_id])
     attributes = relationship(

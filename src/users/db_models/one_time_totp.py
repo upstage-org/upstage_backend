@@ -15,6 +15,7 @@ from sqlalchemy import BigInteger, Boolean, Column, DateTime, ForeignKey, Intege
 from sqlalchemy.orm import relationship
 
 from global_config.db_models.base import BaseModel
+from global_config.helpers.object import get_naive_utc_now
 
 
 class OneTimeTOTPModel(BaseModel):
@@ -28,6 +29,6 @@ class OneTimeTOTPModel(BaseModel):
     )
     url = Column(Text, nullable=False, default="")
     code = Column(Text, nullable=False, default="")
-    recorded_time = Column(DateTime, nullable=False, index=True, default=lambda: arrow.utcnow().datetime)
+    recorded_time = Column(DateTime, nullable=False, index=True, default=lambda: get_naive_utc_now())
     active = Column(Boolean, nullable=False, index=True, default=True)
     user = relationship("UserModel", foreign_keys=[user_id])

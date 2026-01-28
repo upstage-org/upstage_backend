@@ -24,6 +24,7 @@ from sqlalchemy import (
 )
 from sqlalchemy.orm import relationship
 from global_config.db_models.base import BaseModel
+from global_config.helpers.object import get_naive_utc_now
 from assets.db_models.asset_type import AssetTypeModel
 from assets.db_models.asset_license import AssetLicenseModel
 from assets.db_models.media_tag import MediaTagModel
@@ -48,8 +49,8 @@ class AssetModel(BaseModel):
     owner_id = Column(Integer, ForeignKey("upstage_user.id"), nullable=False, default=0)
     description = Column(Text, nullable=True)
     file_location = Column(Text, nullable=False)
-    created_on = Column(TIMESTAMP(timezone=True), default=lambda: arrow.utcnow().datetime)
-    updated_on = Column(TIMESTAMP(timezone=True), default=lambda: arrow.utcnow().datetime)
+    created_on = Column(TIMESTAMP(timezone=True), default=lambda: get_naive_utc_now())
+    updated_on = Column(TIMESTAMP(timezone=True), default=lambda: get_naive_utc_now())
     size = Column(BigInteger, nullable=False, default=0)
     copyright_level = Column(Integer, nullable=False, default=0)
     dormant = Column(Boolean, nullable=False, default=False)

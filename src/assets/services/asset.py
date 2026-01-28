@@ -27,7 +27,7 @@ from global_config.env import (
     STREAM_EXPIRY_DAYS,
     STREAM_KEY,
 )
-from global_config.helpers.object import convert_keys_to_camel_case, normalize_datetime_to_naive_utc
+from global_config.helpers.object import convert_keys_to_camel_case, normalize_datetime_to_naive_utc, get_naive_utc_now
 from sqlalchemy.orm import joinedload, selectinload, contains_eager
 from assets.db_models.asset import AssetModel, AvatarVoice, Voice, Previlege
 from assets.db_models.asset_license import AssetLicenseModel
@@ -427,7 +427,7 @@ class AssetService:
                     asset.owner_id = new_owner.id
             else:
                 raise GraphQLError("Owner not found")
-        asset.updated_on = arrow.utcnow().datetime
+        asset.updated_on = get_naive_utc_now()
         local_db_session.flush()
 
     def process_file_location(self, input, local_db_session, asset):
@@ -582,7 +582,7 @@ class AssetService:
     def resolve_sign(self, user: UserModel, asset: AssetModel):
         if asset.owner_id == user.id:
             timestamp = int(
-                arrow.utcnow().shift(days=STREAM_EXPIRY_DAYS).timestamp()
+                arrow.utcnow().shift(days=STREAM_EXPIRY_DAYS).datetime.replace(tzinfo=None).timestamp()
             )
             payload = "/live/{0}-{1}-{2}".format(
                 asset.file_location, timestamp, STREAM_KEY
@@ -594,7 +594,7 @@ class AssetService:
     def resolve_sign_from_values(self, owner: UserModel, file_location: str, owner_id: int, user_id: Optional[int]):
         if owner_id == user_id:
             timestamp = int(
-                arrow.utcnow().shift(days=STREAM_EXPIRY_DAYS).timestamp()
+                arrow.utcnow().shift(days=STREAM_EXPIRY_DAYS).datetime.replace(tzinfo=None).timestamp()
             )
             payload = "/live/{0}-{1}-{2}".format(
                 file_location, timestamp, STREAM_KEY

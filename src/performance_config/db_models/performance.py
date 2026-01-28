@@ -22,6 +22,7 @@ from sqlalchemy import (
     Text,
 )
 from global_config.db_models.base import BaseModel
+from global_config.helpers.object import get_naive_utc_now
 from sqlalchemy.orm import relationship
 
 
@@ -31,7 +32,7 @@ class PerformanceModel(BaseModel):
     name = Column(String, nullable=True)
     description = Column(Text, nullable=True)
     stage_id = Column(Integer, ForeignKey("stage.id"), nullable=False, default=0)
-    created_on = Column(DateTime, nullable=False, default=lambda: arrow.utcnow().datetime)
+    created_on = Column(DateTime, nullable=False, default=lambda: get_naive_utc_now())
     saved_on = Column(DateTime, nullable=True)
     recording = Column(Boolean, nullable=False, default=False)
     stage = relationship("StageModel", foreign_keys=[stage_id])

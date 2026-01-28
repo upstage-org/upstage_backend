@@ -13,6 +13,7 @@ if projdir not in sys.path:
 import arrow
 from sqlalchemy import Column, DateTime, Integer, String
 from global_config.db_models.base import BaseModel
+from global_config.helpers.object import get_naive_utc_now
 from sqlalchemy.dialects import postgresql
 
 
@@ -23,4 +24,4 @@ class ReceiveStatModel(BaseModel):
     mqtt_timestamp = Column(DateTime, index=True)
     topic = Column(String)
     payload = Column(postgresql.JSON)
-    created = Column(DateTime, default=lambda: arrow.utcnow().datetime, index=True)
+    created = Column(DateTime, default=lambda: get_naive_utc_now(), index=True)

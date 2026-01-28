@@ -13,6 +13,7 @@ if projdir not in sys.path:
 import arrow
 from sqlalchemy import BigInteger, Column, DateTime, String
 from global_config.db_models.base import BaseModel
+from global_config.helpers.object import get_naive_utc_now
 
 
 class TagModel(BaseModel):
@@ -20,4 +21,4 @@ class TagModel(BaseModel):
     id = Column(BigInteger, primary_key=True)
     name = Column(String, nullable=False)
     color = Column(String, nullable=True)
-    created_on = Column(DateTime, nullable=False, default=lambda: arrow.utcnow().datetime)
+    created_on = Column(DateTime, nullable=False, default=lambda: get_naive_utc_now())

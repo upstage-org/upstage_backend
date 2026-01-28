@@ -23,6 +23,7 @@ from sqlalchemy import (
 )
 from sqlalchemy.orm import relationship
 from global_config.db_models.base import BaseModel
+from global_config.helpers.object import get_naive_utc_now
 
 
 class AssetUsageModel(BaseModel):
@@ -33,7 +34,7 @@ class AssetUsageModel(BaseModel):
     approved = Column(Boolean, nullable=False, default=False)
     seen = Column(Boolean, nullable=False, default=False)
     note = Column(String, nullable=True)
-    created_on = Column(DateTime, nullable=False, default=lambda: arrow.utcnow().datetime)
+    created_on = Column(DateTime, nullable=False, default=lambda: get_naive_utc_now())
     user = relationship("UserModel", foreign_keys=[user_id])
     asset = relationship("AssetModel", foreign_keys=[asset_id])
 

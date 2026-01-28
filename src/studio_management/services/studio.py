@@ -20,7 +20,7 @@ from sqlalchemy import and_, or_, nulls_last
 
 from assets.db_models.asset_usage import AssetUsageModel
 from authentication.db_models.user_session import UserSessionModel
-from global_config.helpers.object import convert_keys_to_camel_case, normalize_datetime_to_naive_utc
+from global_config.helpers.object import convert_keys_to_camel_case, normalize_datetime_to_naive_utc, get_naive_utc_now
 from global_config.database import ScopedSession
 from global_config.env import (
     UPLOAD_USER_CONTENT_FOLDER,
@@ -258,7 +258,7 @@ class StudioService:
                 )
             )
         if not value and user.active:
-            user.deactivated_on = arrow.utcnow().datetime
+            user.deactivated_on = get_naive_utc_now()
 
     def delete_user(self, id: int, current_user: UserModel):
         with ScopedSession() as local_db_session:

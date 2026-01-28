@@ -15,6 +15,7 @@ from sqlalchemy import BigInteger, Column, DateTime, ForeignKey, Integer, String
 from sqlalchemy.orm import relationship
 from assets.db_models.asset import AssetModel
 from global_config.db_models.base import BaseModel
+from global_config.helpers.object import get_naive_utc_now
 
 
 class AssetAttributeModel(BaseModel):
@@ -30,5 +31,5 @@ class AssetAttributeModel(BaseModel):
     asset_id = Column(Integer, ForeignKey("asset.id"), nullable=False, default=0)
     name = Column(String, nullable=False)
     description = Column(Text, nullable=False)
-    created_on = Column(DateTime, nullable=False, default=lambda: arrow.utcnow().datetime)
+    created_on = Column(DateTime, nullable=False, default=lambda: get_naive_utc_now())
     asset = relationship("AssetModel", foreign_keys=[asset_id])

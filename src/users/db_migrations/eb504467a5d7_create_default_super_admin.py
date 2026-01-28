@@ -12,6 +12,7 @@ from alembic import op
 from sqlalchemy.sql import table, column
 from sqlalchemy import String, Integer, Text, Boolean, TIMESTAMP
 import arrow
+from global_config.helpers.object import get_naive_utc_now
 
 from global_config.helpers.fernet_crypto import encrypt
 from users.db_models.user import SUPER_ADMIN
@@ -49,7 +50,7 @@ def upgrade() -> None:
                 "password": encrypt(f"Secret@123"),
                 "role": SUPER_ADMIN,
                 "active": True,
-                "created_on": arrow.utcnow().datetime,
+                "created_on": get_naive_utc_now(),
                 "last_login": None,
                 "bin_name": "admin",
                 "can_send_email": True,

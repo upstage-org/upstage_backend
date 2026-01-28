@@ -27,6 +27,17 @@ def camel_to_snake(name: str) -> str:
     return re.sub("([a-z0-9])([A-Z])", r"\1_\2", s1).lower()
 
 
+def get_naive_utc_now():
+    """
+    Get the current UTC time as a timezone-naive datetime.
+    This ensures all datetimes in the backend are timezone-naive UTC.
+    
+    Returns:
+        timezone-naive datetime in UTC
+    """
+    return arrow.utcnow().datetime.replace(tzinfo=None)
+
+
 def normalize_datetime_to_naive_utc(dt):
     """
     Convert a datetime (timezone-aware or timezone-naive) to timezone-naive UTC.

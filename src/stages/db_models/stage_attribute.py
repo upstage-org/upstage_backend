@@ -14,6 +14,7 @@ import arrow
 from sqlalchemy import BigInteger, Column, DateTime, ForeignKey, Integer, String, Text
 from sqlalchemy.orm import relationship
 from global_config.db_models.base import BaseModel
+from global_config.helpers.object import get_naive_utc_now
 
 
 class StageAttributeModel(BaseModel):
@@ -22,7 +23,7 @@ class StageAttributeModel(BaseModel):
     stage_id = Column(Integer, ForeignKey("stage.id"), nullable=False, default=0)
     name = Column(String, nullable=False)
     description = Column(Text, nullable=False)
-    created_on = Column(DateTime, nullable=False, default=lambda: arrow.utcnow().datetime)
+    created_on = Column(DateTime, nullable=False, default=lambda: get_naive_utc_now())
     stage = relationship(
         "StageModel", foreign_keys=[stage_id], back_populates="attributes"
     )

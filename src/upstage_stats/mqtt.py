@@ -19,7 +19,7 @@ import paho.mqtt.client as mqtt
 
 from global_config.env import MQTT_TRANSPORT
 from global_config.database import ScopedSession
-from global_config.helpers.object import normalize_datetime_to_naive_utc
+from global_config.helpers.object import normalize_datetime_to_naive_utc, get_naive_utc_now
 from upstage_stats.db_models.receive_stat import ReceiveStatModel
 from upstage_stats.db_models.connection_stat import ConnectionStatModel
 
@@ -34,7 +34,7 @@ def on_connect(client: mqtt.Client, userdata, flags, rc):
         client.subscribe(CONNECTION_TOPIC)
         connection_payload = {
             "connected": client._client_id.decode("utf-8"),
-            "timestamp": arrow.utcnow().isoformat(),
+            "timestamp": get_naive_utc_now().isoformat(),
             "channel": CONNECTION_TOPIC,
         }
         client.publish(CONNECTION_TOPIC, payload=json.dumps(connection_payload))
@@ -79,7 +79,7 @@ def on_message(client: mqtt.Client, userdata, msg: mqtt.MQTTMessage):
                     if not receive_stat.first():
                         receive_stat = ReceiveStatModel(
                             received_id=client_id,
-                            mqtt_timestamp=arrow.utcnow().datetime,
+                            mqtt_timestamp=get_naive_utc_now(),
                             topic=LIVE_CLIENT_TOPIC,
                             payload=payload,
                         )
@@ -87,7 +87,7 @@ def on_message(client: mqtt.Client, userdata, msg: mqtt.MQTTMessage):
                     else:
                         receive_stat.update(
                             {
-                                ReceiveStatModel.mqtt_timestamp: arrow.utcnow().datetime,
+                                ReceiveStatModel.mqtt_timestamp: get_naive_utc_now(),
                                 ReceiveStatModel.payload: payload,
                             },
                             synchronize_session=False,
@@ -117,7 +117,7 @@ def build_client(client_id=get_client_id(), transport=MQTT_TRANSPORT):
 
 
 def get_not_live_users():
-    two_minute_ago = arrow.utcnow().shift(minutes=-2).datetime
+    two_minute_ago = arrow.utcnow().shift(minutes=-2).datetime.replace(tzinfo=None)
     # Normalize to timezone-naive UTC for SQLAlchemy query comparison
     # SQLAlchemy will handle the comparison at the database level
     with ScopedSession() as local_db_session:

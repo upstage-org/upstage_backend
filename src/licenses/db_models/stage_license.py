@@ -21,6 +21,7 @@ from sqlalchemy import (
     String,
 )
 from global_config.db_models.base import BaseModel
+from global_config.helpers.object import get_naive_utc_now
 from stages.db_models.stage import StageModel
 from sqlalchemy.orm import relationship
 
@@ -35,7 +36,7 @@ class StageLicenseModel(BaseModel):
     __tablename__ = "stage_license"
     id = Column(BigInteger, primary_key=True)
     stage_id = Column(Integer, ForeignKey(StageModel.id), nullable=False, default=0)
-    created_on = Column(DateTime, nullable=False, default=lambda: arrow.utcnow().datetime)
+    created_on = Column(DateTime, nullable=False, default=lambda: get_naive_utc_now())
     expires_on = Column(DateTime, nullable=True)
     access_path = Column(String, nullable=False, unique=True)
     grant_recursively = Column(Boolean, nullable=False, default=False)

@@ -13,6 +13,7 @@ if projdir not in sys.path:
 import arrow
 from sqlalchemy import BigInteger, Column, DateTime, String, Text
 from global_config.db_models.base import BaseModel
+from global_config.helpers.object import get_naive_utc_now
 
 
 class AssetTypeModel(BaseModel):
@@ -27,4 +28,4 @@ class AssetTypeModel(BaseModel):
     name = Column(String, nullable=False)
     description = Column(Text, nullable=True)
     file_location = Column(Text, nullable=False)
-    created_on = Column(DateTime, nullable=False, default=lambda: arrow.utcnow().datetime)
+    created_on = Column(DateTime, nullable=False, default=lambda: get_naive_utc_now())

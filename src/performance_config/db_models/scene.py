@@ -13,6 +13,7 @@ if projdir not in sys.path:
 import arrow
 from sqlalchemy import BigInteger, Boolean, Column, DateTime, ForeignKey, Integer, Text
 from global_config.db_models.base import BaseModel
+from global_config.helpers.object import get_naive_utc_now
 from sqlalchemy.orm import relationship
 
 from stages.db_models.stage import StageModel
@@ -26,7 +27,7 @@ class SceneModel(BaseModel):
     scene_order = Column(Integer, index=True, nullable=True, default=0)
     scene_preview = Column(Text, nullable=True)
     payload = Column(Text, nullable=False)
-    created_on = Column(DateTime, nullable=False, default=lambda: arrow.utcnow().datetime)
+    created_on = Column(DateTime, nullable=False, default=lambda: get_naive_utc_now())
     active = Column(Boolean, nullable=False, default=True)
     owner_id = Column(Integer, ForeignKey(UserModel.id), nullable=False, default=0)
     stage_id = Column(Integer, ForeignKey(StageModel.id), nullable=False, default=0)

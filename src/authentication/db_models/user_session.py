@@ -14,6 +14,7 @@ import arrow
 from sqlalchemy import BigInteger, Column, Integer, Text, DateTime, ForeignKey
 from sqlalchemy.orm import relationship
 from global_config.db_models.base import BaseModel
+from global_config.helpers.object import get_naive_utc_now
 from users.db_models.user import UserModel
 
 
@@ -29,7 +30,7 @@ class UserSessionModel(BaseModel):
     access_token = Column(Text, default=None)
     refresh_token = Column(Text, default=None)
     recorded_time = Column(
-        DateTime, nullable=False, index=True, default=lambda: arrow.utcnow().datetime
+        DateTime, nullable=False, index=True, default=lambda: get_naive_utc_now()
     )
     app_version = Column(Text, default=None)
     app_os_type = Column(Text, default=None)
