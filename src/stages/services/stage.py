@@ -366,9 +366,10 @@ class StageService:
                     stage.id, "description", input.description, local_db_session
                 )
             
-            if hasattr(input, "status") and input.status is not None:
+            # Update status - must be explicitly provided and not empty
+            if hasattr(input, "status") and input.status is not None and input.status != "":
                 self.update_stage_attribute(
-                    stage.id, "status", input.status, local_db_session
+                    stage.id, "status", str(input.status).lower(), local_db_session
                 )
             
             if hasattr(input, "playerAccess") and input.playerAccess is not None:
