@@ -330,40 +330,58 @@ class StageService:
 
             self.extract_permission(user, stage)
 
-            stage.name = (
-                input.name if hasattr(input, "name") and input.name else stage.name
-            )
-            stage.description = (
-                input.description
-                if hasattr(input, "description") and input.description
-                else stage.description
-            )
-            stage.file_location = (
-                input.fileLocation
-                if hasattr(input, "fileLocation") and input.fileLocation
-                else stage.file_location
-            )
+            # Update name if provided
+            if hasattr(input, "name") and input.name is not None:
+                stage.name = input.name
+            
+            # Update description if provided
+            if hasattr(input, "description") and input.description is not None:
+                stage.description = input.description
+            
+            # Update file_location if provided
+            if hasattr(input, "fileLocation") and input.fileLocation is not None:
+                stage.file_location = input.fileLocation
 
-            stage.owner_id = input.owner if  hasattr(input, "owner") and input.owner else stage.owner_id
+            # Update owner_id if provided (owner_id cannot be null per DB schema)
+            if hasattr(input, "owner") and input.owner is not None and input.owner != "":
+                try:
+                    stage.owner_id = int(input.owner)
+                except (ValueError, TypeError):
+                    # Invalid owner ID, keep existing owner
+                    pass
 
-            self.update_stage_attribute(
-                stage.id, "cover", input.cover, local_db_session
-            )
-            self.update_stage_attribute(
-                stage.id, "visibility", str(input.visibility).lower(), local_db_session
-            )
-            self.update_stage_attribute(
-                stage.id, "description", input.description, local_db_session
-            )
-            self.update_stage_attribute(
-                stage.id, "status", input.status, local_db_session
-            )
-            self.update_stage_attribute(
-                stage.id, "playerAccess", input.playerAccess, local_db_session
-            )
-            self.update_stage_attribute(
-                stage.id, "config", input.config, local_db_session
-            )
+            # Update attributes - check for None explicitly, not falsy values
+            if hasattr(input, "cover") and input.cover is not None:
+                self.update_stage_attribute(
+                    stage.id, "cover", input.cover, local_db_session
+                )
+            
+            if hasattr(input, "visibility") and input.visibility is not None:
+                self.update_stage_attribute(
+                    stage.id, "visibility", str(input.visibility).lower(), local_db_session
+                )
+            
+            if hasattr(input, "description") and input.description is not None:
+                self.update_stage_attribute(
+                    stage.id, "description", input.description, local_db_session
+                )
+            
+            if hasattr(input, "status") and input.status is not None:
+                self.update_stage_attribute(
+                    stage.id, "status", input.status, local_db_session
+                )
+            
+            if hasattr(input, "playerAccess") and input.playerAccess is not None:
+                self.update_stage_attribute(
+                    stage.id, "playerAccess", input.playerAccess, local_db_session
+                )
+            
+            if hasattr(input, "config") and input.config is not None:
+                self.update_stage_attribute(
+                    stage.id, "config", input.config, local_db_session
+                )
+            
+            local_db_session.commit()
             # Convert to dict while object is still attached to session
             stage_dict = stage.to_dict()
             return convert_keys_to_camel_case(stage_dict)
@@ -371,7 +389,8 @@ class StageService:
     def update_stage_attribute(
         self, stage_id: int, name: str, value: str, local_db_session
     ):
-        if not value:
+        # Only skip if value is None (not if it's empty string or False)
+        if value is None:
             return
 
         if stage_id:
@@ -387,10 +406,10 @@ class StageService:
             )
             if stage_attribute:
                 stage_attribute.description = value
-                return
-            local_db_session.add(
-                StageAttributeModel(stage_id=stage_id, name=name, description=value)
-            )
+            else:
+                local_db_session.add(
+                    StageAttributeModel(stage_id=stage_id, name=name, description=value)
+                )
             local_db_session.flush()
 
     def delete_stage(self, user: UserModel, id: int):
