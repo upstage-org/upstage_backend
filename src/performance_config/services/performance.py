@@ -13,7 +13,7 @@ if projdir not in sys.path:
 import arrow
 from graphql import GraphQLError
 from global_config.database import ScopedSession
-from global_config.helpers.object import convert_keys_to_camel_case
+from global_config.helpers.object import convert_keys_to_camel_case, normalize_datetime_to_naive_utc
 from event_archive.db_models.event import EventModel
 from performance_config.db_models.performance import PerformanceModel
 from performance_config.db_models.performance_mqtt_config import (
@@ -127,20 +127,25 @@ class PerformanceService:
             ):
                 raise GraphQLError("Only stage owner or Admin can save a recording!")
             saved_on = arrow.utcnow().datetime
+            
+            # Normalize datetimes to timezone-naive UTC for SQLAlchemy query comparison
+            # SQLAlchemy can handle timezone-aware datetimes, but we ensure consistency
+            performance_created_on_naive = normalize_datetime_to_naive_utc(performance.created_on)
+            saved_on_naive = normalize_datetime_to_naive_utc(saved_on)
 
-            events = (
+            events_query = (
                 local_db_session.query(EventModel)
                 .filter(
                     EventModel.topic.ilike(
                         "%/{}/%".format(performance.stage.file_location)
                     )
                 )
-                .filter(EventModel.created > performance.created_on)
-                .filter(EventModel.created < saved_on)
+                .filter(EventModel.created > performance_created_on_naive)
+                .filter(EventModel.created < saved_on_naive)
             )
 
-            if events.count() > 0:
-                for event in events.all():
+            if events_query.count() > 0:
+                for event in events_query.all():
                     local_db_session.expunge(event)
                     make_transient(event)
                     event.id = None

@@ -19,6 +19,7 @@ import paho.mqtt.client as mqtt
 
 from global_config.env import MQTT_TRANSPORT
 from global_config.database import ScopedSession
+from global_config.helpers.object import normalize_datetime_to_naive_utc
 from upstage_stats.db_models.receive_stat import ReceiveStatModel
 from upstage_stats.db_models.connection_stat import ConnectionStatModel
 
@@ -115,12 +116,14 @@ def build_client(client_id=get_client_id(), transport=MQTT_TRANSPORT):
     return client
 
 
-def get_not_alive_users():
+def get_not_live_users():
     two_minute_ago = arrow.utcnow().shift(minutes=-2).datetime
+    # Normalize to timezone-naive UTC for SQLAlchemy query comparison
+    # SQLAlchemy will handle the comparison at the database level
     with ScopedSession() as local_db_session:
-        not_alive_clients = (
+        not_live_clients = (
             local_db_session.query(ReceiveStatModel)
             .filter(ReceiveStatModel.mqtt_timestamp < two_minute_ago)
             .all()
         )
-        return [x.received_id for x in not_alive_clients]
+        return [x.received_id for x in not_live_clients]

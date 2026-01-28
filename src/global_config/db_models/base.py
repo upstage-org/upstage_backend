@@ -13,6 +13,7 @@ if projdir not in sys.path:
 from datetime import datetime
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import class_mapper, ColumnProperty, RelationshipProperty
+import arrow
 # from global_config import Base
 
 global Base
@@ -39,7 +40,13 @@ class BaseModel(Base):
             if isinstance(attr, ColumnProperty):
                 value = getattr(self, attr.key)
                 if isinstance(value, datetime):
-                    result[attr.key] = value.isoformat()
+                    # Normalize datetime to timezone-naive UTC before formatting
+                    # Handle both timezone-aware and timezone-naive datetimes
+                    if value.tzinfo is not None:
+                        normalized_value = arrow.get(value).to('UTC').datetime.replace(tzinfo=None)
+                    else:
+                        normalized_value = value
+                    result[attr.key] = normalized_value.isoformat()
                 else:
                     result[attr.key] = value
 

@@ -27,7 +27,7 @@ from global_config.env import (
     STREAM_EXPIRY_DAYS,
     STREAM_KEY,
 )
-from global_config.helpers.object import convert_keys_to_camel_case
+from global_config.helpers.object import convert_keys_to_camel_case, normalize_datetime_to_naive_utc
 from sqlalchemy.orm import joinedload, selectinload, contains_eager
 from assets.db_models.asset import AssetModel, AvatarVoice, Voice, Previlege
 from assets.db_models.asset_license import AssetLicenseModel
@@ -132,10 +132,11 @@ class AssetService:
                     .filter(TagModel.name.in_(search_assets.tags))
                 )
             if search_assets.createdBetween:
+                # Normalize dates to timezone-naive UTC for comparison
+                start_date = normalize_datetime_to_naive_utc(search_assets.createdBetween[0])
+                end_date = normalize_datetime_to_naive_utc(search_assets.createdBetween[1])
                 query = query.filter(
-                    AssetModel.created_on.between(
-                        search_assets.createdBetween[0], search_assets.createdBetween[1]
-                    )
+                    AssetModel.created_on.between(start_date, end_date)
                 )
 
             total_count = query.count()
@@ -603,11 +604,15 @@ class AssetService:
         return ""
 
     def resolve_src(self, asset: AssetModel):
-        timestamp = int(time.mktime(asset.updated_on.timetuple()))
+        # Normalize datetime to timezone-naive UTC before converting to timestamp
+        updated_on_naive = normalize_datetime_to_naive_utc(asset.updated_on)
+        timestamp = int(time.mktime(updated_on_naive.timetuple()))
         return asset.file_location + "?t=" + str(timestamp)
 
     def resolve_src_from_values(self, file_location: str, updated_on):
-        timestamp = int(time.mktime(updated_on.timetuple()))
+        # Normalize datetime to timezone-naive UTC before converting to timestamp
+        updated_on_naive = normalize_datetime_to_naive_utc(updated_on)
+        timestamp = int(time.mktime(updated_on_naive.timetuple()))
         return file_location + "?t=" + str(timestamp)
 
     def resolve_permission(self, user_id: int, asset: AssetModel):

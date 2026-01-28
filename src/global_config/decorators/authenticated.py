@@ -71,12 +71,18 @@ def authenticated(allowed_roles=None):
                     now = arrow.utcnow().datetime
                     last_login = current_user.last_login
                     # Convert timezone-aware datetime to timezone-unaware UTC if needed
-                    if last_login is not None and last_login.tzinfo is not None:
-                        # Convert to UTC, then remove timezone info to get naive UTC
-                        last_login = arrow.get(last_login).to('UTC').datetime.replace(tzinfo=None)
+                    if last_login is not None:
+                        if last_login.tzinfo is not None:
+                            # Convert to UTC, then remove timezone info to get naive UTC
+                            last_login_naive = arrow.get(last_login).to('UTC').datetime.replace(tzinfo=None)
+                        else:
+                            # Already timezone-naive, use as-is
+                            last_login_naive = last_login
+                    else:
+                        last_login_naive = None
                     if (
-                        last_login is None
-                        or (now - last_login) > LAST_LOGIN_UPDATE_THROTTLE
+                        last_login_naive is None
+                        or (now - last_login_naive) > LAST_LOGIN_UPDATE_THROTTLE
                     ):
                         local_db_session.query(UserModel).filter(
                             UserModel.id == user_id

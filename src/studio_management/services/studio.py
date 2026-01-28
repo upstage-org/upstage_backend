@@ -20,7 +20,7 @@ from sqlalchemy import and_, or_, nulls_last
 
 from assets.db_models.asset_usage import AssetUsageModel
 from authentication.db_models.user_session import UserSessionModel
-from global_config.helpers.object import convert_keys_to_camel_case
+from global_config.helpers.object import convert_keys_to_camel_case, normalize_datetime_to_naive_utc
 from global_config.database import ScopedSession
 from global_config.env import (
     UPLOAD_USER_CONTENT_FOLDER,
@@ -79,6 +79,9 @@ class StudioService:
             if "createdBetween" in params:
                 start_date = arrow.get(params["createdBetween"][0], "YYYY-MM-DD").datetime
                 end_date = arrow.get(params["createdBetween"][1], "YYYY-MM-DD").datetime
+                # Normalize dates to timezone-naive UTC for comparison
+                start_date = normalize_datetime_to_naive_utc(start_date)
+                end_date = normalize_datetime_to_naive_utc(end_date)
                 query = query.filter(UserModel.created_on.between(start_date, end_date))
 
             if "sort" in params:

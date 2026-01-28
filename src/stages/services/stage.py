@@ -20,7 +20,7 @@ from global_config.database import (
     ScopedSession,
 )
 from global_config.env import ALGORITHM, SECRET_KEY
-from global_config.helpers.object import convert_keys_to_camel_case
+from global_config.helpers.object import convert_keys_to_camel_case, normalize_datetime_to_naive_utc
 
 from assets.db_models.asset_usage import AssetUsageModel, NotificationType
 from stages.services.stage_operation import StageOperationService
@@ -64,10 +64,11 @@ class StageService:
                 query = query.filter(UserModel.username.in_(input.owners))
 
             if input.createdBetween:
+                # Normalize dates to timezone-naive UTC for comparison
+                start_date = normalize_datetime_to_naive_utc(input.createdBetween[0])
+                end_date = normalize_datetime_to_naive_utc(input.createdBetween[1])
                 query = query.filter(
-                    StageModel.created_on.between(
-                        input.createdBetween[0], input.createdBetween[1]
-                    )
+                    StageModel.created_on.between(start_date, end_date)
                 )
 
             total_count = query.count()
