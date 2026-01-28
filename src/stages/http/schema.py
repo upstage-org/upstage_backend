@@ -85,15 +85,25 @@ def create_stage(_, info, input):
 @mutation.field("updateStage")
 @authenticated(allowed_roles=[SUPER_ADMIN, ADMIN, PLAYER])
 def update_stage(_, info, input):
-    # Check which fields were actually provided in the GraphQL input
-    # Fields not provided won't be in the input dict
-    provided_fields = set(input.keys())
+    # Debug: Print the raw input to see what GraphQL is sending
+    print(f"DEBUG: Raw GraphQL input: {input}")
+    print(f"DEBUG: Input keys: {list(input.keys()) if isinstance(input, dict) else 'not a dict'}")
+    if isinstance(input, dict):
+        for key, value in input.items():
+            print(f"DEBUG: {key} = {value} (type: {type(value).__name__})")
     
-    # Create the Pydantic model - it will set Optional fields to None if not provided
+    # Create the Pydantic model
     stage_input = UpdateStageInput(**input)
     
-    # Store which fields were actually provided for the service to use
-    stage_input._provided_fields = provided_fields
+    # Debug: Print what Pydantic parsed
+    print(f"DEBUG: Parsed Pydantic model:")
+    print(f"  id={stage_input.id}")
+    print(f"  name={stage_input.name}")
+    print(f"  status={stage_input.status}")
+    print(f"  owner={stage_input.owner}")
+    print(f"  playerAccess={stage_input.playerAccess}")
+    print(f"  cover={stage_input.cover}")
+    print(f"  visibility={stage_input.visibility}")
     
     return StageService().update_stage(
         UserModel(**info.context["request"].state.current_user),

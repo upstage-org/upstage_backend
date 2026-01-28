@@ -329,57 +329,72 @@ class StageService:
                 raise GraphQLError("Stage not found")
 
             self.extract_permission(user, stage)
-            
-            # Get which fields were actually provided in the GraphQL input
-            provided_fields = getattr(input, '_provided_fields', set())
-            
-            # Update name if provided
-            if "name" in provided_fields and input.name is not None:
+
+            # Update name if provided (not None)
+            if input.name is not None:
                 stage.name = input.name
             
-            # Update description if provided
-            if "description" in provided_fields and input.description is not None:
+            # Update description if provided (can be empty string)
+            if input.description is not None:
                 stage.description = input.description
             
             # Update file_location if provided
-            if "fileLocation" in provided_fields and input.fileLocation is not None:
+            if input.fileLocation is not None:
                 stage.file_location = input.fileLocation
 
             # Update owner_id if provided (owner_id cannot be null per DB schema)
-            if "owner" in provided_fields and input.owner is not None and str(input.owner).strip() != "":
+            # Only update if owner is not None and not empty string
+            if input.owner is not None and str(input.owner).strip() != "":
                 try:
                     stage.owner_id = int(input.owner)
                 except (ValueError, TypeError):
                     # Invalid owner ID, keep existing owner
                     pass
 
-            # Update attributes - only if field was provided in the input
-            # Cover can be None, empty string, or URL
-            if "cover" in provided_fields and input.cover is not None:
+            # Update attributes - always update if value is not None
+            # This ensures we save even empty strings or False values
+            
+            print(f"DEBUG: Updating attributes for stage {stage.id}")
+            print(f"  cover={input.cover} (is not None: {input.cover is not None})")
+            print(f"  visibility={input.visibility} (is not None: {input.visibility is not None})")
+            print(f"  status={input.status} (is not None: {input.status is not None})")
+            print(f"  playerAccess={input.playerAccess} (is not None: {input.playerAccess is not None})")
+            print(f"  owner={input.owner} (is not None: {input.owner is not None})")
+            
+            # Cover - can be None, empty string, or URL
+            if input.cover is not None:
+                print(f"DEBUG: Updating cover attribute")
                 self.update_stage_attribute(
                     stage.id, "cover", str(input.cover), local_db_session
                 )
             
-            # Visibility - bool can be False, so check if field was provided
-            if "visibility" in provided_fields and input.visibility is not None:
+            # Visibility - bool can be False, so always update if not None
+            if input.visibility is not None:
+                print(f"DEBUG: Updating visibility attribute")
                 self.update_stage_attribute(
                     stage.id, "visibility", str(bool(input.visibility)).lower(), local_db_session
                 )
             
-            # Status - must be explicitly provided and not empty
-            if "status" in provided_fields and input.status is not None and str(input.status).strip() != "":
+            # Status - update if not None and not empty
+            if input.status is not None and str(input.status).strip() != "":
+                print(f"DEBUG: Updating status attribute to: {input.status}")
                 self.update_stage_attribute(
                     stage.id, "status", str(input.status).lower().strip(), local_db_session
                 )
+            else:
+                print(f"DEBUG: Skipping status update - status={input.status}, empty={input.status is not None and str(input.status).strip() == '' if input.status is not None else 'N/A'}")
             
             # PlayerAccess - can be empty JSON array string "[]" or JSON string
-            if "playerAccess" in provided_fields and input.playerAccess is not None:
+            # Always update if not None (even if empty string "[]")
+            if input.playerAccess is not None:
+                print(f"DEBUG: Updating playerAccess attribute")
                 self.update_stage_attribute(
                     stage.id, "playerAccess", str(input.playerAccess), local_db_session
                 )
             
             # Config - can be None or JSON string
-            if "config" in provided_fields and input.config is not None:
+            if input.config is not None:
+                print(f"DEBUG: Updating config attribute")
                 self.update_stage_attribute(
                     stage.id, "config", str(input.config), local_db_session
                 )
@@ -392,6 +407,11 @@ class StageService:
     def update_stage_attribute(
         self, stage_id: int, name: str, value: str, local_db_session
     ):
+        """
+        Update or create a stage attribute.
+        This method will save the value even if it's an empty string or False.
+        Only skips if value is None.
+        """
         # Only skip if value is None (not if it's empty string or False)
         if value is None:
             return
@@ -399,31 +419,42 @@ class StageService:
         if not stage_id:
             return
 
-        # Convert value to string to ensure consistency
-        value_str = str(value) if value is not None else ""
-        
-        stage_attribute = (
-            local_db_session.query(StageAttributeModel)
-            .filter(
-                and_(
-                    StageAttributeModel.stage_id == stage_id,
-                    StageAttributeModel.name == name,
+        try:
+            # Convert value to string to ensure consistency
+            value_str = str(value) if value is not None else ""
+            
+            stage_attribute = (
+                local_db_session.query(StageAttributeModel)
+                .filter(
+                    and_(
+                        StageAttributeModel.stage_id == stage_id,
+                        StageAttributeModel.name == name,
+                    )
                 )
+                .first()
             )
-            .first()
-        )
-        
-        if stage_attribute:
-            # Update existing attribute
-            stage_attribute.description = value_str
-        else:
-            # Create new attribute
-            local_db_session.add(
-                StageAttributeModel(stage_id=stage_id, name=name, description=value_str)
-            )
-        
-        # Flush to ensure the change is in the session
-        local_db_session.flush()
+            
+            if stage_attribute:
+                # Update existing attribute
+                stage_attribute.description = value_str
+            else:
+                # Create new attribute
+                new_attribute = StageAttributeModel(
+                    stage_id=stage_id, 
+                    name=name, 
+                    description=value_str
+                )
+                local_db_session.add(new_attribute)
+            
+            # Flush to ensure the change is in the session
+            local_db_session.flush()
+        except Exception as e:
+            # Log the error but don't fail the entire update
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.error(f"Error updating stage attribute {name} for stage {stage_id}: {str(e)}")
+            # Re-raise to see what's wrong
+            raise
 
     def delete_stage(self, user: UserModel, id: int):
         with ScopedSession() as local_db_session:
