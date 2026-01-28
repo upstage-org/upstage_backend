@@ -249,9 +249,40 @@ class StageService:
                 .all()
             )
             assets_list = [ps.child_asset.to_dict() for ps in parent_stages]
+            
+            # Get all stage attributes (to_dict() returns empty array for dynamic relationships)
+            stage_attributes = (
+                local_db_session.query(StageAttributeModel)
+                .filter(StageAttributeModel.stage_id == stage.id)
+                .all()
+            )
+            attributes_list = [
+                {
+                    "id": attr.id,
+                    "name": attr.name,
+                    "description": attr.description,
+                }
+                for attr in stage_attributes
+            ]
+            
+            # Get attribute values using hybrid properties for convenience
             cover = stage.cover
             visibility = stage.visibility
             status = stage.status
+            
+            # Get playerAccess attribute (no hybrid property, so query directly)
+            player_access_attr = (
+                local_db_session.query(StageAttributeModel)
+                .filter(
+                    and_(
+                        StageAttributeModel.stage_id == stage.id,
+                        StageAttributeModel.name == "playerAccess",
+                    )
+                )
+                .first()
+            )
+            player_access = player_access_attr.description if player_access_attr else None
+            
             performances = [
                 convert_keys_to_camel_case(pf)
                 for pf in self.stage_operation_service.resolve_performances(
@@ -269,9 +300,11 @@ class StageService:
                 {
                     **stage_dict,
                     "assets": assets_list,
+                    "attributes": attributes_list,  # Include attributes array for frontend
                     "cover": cover,
                     "visibility": visibility,
                     "status": status,
+                    "playerAccess": player_access,
                     "permission": permission,
                     "performances": performances,
                     "chats": chats,
@@ -354,47 +387,33 @@ class StageService:
             # Update attributes - always update if value is not None
             # This ensures we save even empty strings or False values
             
-            print(f"DEBUG: Updating attributes for stage {stage.id}")
-            print(f"  cover={input.cover} (is not None: {input.cover is not None})")
-            print(f"  visibility={input.visibility} (is not None: {input.visibility is not None})")
-            print(f"  status={input.status} (is not None: {input.status is not None})")
-            print(f"  playerAccess={input.playerAccess} (is not None: {input.playerAccess is not None})")
-            print(f"  owner={input.owner} (is not None: {input.owner is not None})")
-            
             # Cover - can be None, empty string, or URL
             if input.cover is not None:
-                print(f"DEBUG: Updating cover attribute")
                 self.update_stage_attribute(
                     stage.id, "cover", str(input.cover), local_db_session
                 )
             
             # Visibility - bool can be False, so always update if not None
             if input.visibility is not None:
-                print(f"DEBUG: Updating visibility attribute")
                 self.update_stage_attribute(
                     stage.id, "visibility", str(bool(input.visibility)).lower(), local_db_session
                 )
             
             # Status - update if not None and not empty
             if input.status is not None and str(input.status).strip() != "":
-                print(f"DEBUG: Updating status attribute to: {input.status}")
                 self.update_stage_attribute(
                     stage.id, "status", str(input.status).lower().strip(), local_db_session
                 )
-            else:
-                print(f"DEBUG: Skipping status update - status={input.status}, empty={input.status is not None and str(input.status).strip() == '' if input.status is not None else 'N/A'}")
             
             # PlayerAccess - can be empty JSON array string "[]" or JSON string
             # Always update if not None (even if empty string "[]")
             if input.playerAccess is not None:
-                print(f"DEBUG: Updating playerAccess attribute")
                 self.update_stage_attribute(
                     stage.id, "playerAccess", str(input.playerAccess), local_db_session
                 )
             
             # Config - can be None or JSON string
             if input.config is not None:
-                print(f"DEBUG: Updating config attribute")
                 self.update_stage_attribute(
                     stage.id, "config", str(input.config), local_db_session
                 )
