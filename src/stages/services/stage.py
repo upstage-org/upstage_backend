@@ -363,20 +363,15 @@ class StageService:
 
             self.extract_permission(user, stage)
 
-            # Update name if provided (not None)
-            if input.name is not None:
-                stage.name = input.name
-            
-            # Update description if provided (can be empty string)
-            if input.description is not None:
-                stage.description = input.description
-            
-            # Update file_location if provided
-            if input.fileLocation is not None:
-                stage.file_location = input.fileLocation
+            # ALWAYS update all fields with current values from input
+            # Frontend should always send all current values, whether changed or not
 
-            # Update owner_id if provided (owner_id cannot be null per DB schema)
-            # Only update if owner is not None and not empty string
+            # Update core stage fields - use existing value if input is None
+            stage.name = input.name if input.name is not None else stage.name
+            stage.description = input.description if input.description is not None else stage.description
+            stage.file_location = input.fileLocation if input.fileLocation is not None else stage.file_location
+
+            # Update owner_id - preserve existing if not provided or invalid
             if input.owner is not None and str(input.owner).strip() != "":
                 try:
                     stage.owner_id = int(input.owner)
@@ -384,40 +379,43 @@ class StageService:
                     # Invalid owner ID, keep existing owner
                     pass
 
-            # Update attributes - always update if value is not None
-            # This ensures we save even empty strings or False values
-            
-            # Cover - can be None, empty string, or URL
-            if input.cover is not None:
-                self.update_stage_attribute(
-                    stage.id, "cover", str(input.cover), local_db_session
-                )
-            
-            # Visibility - bool can be False, so always update if not None
-            if input.visibility is not None:
-                self.update_stage_attribute(
-                    stage.id, "visibility", str(bool(input.visibility)).lower(), local_db_session
-                )
-            
-            # Status - update if not None and not empty
-            if input.status is not None and str(input.status).strip() != "":
-                self.update_stage_attribute(
-                    stage.id, "status", str(input.status).lower().strip(), local_db_session
-                )
-            
-            # PlayerAccess - can be empty JSON array string "[]" or JSON string
-            # Always update if not None (even if empty string "[]")
-            if input.playerAccess is not None:
-                self.update_stage_attribute(
-                    stage.id, "playerAccess", str(input.playerAccess), local_db_session
-                )
-            
-            # Config - can be None or JSON string
+            # ALWAYS update stage attributes with explicit values
+            # This ensures all values are set every time, preventing partial updates
+
+            # Cover - update even if empty/null (use "null" string for None)
+            cover_value = str(input.cover) if input.cover is not None else ""
+            self.update_stage_attribute(
+                stage.id, "cover", cover_value, local_db_session
+            )
+
+            # Visibility - ALWAYS update, default to True if not provided
+            # Frontend should ALWAYS send this value
+            visibility_value = input.visibility if input.visibility is not None else True
+            self.update_stage_attribute(
+                stage.id, "visibility", str(bool(visibility_value)).lower(), local_db_session
+            )
+
+            # Status - ALWAYS update, default to "rehearsal" if not provided or empty
+            # Frontend should ALWAYS send "live" or "rehearsal"
+            status_value = input.status if (input.status is not None and str(input.status).strip() != "") else "rehearsal"
+            self.update_stage_attribute(
+                stage.id, "status", str(status_value).lower().strip(), local_db_session
+            )
+
+            # PlayerAccess - ALWAYS update, default to empty array if not provided
+            # Frontend should ALWAYS send this as JSON string (even "[]")
+            player_access_value = input.playerAccess if input.playerAccess is not None else "[]"
+            self.update_stage_attribute(
+                stage.id, "playerAccess", str(player_access_value), local_db_session
+            )
+
+            # Config - ALWAYS update if provided
+            # This is optional, so only update if explicitly sent
             if input.config is not None:
                 self.update_stage_attribute(
                     stage.id, "config", str(input.config), local_db_session
                 )
-            
+
             local_db_session.commit()
             
             # Expire the stage object to force reload of relationships and hybrid properties

@@ -208,10 +208,11 @@ class AssetService:
     def upload_file(self, user: UserModel, base64: str, filename: str):
         # Extract user attributes early to avoid accessing detached user object
         upload_limit = user.upload_limit if user else None
-        
+
         file_size = self.file_handing.get_file_size(base64)
 
-        if file_size > upload_limit:
+        # Only check upload limit if it's set (not None)
+        if upload_limit is not None and file_size > upload_limit:
             raise GraphQLError(
                 f"File size must be under {self.file_handing.convert_KB_to_MB(upload_limit)}MB."
             )
@@ -431,7 +432,14 @@ class AssetService:
         local_db_session.flush()
 
     def process_file_location(self, input, local_db_session, asset):
-        file_location = input["urls"][0] if "urls" in input else input.urls[0]
+        # Check if urls array exists and has at least one element
+        urls = input.get("urls") if isinstance(input, dict) else getattr(input, "urls", [])
+
+        # Return existing file_location if urls is empty
+        if not urls or len(urls) == 0:
+            return asset.file_location if asset.file_location else ""
+
+        file_location = urls[0]
         if "?" in file_location:
             file_location = file_location[: file_location.index("?")]
         if file_location != asset.file_location and "/" not in file_location:
