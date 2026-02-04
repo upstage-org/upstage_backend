@@ -188,6 +188,11 @@ class AssetService:
                 ]
                 # Extract owner data while session is active
                 owner_dict = convert_keys_to_camel_case(asset.owner.to_dict()) if asset.owner else None
+                # Resolve tag names while session is active (asset.tags is dynamic)
+                tags_list = [
+                    mt.tag.name for mt in asset.tags.all()
+                    if getattr(mt, "tag", None) and getattr(mt.tag, "name", None)
+                ]
                 # Extract asset attributes for resolve_privilege while still in session
                 asset_owner_id = asset.owner_id
                 asset_copyright_level = asset.copyright_level
@@ -198,6 +203,7 @@ class AssetService:
                     "stages": stages_list,
                     "permissions": permissions_list,
                     "owner": owner_dict,
+                    "tags": tags_list,
                 })
 
             return {
@@ -340,6 +346,31 @@ class AssetService:
                 permission.approved = True
             local_db_session.flush()
 
+    def _apply_voice_link_note_to_attributes(self, input: SaveMediaInput, attributes: dict):
+        """Update voice and link in attributes dict from input (used by process_urls)."""
+        if input.voice:
+            voice = input.voice
+            if voice and getattr(voice, "voice", None):
+                attributes["voice"] = {
+                    "voice": voice.voice,
+                    "variant": getattr(voice, "variant", ""),
+                    "pitch": getattr(voice, "pitch", 50),
+                    "speed": getattr(voice, "speed", 1),
+                    "amplitude": getattr(voice, "amplitude", 50),
+                }
+            elif "voice" in attributes:
+                del attributes["voice"]
+        if input.link:
+            link = input.link
+            if link and getattr(link, "url", None):
+                attributes["link"] = {
+                    "url": link.url,
+                    "blank": getattr(link, "blank", True),
+                    "effect": getattr(link, "effect", False),
+                }
+            elif "link" in attributes:
+                del attributes["link"]
+
     def process_urls(
         self,
         input: SaveMediaInput,
@@ -375,33 +406,21 @@ class AssetService:
             if asset_type.name == "stream" and "/" not in file_location:
                 attributes["isRTMP"] = True
 
-            if input.voice:
-                voice = input.voice
-                if voice and voice.voice:
-                    attributes["voice"] = {
-                        "voice": voice.voice,
-                        "variant": voice.variant,
-                        "pitch": voice.pitch,
-                        "speed": voice.speed,
-                        "amplitude": voice.amplitude,
-                    }
-                elif "voice" in attributes:
-                    del attributes["voice"]
+            self._apply_voice_link_note_to_attributes(input, attributes)
 
-            if input.link:
-                link = input.link
-                if link and link.url:
-                    attributes["link"] = {
-                        "url": link.url,
-                        "blank": link.blank,
-                        "effect": link.effect,
-                    }
-                elif "link" in attributes:
-                    del attributes["link"]
-
-            attributes["note"] = input.note
+            attributes["note"] = input.note if input.note is not None else attributes.get("note", "")
             asset.description = json.dumps(attributes)
             local_db_session.flush()
+        elif input.id and asset.description:
+            # Metadata-only update (e.g. voice, link, note) when no url change
+            attributes = json.loads(asset.description)
+            self._apply_voice_link_note_to_attributes(input, attributes)
+            attributes["w"] = input.w
+            attributes["h"] = input.h
+            attributes["note"] = input.note if input.note is not None else attributes.get("note", "")
+            asset.description = json.dumps(attributes)
+            local_db_session.flush()
+
         if not len(input.stageIds):
             asset.stages.delete()
 
@@ -689,6 +708,11 @@ class AssetService:
                 ]
                 # Extract owner data while session is active
                 owner_dict = convert_keys_to_camel_case(asset.owner.to_dict()) if asset.owner else None
+                # Resolve tag names while session is active
+                tags_list = [
+                    mt.tag.name for mt in asset.tags.all()
+                    if getattr(mt, "tag", None) and getattr(mt.tag, "name", None)
+                ]
                 # Extract asset_license values to avoid accessing detached object
                 asset_license_level = asset.asset_license.level if asset.asset_license else None
                 asset_license_permissions = asset.asset_license.permissions if asset.asset_license else None
@@ -708,6 +732,11 @@ class AssetService:
             ]
             # Extract owner data while session is active
             owner_dict = convert_keys_to_camel_case(asset.owner.to_dict()) if asset.owner else None
+            # Resolve tag names while session is active
+            tags_list = [
+                mt.tag.name for mt in asset.tags.all()
+                if getattr(mt, "tag", None) and getattr(mt.tag, "name", None)
+            ]
             # Extract asset_license values to avoid accessing detached object
             asset_license_level = asset.asset_license.level if asset.asset_license else None
             asset_license_permissions = asset.asset_license.permissions if asset.asset_license else None
@@ -737,6 +766,7 @@ class AssetService:
             "stages": stages_list,
             "permissions": permissions_list,
             "owner": owner_dict,
+            "tags": tags_list,
         }
 
     def get_media_types(self):
