@@ -261,7 +261,7 @@ class AssetService:
     def update_asset_tags(
         self, input: SaveMediaInput, local_db_session, asset: AssetModel
     ):
-        if input.tags:
+        if input.tags is not None:
             tags = input.tags
             asset.tags.delete()
             for tag in tags:
