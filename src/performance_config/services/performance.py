@@ -22,7 +22,14 @@ from performance_config.db_models.performance_mqtt_config import (
 )
 from performance_config.db_models.performance_config import PerformanceConfigModel
 from stages.db_models.stage import StageModel
-from stages.http.validation import DuplicatePerformanceInput, EventInput, PerformanceInput, RecordInput, SavePerformanceInput
+from stages.http.validation import (
+    CreatePerformanceWithEventsInput,
+    DuplicatePerformanceInput,
+    EventInput,
+    PerformanceInput,
+    RecordInput,
+    SavePerformanceInput,
+)
 from users.db_models.user import ADMIN, SUPER_ADMIN, UserModel
 from sqlalchemy.orm.session import make_transient
 
@@ -206,6 +213,66 @@ class PerformanceService:
             local_db_session.flush()
             performance = (
                 local_db_session.query(PerformanceModel).filter_by(id=performance_id).first()
+            )
+            return convert_keys_to_camel_case(performance.to_dict())
+
+    def create_performance_with_events(
+        self, user: UserModel, input: CreatePerformanceWithEventsInput
+    ):
+        """Create a new performance and save the given events (e.g. compressed replay)."""
+        stage_id = int(input.stageId) if input.stageId is not None else None
+        if stage_id is None:
+            raise GraphQLError("stageId is required")
+        with ScopedSession() as local_db_session:
+            stage = (
+                local_db_session.query(StageModel)
+                .filter_by(id=stage_id)
+                .first()
+            )
+            if not stage:
+                raise GraphQLError("Stage not found")
+            if (
+                user.role not in [SUPER_ADMIN, ADMIN]
+                and user.id != stage.owner_id
+            ):
+                raise GraphQLError(
+                    "You are not allowed to create a performance on this stage"
+                )
+            performance = PerformanceModel(
+                name=input.name,
+                description=input.description,
+                recording=False,
+                stage_id=stage_id,
+            )
+            local_db_session.add(performance)
+            local_db_session.flush()
+            performance_id = performance.id
+
+            for ev in input.events:
+                if ev.payload is None:
+                    payload = {}
+                elif isinstance(ev.payload, dict):
+                    payload = ev.payload
+                elif isinstance(ev.payload, str):
+                    try:
+                        payload = json.loads(ev.payload)
+                    except (TypeError, ValueError):
+                        payload = {}
+                else:
+                    payload = {}
+                event = EventModel(
+                    topic=ev.topic,
+                    mqtt_timestamp=ev.mqttTimestamp,
+                    performance_id=performance_id,
+                    payload=payload,
+                )
+                local_db_session.add(event)
+
+            local_db_session.flush()
+            performance = (
+                local_db_session.query(PerformanceModel)
+                .filter_by(id=performance_id)
+                .first()
             )
             return convert_keys_to_camel_case(performance.to_dict())
 

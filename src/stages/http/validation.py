@@ -112,6 +112,14 @@ class SavePerformanceInput(BaseModel):
     events: List[EventInput] = Field(..., description="Events to save (e.g. compressed replay events)")
 
 
+class CreatePerformanceWithEventsInput(BaseModel):
+    """Create a new performance with the given events (e.g. compressed replay)."""
+    stageId: int = Field(..., description="Stage to attach the performance to")
+    name: str = Field(..., description="Performance name")
+    description: Optional[str] = Field(None, description="Performance description")
+    events: List[EventInput] = Field(..., description="Events to save")
+
+
 class SearchStageInput(BaseModel):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)

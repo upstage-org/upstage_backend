@@ -174,6 +174,13 @@ type_defs = gql("""
         description: String
         events: [EventInput!]!
     }
+
+    input CreatePerformanceWithEventsInput {
+        stageId: ID!
+        name: String!
+        description: String
+        events: [EventInput!]!
+    }
     
     input SceneInput {
         name: String
@@ -701,6 +708,7 @@ type_defs = gql("""
         updatePerformance(input: PerformanceInput!): CommonResponse
         duplicatePerformance(input: DuplicatePerformanceInput!): Performance
         savePerformance(input: SavePerformanceInput!): Performance
+        createPerformanceWithEvents(input: CreatePerformanceWithEventsInput!): Performance
         deletePerformance(id: ID!): CommonResponse
         startRecording(input: RecordInput!): Performance
         saveRecording(id: ID!): Performance

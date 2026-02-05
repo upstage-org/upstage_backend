@@ -21,6 +21,7 @@ from ariadne.asgi import GraphQL
 from stages.http.validation import (
     AssignMediaInput,
     AssignStagesInput,
+    CreatePerformanceWithEventsInput,
     DuplicatePerformanceInput,
     DuplicateStageInput,
     PerformanceInput,
@@ -211,6 +212,15 @@ def save_performance(_, info, input):
     return PerformanceService().save_performance(
         UserModel(**info.context["request"].state.current_user),
         SavePerformanceInput(**input),
+    )
+
+
+@mutation.field("createPerformanceWithEvents")
+@authenticated(allowed_roles=[SUPER_ADMIN, ADMIN, PLAYER])
+def create_performance_with_events(_, info, input):
+    return PerformanceService().create_performance_with_events(
+        UserModel(**info.context["request"].state.current_user),
+        CreatePerformanceWithEventsInput(**input),
     )
 
 
