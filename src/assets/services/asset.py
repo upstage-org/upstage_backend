@@ -143,24 +143,26 @@ class AssetService:
 
             if search_assets.sort:
                 sort_option = search_assets.sort[-1]
-                field, direction = sort_option.rsplit("_", 1)
-                if field == "ASSET_TYPE_ID":
-                    sort_field = AssetModel.asset_type_id
-                elif field == "OWNER_ID":
-                    sort_field = AssetModel.owner_id
-                elif field == "NAME":
-                    sort_field = AssetModel.name
-                elif field == "CREATED_ON":
-                    sort_field = AssetModel.created_on
-                elif field == "SIZE":
-                    sort_field = AssetModel.size
-                elif field == "COPYRIGHT_LEVEL":
-                    sort_field = AssetModel.copyright_level
-
-                if direction == "ASC":
-                    query = query.order_by(sort_field.asc())
-                elif direction == "DESC":
-                    query = query.order_by(sort_field.desc())
+                if sort_option and "_" in sort_option:
+                    field, direction = sort_option.rsplit("_", 1)
+                    sort_field = None
+                    if field == "ASSET_TYPE_ID":
+                        sort_field = AssetModel.asset_type_id
+                    elif field == "OWNER_ID":
+                        sort_field = AssetModel.owner_id
+                    elif field == "NAME":
+                        sort_field = AssetModel.name
+                    elif field == "CREATED_ON":
+                        sort_field = AssetModel.created_on
+                    elif field == "SIZE":
+                        sort_field = AssetModel.size
+                    elif field == "COPYRIGHT_LEVEL":
+                        sort_field = AssetModel.copyright_level
+                    if sort_field is not None and direction in ("ASC", "DESC"):
+                        if direction == "ASC":
+                            query = query.order_by(sort_field.asc())
+                        else:
+                            query = query.order_by(sort_field.desc())
 
             if search_assets.page and search_assets.limit:
                 query = query.limit(search_assets.limit).offset(

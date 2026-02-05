@@ -73,14 +73,16 @@ class StageService:
 
             total_count = query.count()
 
+            has_db_sort = False
             if input.sort:
                 sort = input.sort
                 for sort_option in sort:
+                    if not sort_option or "_" not in sort_option:
+                        continue
                     field, direction = sort_option.rsplit("_", 1)
-
+                    sort_field = None
                     if field == "ACCESS":
                         continue
-
                     if field == "OWNER_ID":
                         sort_field = StageModel.owner_id
                     elif field == "NAME":
@@ -89,13 +91,13 @@ class StageService:
                         sort_field = StageModel.created_on
                     elif field == "LAST_ACCESS":
                         sort_field = StageModel.last_access
-
-                    if direction == "ASC":
-                        query = query.order_by(nulls_last(sort_field.asc()))
-                    elif direction == "DESC":
-                        query = query.order_by(nulls_last(sort_field.desc()))
-
-            else:
+                    if sort_field is not None and direction in ("ASC", "DESC"):
+                        if direction == "ASC":
+                            query = query.order_by(nulls_last(sort_field.asc()))
+                        else:
+                            query = query.order_by(nulls_last(sort_field.desc()))
+                        has_db_sort = True
+            if not has_db_sort:
                 query = query.order_by(StageModel.name.asc())
 
             data = query.all()
