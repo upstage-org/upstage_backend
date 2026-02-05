@@ -809,8 +809,18 @@ class AssetService:
                                         setattr(av, key, 175)
                                     else:
                                         setattr(av, key, 50)
-                            voices.append(Voice(avatar=media, voice=av))
-            return [convert_keys_to_camel_case(voice) for voice in voices]
+                            # Resolve asset to dict while session is active so GraphQL
+                            # never sees a detached AssetModel (avatar.name, avatar.src, etc.)
+                            avatar_dict = self.resolve_fields(media, None)
+                            voice_dict = {
+                                "voice": av.voice,
+                                "variant": av.variant,
+                                "pitch": getattr(av, "pitch", 50),
+                                "speed": getattr(av, "speed", 175),
+                                "amplitude": getattr(av, "amplitude", 50),
+                            }
+                            voices.append({"avatar": avatar_dict, "voice": voice_dict})
+            return [convert_keys_to_camel_case(v) for v in voices]
 
     def resolve_privilege(self, user_id: int, asset: AssetModel):
         if not user_id:
