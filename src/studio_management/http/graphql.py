@@ -288,7 +288,7 @@ type_defs = gql("""
         uploadLimit: Int
         intro: String
         canSendEmail: Boolean
-        lastLogin: String
+        latestActivity: String
         roleName: String
     }
                 
@@ -493,7 +493,7 @@ type_defs = gql("""
         uploadLimit
         intro
         canSendEmail
-        lastLogin
+        latestActivity
         roleName
     }
                 
@@ -596,8 +596,8 @@ type_defs = gql("""
         USERNAME_DESC
         CREATED_ON_ASC
         CREATED_ON_DESC
-        LAST_LOGIN_ASC
-        LAST_LOGIN_DESC
+        LATEST_ACTIVITY_ASC
+        LATEST_ACTIVITY_DESC
         ROLE_ASC
         ROLE_DESC
         EMAIL_ASC

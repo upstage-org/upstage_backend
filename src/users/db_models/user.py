@@ -47,4 +47,4 @@ class UserModel(BaseModel):
     upload_limit = Column(Integer, default=1024 * 1024)
     intro = Column(Text, default=None)
     can_send_email = Column(Boolean, default=False)
-    last_login = Column(TIMESTAMP(timezone=True), default=None)
+    latest_activity = Column(TIMESTAMP(timezone=True), default=None)

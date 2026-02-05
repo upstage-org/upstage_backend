@@ -20,9 +20,9 @@ from graphql import GraphQLError
 from global_config.env import ALGORITHM, SECRET_KEY
 from users.services.user import UserService
 
-# When validating the access token, update last_login at most this often per user
-# so the Player Management "Last Login" column reflects recent activity.
-LAST_LOGIN_UPDATE_THROTTLE = timedelta(hours=1)
+# When validating the access token, update latest_activity at most this often per user
+# so the Player Management "Latest activity" column reflects recent activity.
+LATEST_ACTIVITY_UPDATE_THROTTLE = timedelta(hours=1)
 
 
 def authenticated(allowed_roles=None):
@@ -66,28 +66,28 @@ def authenticated(allowed_roles=None):
                     if allowed_roles and current_user.role not in allowed_roles:
                         raise GraphQLError("Permission denied")
 
-                    # Keep "Last Login" in Player Management accurate: update when we see
+                    # Keep "Latest activity" in Player Management accurate: update when we see
                     # an authenticated request, throttled to avoid a write on every request.
                     # Use timezone-unaware UTC-0 datetime
                     now = get_naive_utc_now()
-                    last_login = current_user.last_login
+                    latest_activity = current_user.latest_activity
                     # Convert timezone-aware datetime to timezone-unaware UTC if needed
-                    if last_login is not None:
-                        if last_login.tzinfo is not None:
+                    if latest_activity is not None:
+                        if latest_activity.tzinfo is not None:
                             # Convert to UTC, then remove timezone info to get naive UTC
-                            last_login_naive = arrow.get(last_login).to('UTC').datetime.replace(tzinfo=None)
+                            latest_activity_naive = arrow.get(latest_activity).to('UTC').datetime.replace(tzinfo=None)
                         else:
                             # Already timezone-naive, use as-is
-                            last_login_naive = last_login
+                            latest_activity_naive = latest_activity
                     else:
-                        last_login_naive = None
+                        latest_activity_naive = None
                     if (
-                        last_login_naive is None
-                        or (now - last_login_naive) > LAST_LOGIN_UPDATE_THROTTLE
+                        latest_activity_naive is None
+                        or (now - latest_activity_naive) > LATEST_ACTIVITY_UPDATE_THROTTLE
                     ):
                         local_db_session.query(UserModel).filter(
                             UserModel.id == user_id
-                        ).update({"last_login": now})
+                        ).update({"latest_activity": now})
 
                     # Convert to dict while object is still attached to session
                     user_dict = current_user.to_dict()

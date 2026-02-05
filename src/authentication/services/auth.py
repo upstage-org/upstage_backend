@@ -98,7 +98,7 @@ class AuthenticationService:
             local_db_session.flush()
 
             local_db_session.query(UserModel).filter(UserModel.id == user_id).update(
-                {"last_login": get_naive_utc_now()}
+                {"latest_activity": get_naive_utc_now()}
             )
             local_db_session.commit()
 
@@ -223,7 +223,7 @@ class AuthenticationService:
             local_db_session.flush()
 
             local_db_session.query(UserModel).filter(UserModel.id == user.id).update(
-                {"last_login": get_naive_utc_now()}
+                {"latest_activity": get_naive_utc_now()}
             )
             local_db_session.commit()
 

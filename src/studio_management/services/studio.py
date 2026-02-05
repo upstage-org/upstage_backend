@@ -95,8 +95,8 @@ class StudioService:
                         sort_field = UserModel.created_on
                     elif field == "EMAIL":
                         sort_field = UserModel.email
-                    elif field == "LAST_LOGIN":
-                        sort_field = UserModel.last_login
+                    elif field == "LATEST_ACTIVITY":
+                        sort_field = UserModel.latest_activity
 
                     if direction == "ASC":
                         query = query.order_by(nulls_last(sort_field.asc()))
