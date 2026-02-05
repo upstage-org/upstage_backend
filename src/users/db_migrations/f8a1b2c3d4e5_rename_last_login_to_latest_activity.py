@@ -12,7 +12,7 @@ from alembic import op
 
 
 revision: str = "f8a1b2c3d4e5"
-down_revision: Union[str, None] = "eb504467a5d7"
+down_revision: Union[str, None] = "f6e7b37dc826"
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 
