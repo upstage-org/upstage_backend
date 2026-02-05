@@ -160,6 +160,20 @@ type_defs = gql("""
         name: String!
         description: String
     }
+
+    input EventInput {
+        topic: String!
+        mqttTimestamp: Float!
+        payload: JSONString
+    }
+
+    input SavePerformanceInput {
+        performanceId: ID
+        stageId: ID
+        name: String!
+        description: String
+        events: [EventInput!]!
+    }
     
     input SceneInput {
         name: String
@@ -686,6 +700,7 @@ type_defs = gql("""
         deleteScene(id: ID!): CommonResponse
         updatePerformance(input: PerformanceInput!): CommonResponse
         duplicatePerformance(input: DuplicatePerformanceInput!): Performance
+        savePerformance(input: SavePerformanceInput!): Performance
         deletePerformance(id: ID!): CommonResponse
         startRecording(input: RecordInput!): Performance
         saveRecording(id: ID!): Performance

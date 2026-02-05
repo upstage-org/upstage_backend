@@ -10,6 +10,7 @@ if projdir not in sys.path:
     sys.path.append(projdir)
     sys.path.append(projdir2)
 
+import json
 import arrow
 from graphql import GraphQLError
 from global_config.database import ScopedSession
@@ -21,7 +22,7 @@ from performance_config.db_models.performance_mqtt_config import (
 )
 from performance_config.db_models.performance_config import PerformanceConfigModel
 from stages.db_models.stage import StageModel
-from stages.http.validation import DuplicatePerformanceInput, PerformanceInput, RecordInput
+from stages.http.validation import DuplicatePerformanceInput, EventInput, PerformanceInput, RecordInput, SavePerformanceInput
 from users.db_models.user import ADMIN, SUPER_ADMIN, UserModel
 from sqlalchemy.orm.session import make_transient
 
@@ -136,6 +137,77 @@ class PerformanceService:
                 .first()
             )
             return convert_keys_to_camel_case(new_performance.to_dict())
+
+    def save_performance(self, user: UserModel, input: SavePerformanceInput):
+        """Save a performance with the given events. Replaces existing performance if performanceId set, else creates new (requires stageId)."""
+        with ScopedSession() as local_db_session:
+            if input.performanceId is not None:
+                performance = (
+                    local_db_session.query(PerformanceModel)
+                    .filter_by(id=input.performanceId)
+                    .first()
+                )
+                if not performance:
+                    raise GraphQLError("Performance not found")
+                if (
+                    user.role not in [SUPER_ADMIN, ADMIN]
+                    and user.id != performance.stage.owner_id
+                ):
+                    raise GraphQLError("You are not allowed to save over this performance")
+                performance.name = input.name
+                performance.description = input.description
+                local_db_session.query(EventModel).filter(
+                    EventModel.performance_id == input.performanceId
+                ).delete(synchronize_session=False)
+                performance_id = performance.id
+            else:
+                if input.stageId is None:
+                    raise GraphQLError("stageId is required when creating a new performance")
+                stage = (
+                    local_db_session.query(StageModel).filter_by(id=input.stageId).first()
+                )
+                if not stage:
+                    raise GraphQLError("Stage not found")
+                if (
+                    user.role not in [SUPER_ADMIN, ADMIN]
+                    and user.id != stage.owner_id
+                ):
+                    raise GraphQLError("You are not allowed to create a performance on this stage")
+                performance = PerformanceModel(
+                    name=input.name,
+                    description=input.description,
+                    recording=False,
+                    stage_id=input.stageId,
+                )
+                local_db_session.add(performance)
+                local_db_session.flush()
+                performance_id = performance.id
+
+            for ev in input.events:
+                if ev.payload is None:
+                    payload = {}
+                elif isinstance(ev.payload, dict):
+                    payload = ev.payload
+                elif isinstance(ev.payload, str):
+                    try:
+                        payload = json.loads(ev.payload)
+                    except (TypeError, ValueError):
+                        payload = {}
+                else:
+                    payload = {}
+                event = EventModel(
+                    topic=ev.topic,
+                    mqtt_timestamp=ev.mqttTimestamp,
+                    performance_id=performance_id,
+                    payload=payload,
+                )
+                local_db_session.add(event)
+
+            local_db_session.flush()
+            performance = (
+                local_db_session.query(PerformanceModel).filter_by(id=performance_id).first()
+            )
+            return convert_keys_to_camel_case(performance.to_dict())
 
     def delete_performance(self, user: UserModel, id: int):
         with ScopedSession() as local_db_session:

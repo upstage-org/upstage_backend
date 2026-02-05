@@ -24,6 +24,7 @@ from stages.http.validation import (
     DuplicateStageInput,
     PerformanceInput,
     RecordInput,
+    SavePerformanceInput,
     SceneInput,
     SearchStageInput,
     UpdateStageInput,
@@ -197,6 +198,15 @@ def duplicate_performance(_, info, input):
     return PerformanceService().duplicate_performance(
         UserModel(**info.context["request"].state.current_user),
         DuplicatePerformanceInput(**input),
+    )
+
+
+@mutation.field("savePerformance")
+@authenticated(allowed_roles=[SUPER_ADMIN, ADMIN, PLAYER])
+def save_performance(_, info, input):
+    return PerformanceService().save_performance(
+        UserModel(**info.context["request"].state.current_user),
+        SavePerformanceInput(**input),
     )
 
 

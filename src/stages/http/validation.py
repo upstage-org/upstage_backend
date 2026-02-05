@@ -1,6 +1,6 @@
 # -*- coding: iso8859-15 -*-
 from datetime import date
-from typing import List, Optional
+from typing import Any, List, Optional
 from pydantic import BaseModel, Field, conint
 
 
@@ -95,6 +95,21 @@ class DuplicatePerformanceInput(BaseModel):
     description: Optional[str] = Field(
         None, description="Description for the new performance"
     )
+
+
+class EventInput(BaseModel):
+    topic: str = Field(..., description="Event MQTT topic")
+    mqttTimestamp: float = Field(..., description="Event timestamp")
+    payload: Optional[Any] = Field(default=None, description="Event payload (JSON)")
+
+
+class SavePerformanceInput(BaseModel):
+    """Save a performance with the given events. Replace existing if performanceId set, else create new (requires stageId)."""
+    performanceId: Optional[int] = Field(None, description="If set, replace this performance's events and update name/description")
+    stageId: Optional[int] = Field(None, description="Required when creating new performance (no performanceId)")
+    name: str = Field(..., description="Performance name")
+    description: Optional[str] = Field(None, description="Performance description")
+    events: List[EventInput] = Field(..., description="Events to save (e.g. compressed replay events)")
 
 
 class SearchStageInput(BaseModel):
