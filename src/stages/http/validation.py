@@ -89,6 +89,14 @@ class RecordInput(BaseModel):
     )
 
 
+class DuplicatePerformanceInput(BaseModel):
+    sourceId: int = Field(..., description="ID of the performance to copy")
+    name: str = Field(..., description="Name for the new performance")
+    description: Optional[str] = Field(
+        None, description="Description for the new performance"
+    )
+
+
 class SearchStageInput(BaseModel):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)

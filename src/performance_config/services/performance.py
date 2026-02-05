@@ -21,7 +21,7 @@ from performance_config.db_models.performance_mqtt_config import (
 )
 from performance_config.db_models.performance_config import PerformanceConfigModel
 from stages.db_models.stage import StageModel
-from stages.http.validation import PerformanceInput, RecordInput
+from stages.http.validation import DuplicatePerformanceInput, PerformanceInput, RecordInput
 from users.db_models.user import ADMIN, SUPER_ADMIN, UserModel
 from sqlalchemy.orm.session import make_transient
 
@@ -92,6 +92,50 @@ class PerformanceService:
             local_db_session.flush()
 
             return {"success": True}
+
+    def duplicate_performance(self, user: UserModel, input: DuplicatePerformanceInput):
+        with ScopedSession() as local_db_session:
+            source = (
+                local_db_session.query(PerformanceModel)
+                .filter_by(id=input.sourceId)
+                .first()
+            )
+            if not source:
+                raise GraphQLError("Performance not found")
+            if (
+                user.role not in [SUPER_ADMIN, ADMIN]
+                and user.id != source.stage.owner_id
+            ):
+                raise GraphQLError("You are not allowed to duplicate this performance")
+
+            new_performance = PerformanceModel(
+                name=input.name,
+                description=input.description,
+                recording=False,
+                stage_id=source.stage_id,
+            )
+            local_db_session.add(new_performance)
+            local_db_session.flush()
+
+            events = (
+                local_db_session.query(EventModel)
+                .filter(EventModel.performance_id == input.sourceId)
+                .all()
+            )
+            for event in events:
+                local_db_session.expunge(event)
+                make_transient(event)
+                event.id = None
+                event.performance_id = new_performance.id
+                local_db_session.add(event)
+
+            local_db_session.flush()
+            new_performance = (
+                local_db_session.query(PerformanceModel)
+                .filter_by(id=new_performance.id)
+                .first()
+            )
+            return convert_keys_to_camel_case(new_performance.to_dict())
 
     def delete_performance(self, user: UserModel, id: int):
         with ScopedSession() as local_db_session:

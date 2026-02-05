@@ -154,6 +154,12 @@ type_defs = gql("""
         name: String!
         description: String
     }
+
+    input DuplicatePerformanceInput {
+        sourceId: ID!
+        name: String!
+        description: String
+    }
     
     input SceneInput {
         name: String
@@ -679,6 +685,7 @@ type_defs = gql("""
         saveScene(input: SceneInput!): Scene
         deleteScene(id: ID!): CommonResponse
         updatePerformance(input: PerformanceInput!): CommonResponse
+        duplicatePerformance(input: DuplicatePerformanceInput!): Performance
         deletePerformance(id: ID!): CommonResponse
         startRecording(input: RecordInput!): Performance
         saveRecording(id: ID!): Performance
