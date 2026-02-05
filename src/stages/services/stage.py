@@ -102,12 +102,13 @@ class StageService:
 
             data = query.all()
 
-            access = input.access if input.access and len(input.access) else ['owner', 'editor', 'player']
+            access = input.access if input.access and len(input.access) else ['owner', 'editor', 'player', 'audience']
+            show_all_for_admin = getattr(user, 'role', None) in (SUPER_ADMIN, ADMIN)
 
             stages = []
             for stage in data:
                 permission = self.stage_operation_service.resolve_permission(user.id, stage)
-                if permission in access:
+                if show_all_for_admin or permission in access:
                     # Access properties and relationships while object is still attached to session
                     stage_dict = stage.to_dict()
                     cover = stage.cover
