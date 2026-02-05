@@ -563,8 +563,10 @@ class AssetService:
             attributes = json.loads(asset.description)
             if "frames" in attributes:
                 for frame in attributes["frames"]:
+                    # Only delete frame file if no other asset uses it (exclude the one we're deleting)
                     frame_asset = (
                         local_db_session.query(AssetModel)
+                        .filter(AssetModel.id != asset.id)
                         .filter(
                             or_(
                                 AssetModel.file_location == frame,
@@ -604,7 +606,17 @@ class AssetService:
             multiframe_media.description = json.dumps(attributes)
             local_db_session.flush()
 
-        self.file_handing.delete_file(physical_path)
+        # Only delete the physical file if no other asset uses this file_location
+        # (e.g. the original single-image media that was used as the first frame
+        # still exists and must keep its file)
+        other_using_same_file = (
+            local_db_session.query(AssetModel)
+            .filter(AssetModel.file_location == asset.file_location)
+            .filter(AssetModel.id != asset.id)
+            .first()
+        )
+        if not other_using_same_file:
+            self.file_handing.delete_file(physical_path)
 
     def resolve_sign(self, user: UserModel, asset: AssetModel):
         if asset.owner_id == user.id:
