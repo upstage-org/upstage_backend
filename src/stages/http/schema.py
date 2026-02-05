@@ -10,6 +10,7 @@ if projdir not in sys.path:
     sys.path.append(projdir)
     sys.path.append(projdir2)
 
+from graphql import GraphQLError
 from ariadne import MutationType, QueryType, make_executable_schema
 from global_config.decorators.authenticated import authenticated
 from performance_config.services.performance import PerformanceService
@@ -186,9 +187,12 @@ def update_performance(_, info, input):
 
 @mutation.field("deletePerformance")
 @authenticated(allowed_roles=[SUPER_ADMIN, ADMIN, PLAYER])
-def delete_performance(_, info, id: int):
+def delete_performance(_, info, id):
+    performance_id = int(id) if id is not None else None
+    if performance_id is None:
+        raise GraphQLError("Performance id is required")
     return PerformanceService().delete_performance(
-        UserModel(**info.context["request"].state.current_user), id
+        UserModel(**info.context["request"].state.current_user), performance_id
     )
 
 
