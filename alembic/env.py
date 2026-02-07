@@ -35,8 +35,9 @@ def get_env(key, default=None):
 
 
 # version_locations in .ini are relative to script_location (alembic/), but migrations
-# live in src/N/db_migrations at project root. Set absolute paths so they are found
-# when running from any cwd (e.g. cd /usr/app && alembic -c ./scripts/alembic.ini upgrade head).
+# live in src/N/db_migrations at project root. ScriptDirectory is created before env.py
+# runs, so we must set version_locations on the script object (config.set_main_option
+# is too late). This ensures migrations are found when running from any cwd.
 _migration_dirs = [
   "src/users/db_migrations",
   "src/authentication/db_migrations",
@@ -47,10 +48,7 @@ _migration_dirs = [
   "src/performance_config/db_migrations",
   "src/upstage_stats/db_migrations",
 ]
-config.set_main_option(
-  "version_locations",
-  os.pathsep.join(os.path.join(projdir, d) for d in _migration_dirs),
-)
+context.script.version_locations = [os.path.join(projdir, d) for d in _migration_dirs]
 
 config.set_main_option('sqlalchemy.url', DATABASE_URL)
 
