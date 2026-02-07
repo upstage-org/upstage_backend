@@ -34,6 +34,23 @@ def get_env(key, default=None):
   return loaded_env.get(key) or os.getenv(key, default)
 
 
+# version_locations in .ini are relative to script_location (alembic/), but migrations
+# live in src/N/db_migrations at project root. Set absolute paths so they are found
+# when running from any cwd (e.g. cd /usr/app && alembic -c ./scripts/alembic.ini upgrade head).
+_migration_dirs = [
+  "src/users/db_migrations",
+  "src/authentication/db_migrations",
+  "src/assets/db_migrations",
+  "src/stages/db_migrations",
+  "src/upstage_options/db_migrations",
+  "src/event_archive/db_migrations",
+  "src/performance_config/db_migrations",
+  "src/upstage_stats/db_migrations",
+]
+config.set_main_option(
+  "version_locations",
+  os.pathsep.join(os.path.join(projdir, d) for d in _migration_dirs),
+)
 
 config.set_main_option('sqlalchemy.url', DATABASE_URL)
 
