@@ -35,4 +35,5 @@ class PerformanceModel(BaseModel):
     created_on = Column(DateTime, nullable=False, default=lambda: get_naive_utc_now())
     saved_on = Column(DateTime, nullable=True)
     recording = Column(Boolean, nullable=False, default=False)
+    duration = Column(BigInteger, nullable=True)  # duration in milliseconds from first to last event
     stage = relationship("StageModel", foreign_keys=[stage_id])

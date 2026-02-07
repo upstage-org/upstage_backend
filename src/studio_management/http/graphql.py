@@ -554,6 +554,7 @@ type_defs = gql("""
         createdOn: Date
         savedOn: Date
         recording: Boolean
+        duration: Int
     }
                 
     type Config{

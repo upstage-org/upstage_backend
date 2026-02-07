@@ -31,7 +31,27 @@ from stages.http.validation import (
     SavePerformanceInput,
 )
 from users.db_models.user import ADMIN, SUPER_ADMIN, UserModel
+from sqlalchemy import func
 from sqlalchemy.orm.session import make_transient
+
+
+def _update_performance_duration(session, performance_id):
+    """Set performance.duration (ms) from min/max event mqtt_timestamp."""
+    row = (
+        session.query(
+            func.min(EventModel.mqtt_timestamp).label("min_ts"),
+            func.max(EventModel.mqtt_timestamp).label("max_ts"),
+        )
+        .filter(EventModel.performance_id == performance_id)
+        .first()
+    )
+    if row and row.min_ts is not None and row.max_ts is not None:
+        delta = row.max_ts - row.min_ts
+        # Timestamps may be Unix seconds (large, e.g. 1e9) or relative ms (e.g. 0–1e6)
+        duration_ms = int(delta * 1000) if delta < 1e9 else int(delta)
+        session.query(PerformanceModel).filter_by(id=performance_id).update(
+            {PerformanceModel.duration: duration_ms}
+        )
 
 
 class PerformanceService:
@@ -211,6 +231,7 @@ class PerformanceService:
                 local_db_session.add(event)
 
             local_db_session.flush()
+            _update_performance_duration(local_db_session, performance_id)
             performance = (
                 local_db_session.query(PerformanceModel).filter_by(id=performance_id).first()
             )
@@ -269,6 +290,7 @@ class PerformanceService:
                 local_db_session.add(event)
 
             local_db_session.flush()
+            _update_performance_duration(local_db_session, performance_id)
             performance = (
                 local_db_session.query(PerformanceModel)
                 .filter_by(id=performance_id)
