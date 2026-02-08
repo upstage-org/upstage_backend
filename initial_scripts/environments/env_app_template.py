@@ -64,5 +64,5 @@ SEND_EMAIL_SERVER = "https://upstage.live"
 # Change to "Production" for official releases.
 ENV_TYPE="Dev/Testing"
 
-JWT_ACCESS_TOKEN_MINUTES = "86400" # 1 day
-JWT_REFRESH_TOKEN_DAYS = "30" # 30 days
+JWT_ACCESS_TOKEN_MINUTES = 86400 # 1 day
+JWT_REFRESH_TOKEN_DAYS = 30 # 30 days
