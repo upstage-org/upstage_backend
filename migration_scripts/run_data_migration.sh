@@ -27,7 +27,7 @@ psql -h "$DB_HOST" -p "$DB_PORT" -U "$DB_USER" -d postgres -c "SELECT 1 FROM pg_
 psql -h "$DB_HOST" -p "$DB_PORT" -U "$DB_USER" -d postgres -c "CREATE DATABASE \"original_upstage\""
 
 echo "Restoring database from $SQL_FILE..."
-psql -h "$DB_HOST" -p "$DB_PORT" -U "$DB_USER" -d original_upstage -f  $SQL_FILE
+pg_restore -h "$DB_HOST" -p "$DB_PORT" -U "$DB_USER" -d original_upstage --jobs=4 --verbose backup.dump
 
 echo "Done restoring database: $DB_NAME"
 
