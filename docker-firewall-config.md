@@ -2,7 +2,7 @@
 
 ## Docker Container Port Access Configuration
 
-**Note:** There's some trickiness to running all images on the same machine. Follow these steps carefully:
+**Note:** There's some trickiness to running images across different machines. In essence, the docker ports have to be exposed, and iptables rules have to be established to prevent external access to the external postgresql and mongo ports. MQTT ports should be open to the public, since the frontend accesses these from anywhere. Follow these steps carefully:
 
 ### 1. UFW Localhost Rules (Essential for same machine)
 

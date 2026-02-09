@@ -102,4 +102,5 @@ services:
 
 networks:
   upstage-network:
-    name: upstage-network
+    driver: bridge
+    external: true
