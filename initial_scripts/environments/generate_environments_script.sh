@@ -43,6 +43,10 @@ generate_config() {
     a=`hostname -I`
     read -a arr <<< "$a"
     echo "
+In a single-machine setup, SVC_HOST should be set to 127.0.0.1
+
+In a multi-machine setup, we try to derive APP_HOST.
+
 Note that on Digital Ocean, the third IP in the 'hostname -I' command: ${arr[2]} is the local network IP, used for faster connection without going out to the internet. That is the IP we're using. If this is incorrect in your environment, please change this IP address in the generated config file $output_file. All IPs for this server are: ${arr[@]}"
     SVC_HOST="${arr[2]}"
     keys+=("SVC_HOST")
