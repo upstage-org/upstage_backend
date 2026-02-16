@@ -60,6 +60,7 @@ CLOUDFLARE_CAPTCHA_VERIFY_ENDPOINT = os.getenv("CLOUDFLARE_CAPTCHA_VERIFY_ENDPOI
 
 
 HOSTNAME = os.getenv("HOSTNAME")
+print("*****************Hostname is: " + HOSTNAME)
 ACCEPT_EMAIL_HOST = os.getenv("ACCEPT_EMAIL_HOST", "").split(",")
 SEND_EMAIL_SERVER = os.getenv("SEND_EMAIL_SERVER", "http://localhost:8000")
 FULL_DOMAIN = os.getenv("FULL_DOMAIN", "http://localhost:8000")
@@ -97,6 +98,7 @@ if "HARDCODED_HOSTNAME" in os.environ:
 else:
     ORIG_HOSTNAME = socket.gethostname()
     HOSTNAME = socket.gethostname().replace(".", "_").replace("-", "_")
+print("*****************Hostname is now: " + HOSTNAME)
 
 UPLOAD_USER_CONTENT_FOLDER = (
     "/usr/app/uploads"  # This is mounted here by docker-compose file.
