@@ -12,8 +12,8 @@ cp -r ../dashboard/demo /app_code
 cp -r ../requirements.txt /app_code
 cp -r ../migration_scripts /app_code
 
-docker compose -f docker-compose-prod.yaml -p upstage-backend-prod down
+docker compose -f ./docker-compose-prod.yaml -p upstage-backend-prod down
 #docker compose rm -f
-docker compose -f docker-compose-prod.yaml -p upstage-backend-prod up -d
+docker compose -f ./docker-compose-prod.yaml -p upstage-backend-prod up -d
 sleep 5
-docker compose ps
+docker compose -f ./docker-compose-prod.yaml -p upstage-backend-prod ps
