@@ -17,13 +17,12 @@ services:
       - /app_code_dev/migration_scripts:/usr/app/migration_scripts
     command: >
       /bin/bash -c "
-      tail -f /dev/null"
-    #  cd /usr/app &&
-    #  export PYTHONPATH=$(pwd)/src &&
-    #  pip install --upgrade pip &&
-    #  pip install -r ./requirements.txt &&
-    #  export HARDCODED_HOSTNAME=${HARDCODED_HOSTNAME} &&
-    #  ./scripts/start_upstage.sh"
+      cd /usr/app &&
+      export PYTHONPATH=$(pwd)/src &&
+      pip install --upgrade pip &&
+      pip install -r ./requirements.txt &&
+      export HARDCODED_HOSTNAME=${HARDCODED_HOSTNAME} &&
+      ./scripts/start_upstage.sh"
     networks:
       - upstage-network-dev
 
