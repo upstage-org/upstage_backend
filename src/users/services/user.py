@@ -113,22 +113,27 @@ class UserService:
         if not CLOUDFLARE_CAPTCHA_SECRETKEY:
             return
 
+        cf_ip = request.headers.get("CF-Connecting-IP")
         ip = request.headers.get("X-Forwarded-For", request.client.host)
+        if type(ip) == list:
+            ip = ip[0]
+
         """
         Allow CloudFlare to be turned off for testing.
         """
         formData = {
             "secret": CLOUDFLARE_CAPTCHA_SECRETKEY,
             "response": token,
-            "remoteip": ip,
+            "remoteip": cf_ip or ip,
         }
 
         result = requests.post(CLOUDFLARE_CAPTCHA_VERIFY_ENDPOINT, data=formData)
         outcome = result.json()
+        print(f"************* Using {ip} or {cf_ip} , outcome: {outcome} ****")
 
         if not outcome["success"]:
             raise GraphQLError(
-                "We think you are not a human! " + ", ".join(outcome["error-codes"])
+                "We think you are not a human! " + ", ".join(outcome["error-codes"] + " " + outcome)
             )
 
     def update(self, user: UserModel):
