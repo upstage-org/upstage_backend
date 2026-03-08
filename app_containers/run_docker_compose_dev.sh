@@ -15,5 +15,4 @@ cp -r ../migration_scripts /app_code_dev
 docker compose -f docker-compose-dev.yaml -p docker-backend-dev down --remove-orphans
 #docker compose rm -f
 docker compose -f docker-compose-dev.yaml -p docker-backend-dev up -d --build
-sleep 5
-docker compose ps
+docker compose -f docker-compose-dev.yaml -p docker-backend-dev ps
