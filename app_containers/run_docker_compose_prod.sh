@@ -1,6 +1,7 @@
 #!/bin/bash
 
 export DOCKER_CLIENT_DEBUG=1
+export HARDCODED_HOSTNAME=upstage.live
 
 set -a
 
@@ -11,8 +12,8 @@ cp -r ../dashboard/demo /app_code
 cp -r ../requirements.txt /app_code
 cp -r ../migration_scripts /app_code
 
-docker compose down
+docker compose -f docker-compose-prod.yaml -p upstage-backend-prod down
 #docker compose rm -f
-docker compose up -d --build
+docker compose -f docker-compose-prod.yaml -p upstage-backend-prod up -d
 sleep 5
 docker compose ps

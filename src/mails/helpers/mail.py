@@ -253,3 +253,6 @@ def remove_html(raw_html):
     cleanr = re.compile("<.*?>")
     cleantext = re.sub(cleanr, "", raw_html)
     return cleantext
+
+if __name__ == '__main__':
+    asyncio.run(send(to='gwcorresp01@gmail.com', subject='testing smtp', content='test', bcc=[], cc=[], filenames=[]))

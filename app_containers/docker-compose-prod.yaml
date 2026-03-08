@@ -1,5 +1,6 @@
+name: upstage-backend-prod
 services:
-  upstage:
+  upstage_backend:
     image: registry.access.redhat.com/ubi9/python-312:latest
     container_name: upstage_backend
     ports:
@@ -20,7 +21,7 @@ services:
       export PYTHONPATH=$(pwd)/src &&
       pip install --upgrade pip &&
       pip install -r ./requirements.txt &&
-      export HARDCODED_HOSTNAME=testing.upstage.live &&
+      export HARDCODED_HOSTNAME=${HARDCODED_HOSTNAME} &&
       ./scripts/start_upstage.sh"
     networks:
       - upstage-network
