@@ -17,4 +17,4 @@ docker compose -f ./docker-compose-prod.yaml -p upstage-services-prod down
 #docker compose rm -f
 docker compose -f ./docker-compose-prod.yaml -p upstage-services-prod up -d
 sleep 5
-docker compose ps
+docker compose -f ./docker-compose-prod.yaml -p upstage-services-prod ps
