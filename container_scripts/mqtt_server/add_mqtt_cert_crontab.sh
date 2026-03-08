@@ -5,11 +5,7 @@ mkdir -p /etc/mosquitto/ca_certificates/
 chmod 755 /etc/mosquitto/ca_certificates/
 chown mosquitto:mosquitto /etc/mosquitto/ca_certificates/
 
-<<<<<<< HEAD
-cp -L /etc/letsencrypt/live/testing.upstage.live/* /etc/mosquitto/ca_certificates/
-=======
 cp -L /etc/letsencrypt/live/upstage.live/* /etc/mosquitto/ca_certificates/
->>>>>>> d40fd1a3f0cc86828d26ca48f03d44a3f79c7fe5
 chown mosquitto:mosquitto /etc/mosquitto/ca_certificates/*
 
 # crontab does not run in the mosquitto docker container.
