@@ -16,5 +16,4 @@ be sure to remove and recreate the /postgresql_data/* dirs.
 docker compose -f ./docker-compose-services-prod.yaml -p upstage-services-prod down
 #docker compose rm -f
 docker compose -f ./docker-compose-services-prod.yaml -p upstage-services-prod up -d
-sleep 5
 docker compose -f ./docker-compose-services-prod.yaml -p upstage-services-prod ps
