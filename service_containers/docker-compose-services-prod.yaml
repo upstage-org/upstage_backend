@@ -35,7 +35,7 @@ services:
     image: eclipse-mosquitto:latest
     container_name: mosquitto_container
     ports:
-      - "2095:1883"
+      #- "2095:1883"
       - "2096:9001"
     volumes:
       # Auto-change the password in the pw.txt file referenced below:
