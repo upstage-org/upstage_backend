@@ -12,7 +12,7 @@ if projdir not in sys.path:
     sys.path.append(projdir2)
 
 
-from global_config.env import EMAIL_HOST_USER
+from global_config.env import EMAIL_HOST_FROM
 from global_config.database import DBSession
 
 
@@ -72,7 +72,7 @@ We are glad that you're here! Your account has been created and waiting for appr
 Please look at the <a href="https://docs.upstage.live/">UpStage User Manual</a> for documentation on how to use UpStage.
 <br>
 <br>
-If you have any questions, please contact us at <a href="mailto:{EMAIL_HOST_USER}">{EMAIL_HOST_USER}</a>.
+If you have any questions, please contact us at <a href="mailto:{EMAIL_HOST_FROM}">{EMAIL_HOST_FROM}</a>.
 <br>
 <br>
 {get_footer()}
