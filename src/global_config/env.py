@@ -67,7 +67,8 @@ FULL_DOMAIN = os.getenv("FULL_DOMAIN", "http://localhost:8000")
 ACCEPT_SERVER_SEND_EMAIL_EXTERNAL = [
     "https://dev-app1.upstage.live"
 ]  # All client server endpoints. Only config on upstage server
-EMAIL_HOST_USER = os.getenv("EMAIL_HOST_USER")
+EMAIL_HOST_FROM = os.getenv("EMAIL_HOST_FROM")
+EMAIL_HOST_LOGIN = os.getenv("EMAIL_HOST_LOGIN")
 SUPPORT_EMAILS = os.getenv("SUPPORT_EMAILS", "support@upstage.live").split(",")
 EMAIL_HOST_DISPLAY_NAME = os.getenv("EMAIL_HOST_DISPLAY_NAME", "UpStage")
 DOMAIN = os.getenv("DOMAIN", "upstage.live")

@@ -22,6 +22,7 @@ import os
 import re
 import uuid
 import requests
+import ssl
 import pymongo
 import aiosmtplib
 
@@ -33,7 +34,8 @@ from global_config.env import (
     EMAIL_HOST,
     EMAIL_HOST_DISPLAY_NAME,
     EMAIL_HOST_PASSWORD,
-    EMAIL_HOST_USER,
+    EMAIL_HOST_FROM,
+    EMAIL_HOST_LOGIN,
     EMAIL_PORT,
     EMAIL_TIME_EXPIRED_TOKEN,
     EMAIL_USE_TLS,
@@ -146,17 +148,20 @@ async def generate_email_token_clients():
         await sleep(EMAIL_TIME_EXPIRED_TOKEN)
 
 
-async def send_async(msg, user=EMAIL_HOST_USER, password=EMAIL_HOST_PASSWORD):
+async def send_async(msg, user=EMAIL_HOST_LOGIN, password=EMAIL_HOST_PASSWORD):
     """
     Contact SMTP server and send Message
-    We use this from a local server. TLS is not configured here.
+    We use this from a local server. 
+    TLS happens by default, no need to set it here.
     """
     host = EMAIL_HOST
     port = EMAIL_PORT
-    smtp = aiosmtplib.SMTP(hostname=host, port=int(port), use_tls=EMAIL_USE_TLS)
+    smtp = aiosmtplib.SMTP(hostname=host, port=int(port), use_tls=False)
     await smtp.connect()
-    # if EMAIL_USE_TLS:
-    #     await smtp.starttls()
+    '''
+    if EMAIL_USE_TLS:
+        await smtp.starttls(context=ssl.create_default_context())
+    '''
     if user:
         await smtp.login(user, password)
     await smtp.send_message(msg)
@@ -170,7 +175,7 @@ def create_email(
     filenames=[],
     cc=[],
     bcc=[],
-    sender=EMAIL_HOST_USER,
+    sender=EMAIL_HOST_FROM,
     external=False,
 ):
     """
@@ -192,9 +197,34 @@ def create_email(
     # Remove empty strings. Not sure how they get here.
     # Remove support admins if they've been listed as recipients.
     # They are implicitly added to all emails. No need to add them again.
-    to = [x for x in to if x not in ("", None)]
-    cc = [x for x in cc if x not in ("", None)]
-    bcc = [x for x in bcc if x not in ("", None)]
+
+    if type(to) != list:
+        to = [to]
+
+    if type(cc) != list:
+        cc = [cc]
+
+    if type(bcc) != list:
+        bcc = [bcc]
+
+    if len(to) == 1:
+        if to[0] in ("",None):
+            to = []
+    else:
+        to = [x for x in to if x not in ("", None) and len(to) > 1]
+
+    if len(cc) == 1:
+        if cc[0] in ("",None):
+            cc = []
+    else:
+        cc = [x for x in cc if x not in ("", None) and len(cc) > 1]
+
+    if len(bcc) == 1:
+        if bcc[0] in ("",None):
+            bcc = []
+    else:
+        bcc = [x for x in bcc if x not in ("", None) and len(bcc) > 1]
+
     if subject != "Welcome to UpStage!":
         if to and SUPPORT_EMAILS:
             to = list(set(to).difference(set(SUPPORT_EMAILS)))
@@ -211,7 +241,6 @@ def create_email(
                 msg["Bcc"] = ", ".join(SUPPORT_EMAILS)
 
     else:
-        to = [email for email in to if email not in SUPPORT_EMAILS]
         cc = []
         bcc = []
 
@@ -254,5 +283,8 @@ def remove_html(raw_html):
     cleantext = re.sub(cleanr, "", raw_html)
     return cleantext
 
+'''
 if __name__ == '__main__':
-    asyncio.run(send(to='gwcorresp01@gmail.com', subject='testing smtp', content='test', bcc=[], cc=[], filenames=[]))
+    import asyncio
+    asyncio.run(send(to='some_email_address', subject='testing smtp', content='test', bcc=[], cc=[], filenames=[]))
+'''
