@@ -16,10 +16,7 @@ from graphql import GraphQLError
 import jwt
 from requests import Request
 from sqlalchemy import and_, nulls_last, exists
-from global_config.database import (
-    DBSession,
-    ScopedSession,
-)
+from global_config import get_session
 from global_config.env import ALGORITHM, SECRET_KEY
 from global_config.helpers.object import convert_keys_to_camel_case
 
@@ -48,25 +45,10 @@ class StageService:
     def __init__(self):
         self.stage_operation_service = StageOperationService()
 
-    def _safe_db_query(self, query_func):
-        """
-        Safely execute a DBSession query with automatic rollback on error.
-        This prevents "current transaction is aborted" errors.
-        """
-        try:
-            return query_func()
-        except Exception as e:
-            # Rollback the transaction if it's in a failed state
-            try:
-                DBSession.rollback()
-            except:
-                pass
-            # Re-raise the original error
-            raise
-
     def get_all_stages(self, user: UserModel, input: SearchStageInput):
+        session = get_session()
         query = (
-            DBSession.query(StageModel)
+            session.query(StageModel)
             .outerjoin(UserModel)
             .outerjoin(ParentStageModel)
             .outerjoin(AssetModel)
@@ -159,6 +141,7 @@ class StageService:
         }
 
     def get_stage_list(self, info, input: StageStreamInput):
+        session = get_session()
         request: Request = info.context["request"]
         authorization: str = request.headers.get("Authorization")
         current_user_id = None
@@ -169,7 +152,7 @@ class StageService:
             current_user_id = payload.get("user_id")
 
         query = (
-            DBSession.query(StageModel)
+            session.query(StageModel)
             .outerjoin(UserModel)
             .outerjoin(StageAttributeModel)
             .outerjoin(ParentStageModel)
@@ -216,8 +199,9 @@ class StageService:
         ]
 
     def get_stage_by_id(self, user: UserModel, id: int):
+        session = get_session()
         stage = (
-            DBSession.query(StageModel)
+            session.query(StageModel)
             .outerjoin(UserModel)
             .outerjoin(ParentStageModel)
             .outerjoin(AssetModel)
@@ -267,87 +251,87 @@ class StageService:
         return permission
 
     def create_stage(self, user: UserModel, input: StageInput):
-        with ScopedSession() as local_db_session:
-            stage = StageModel(
-                name=input.name,
-                description=input.description,
-                owner_id=input.owner if input.owner else user.id,
-                file_location=input.fileLocation,
-            )
+        session = get_session()
+        stage = StageModel(
+            name=input.name,
+            description=input.description,
+            owner_id=input.owner if input.owner else user.id,
+            file_location=input.fileLocation,
+        )
 
-            local_db_session.add(stage)
-            local_db_session.commit()
+        session.add(stage)
+        session.flush()
 
-            self.update_stage_attribute(
-                stage.id, "cover", input.cover, local_db_session
-            )
-            self.update_stage_attribute(
-                stage.id, "visibility", str(input.visibility).lower(), local_db_session
-            )
-            self.update_stage_attribute(
-                stage.id, "description", input.description, local_db_session
-            )
-            self.update_stage_attribute(
-                stage.id, "status", input.status, local_db_session
-            )
-            self.update_stage_attribute(
-                stage.id, "playerAccess", input.playerAccess, local_db_session
-            )
-            return convert_keys_to_camel_case(stage.to_dict())
+        self.update_stage_attribute(
+            stage.id, "cover", input.cover, session
+        )
+        self.update_stage_attribute(
+            stage.id, "visibility", str(input.visibility).lower(), session
+        )
+        self.update_stage_attribute(
+            stage.id, "description", input.description, session
+        )
+        self.update_stage_attribute(
+            stage.id, "status", input.status, session
+        )
+        self.update_stage_attribute(
+            stage.id, "playerAccess", input.playerAccess, session
+        )
+        return convert_keys_to_camel_case(stage.to_dict())
 
     def update_stage(self, user: UserModel, input: UpdateStageInput):
-        with ScopedSession() as local_db_session:
-            stage = local_db_session.query(StageModel).filter_by(id=input.id).first()
-            if not stage or not input.id:
-                raise GraphQLError("Stage not found")
+        session = get_session()
+        stage = session.query(StageModel).filter_by(id=input.id).first()
+        if not stage or not input.id:
+            raise GraphQLError("Stage not found")
 
-            self.extract_permission(user, stage)
+        self.extract_permission(user, stage)
 
-            stage.name = (
-                input.name if hasattr(input, "name") and input.name else stage.name
-            )
-            stage.description = (
-                input.description
-                if hasattr(input, "description") and input.description
-                else stage.description
-            )
-            stage.file_location = (
-                input.fileLocation
-                if hasattr(input, "fileLocation") and input.fileLocation
-                else stage.file_location
-            )
+        stage.name = (
+            input.name if hasattr(input, "name") and input.name else stage.name
+        )
+        stage.description = (
+            input.description
+            if hasattr(input, "description") and input.description
+            else stage.description
+        )
+        stage.file_location = (
+            input.fileLocation
+            if hasattr(input, "fileLocation") and input.fileLocation
+            else stage.file_location
+        )
 
-            stage.owner_id = input.owner if  hasattr(input, "owner") and input.owner else stage.owner_id
+        stage.owner_id = input.owner if hasattr(input, "owner") and input.owner else stage.owner_id
 
-            self.update_stage_attribute(
-                stage.id, "cover", input.cover, local_db_session
-            )
-            self.update_stage_attribute(
-                stage.id, "visibility", str(input.visibility).lower(), local_db_session
-            )
-            self.update_stage_attribute(
-                stage.id, "description", input.description, local_db_session
-            )
-            self.update_stage_attribute(
-                stage.id, "status", input.status, local_db_session
-            )
-            self.update_stage_attribute(
-                stage.id, "playerAccess", input.playerAccess, local_db_session
-            )
-            self.update_stage_attribute(
-                stage.id, "config", input.config, local_db_session
-            )
-            return convert_keys_to_camel_case(stage.to_dict())
+        self.update_stage_attribute(
+            stage.id, "cover", input.cover, session
+        )
+        self.update_stage_attribute(
+            stage.id, "visibility", str(input.visibility).lower(), session
+        )
+        self.update_stage_attribute(
+            stage.id, "description", input.description, session
+        )
+        self.update_stage_attribute(
+            stage.id, "status", input.status, session
+        )
+        self.update_stage_attribute(
+            stage.id, "playerAccess", input.playerAccess, session
+        )
+        self.update_stage_attribute(
+            stage.id, "config", input.config, session
+        )
+        return convert_keys_to_camel_case(stage.to_dict())
 
     def update_stage_attribute(
-        self, stage_id: int, name: str, value: str, local_db_session
+        self, stage_id: int, name: str, value: str, session
     ):
         if not value:
             return
 
         if stage_id:
             stage_attribute = (
-                local_db_session.query(StageAttributeModel)
+                session.query(StageAttributeModel)
                 .filter(
                     and_(
                         StageAttributeModel.stage_id == stage_id,
@@ -359,79 +343,79 @@ class StageService:
             if stage_attribute:
                 stage_attribute.description = value
                 return
-            local_db_session.add(
+            session.add(
                 StageAttributeModel(stage_id=stage_id, name=name, description=value)
             )
-            local_db_session.flush()
+            session.flush()
 
     def delete_stage(self, user: UserModel, id: int):
-        with ScopedSession() as local_db_session:
-            stage = (
-                local_db_session.query(StageModel).filter(StageModel.id == id).first()
-            )
-            if not stage:
-                raise GraphQLError("Stage not found")
+        session = get_session()
+        stage = (
+            session.query(StageModel).filter(StageModel.id == id).first()
+        )
+        if not stage:
+            raise GraphQLError("Stage not found")
 
-            self.extract_permission(user, stage)
+        self.extract_permission(user, stage)
 
-            local_db_session.query(StageAttributeModel).filter(
-                StageAttributeModel.stage_id == id
-            ).delete()
-            local_db_session.query(ParentStageModel).filter(
-                ParentStageModel.stage_id == id
-            ).delete()
+        session.query(StageAttributeModel).filter(
+            StageAttributeModel.stage_id == id
+        ).delete()
+        session.query(ParentStageModel).filter(
+            ParentStageModel.stage_id == id
+        ).delete()
 
-            local_db_session.query(SceneModel).filter(
-                SceneModel.stage_id == id
-            ).delete()
+        session.query(SceneModel).filter(
+            SceneModel.stage_id == id
+        ).delete()
 
-            performances = local_db_session.query(PerformanceModel).filter(
-                PerformanceModel.stage_id == id
-            )
+        performances = session.query(PerformanceModel).filter(
+            PerformanceModel.stage_id == id
+        )
 
-            local_db_session.query(EventModel).filter(
-                EventModel.performance_id.in_([p.id for p in performances])
-            ).delete()
+        session.query(EventModel).filter(
+            EventModel.performance_id.in_([p.id for p in performances])
+        ).delete()
 
-            local_db_session.query(PerformanceModel).filter(
-                PerformanceModel.stage_id == id
-            ).delete()
+        session.query(PerformanceModel).filter(
+            PerformanceModel.stage_id == id
+        ).delete()
 
-            local_db_session.delete(stage)
-            return {"success": True, "message": "Stage deleted"}
+        session.delete(stage)
+        return {"success": True, "message": "Stage deleted"}
 
     def duplicate_stage(self, user: UserModel, input: DuplicateStageInput):
-        with ScopedSession() as local_db_session:
-            stage = (
-                local_db_session.query(StageModel)
-                .filter(StageModel.id == input.id)
-                .first()
-            )
-            if not stage:
-                raise GraphQLError("Stage not found")
+        session = get_session()
+        stage = (
+            session.query(StageModel)
+            .filter(StageModel.id == input.id)
+            .first()
+        )
+        if not stage:
+            raise GraphQLError("Stage not found")
 
-            file_location = self.get_short_name(input.name, local_db_session)
+        file_location = self.get_short_name(input.name, session)
 
-            new_stage = StageModel(
-                name=input.name,
-                description=stage.description,
-                owner_id=user.id,
-                file_location=file_location,
-            )
+        new_stage = StageModel(
+            name=input.name,
+            description=stage.description,
+            owner_id=user.id,
+            file_location=file_location,
+        )
 
-            local_db_session.add(new_stage)
-            local_db_session.commit()
+        session.add(new_stage)
+        session.flush()
 
-            self.copy_data(input, local_db_session, new_stage)
+        self.copy_data(input, session, new_stage)
 
-            local_db_session.flush()
-            return convert_keys_to_camel_case(new_stage.to_dict())
+        session.flush()
+        return convert_keys_to_camel_case(new_stage.to_dict())
 
     def copy_data(
-        self, input: DuplicateStageInput, local_db_session, new_stage: StageModel
+        self, input: DuplicateStageInput, session, new_stage: StageModel
     ):
         stage_attributes = (
-            local_db_session.query(StageAttributeModel)
+            session.query(StageAttributeModel)
             .filter(StageAttributeModel.stage_id == input.id)
             .all()
         )
@@ -441,29 +425,29 @@ class StageService:
                 new_stage.id,
                 stage_attribute.name,
                 stage_attribute.description,
-                local_db_session,
+                session,
             )
 
         parent_stages = (
-            local_db_session.query(ParentStageModel)
+            session.query(ParentStageModel)
             .filter(ParentStageModel.stage_id == input.id)
             .all()
         )
         for parent_stage in parent_stages:
-            local_db_session.add(
+            session.add(
                 ParentStageModel(
                     stage_id=new_stage.id,
                     child_asset_id=parent_stage.child_asset_id,
                 )
             )
 
-    def get_short_name(self, name, local_db_session):
+    def get_short_name(self, name, session):
         shortname = re.sub(r"\s+", "-", re.sub("[^A-Za-z0-9 ]+", "", name)).lower()
 
         suffix = ""
         while True:
             existed_stage = (
-                local_db_session.query(StageModel)
+                session.query(StageModel)
                 .filter(StageModel.file_location == f"{shortname}{suffix}")
                 .first()
             )
@@ -474,68 +458,68 @@ class StageService:
         return f"{shortname}{suffix}"
 
     def sweep_stage(self, user: UserModel, id: int):
-        with ScopedSession() as local_db_session:
-            stage = (
-                local_db_session.query(StageModel).filter(StageModel.id == id).first()
+        session = get_session()
+        stage = (
+            session.query(StageModel).filter(StageModel.id == id).first()
+        )
+        if not stage:
+            raise GraphQLError("Stage not found")
+
+        events = (
+            session.query(EventModel)
+            .filter(EventModel.performance_id == None)
+            .filter(EventModel.topic.ilike("%/{}/%".format(stage.file_location)))
+        )
+
+        if events.count() > 0:
+            performance = PerformanceModel(stage_id=stage.id)
+
+            session.add(performance)
+            session.flush()
+
+            events.update(
+                {EventModel.performance_id: performance.id},
+                synchronize_session="fetch",
             )
-            if not stage:
-                raise GraphQLError("Stage not found")
+        else:
+            raise GraphQLError("The stage is already sweeped!")
 
-            events = (
-                local_db_session.query(EventModel)
-                .filter(EventModel.performance_id == None)
-                .filter(EventModel.topic.ilike("%/{}/%".format(stage.file_location)))
-            )
-
-            if events.count() > 0:
-                performance = PerformanceModel(stage_id=stage.id)
-
-                local_db_session.add(performance)
-                local_db_session.flush()
-
-                events.update(
-                    {EventModel.performance_id: performance.id},
-                    synchronize_session="fetch",
-                )
-            else:
-                raise GraphQLError("The stage is already sweeped!")
-
-            return convert_keys_to_camel_case(
-                {"success": True, "performanceId": performance.id}
-            )
+        return convert_keys_to_camel_case(
+            {"success": True, "performanceId": performance.id}
+        )
 
     def update_status(self, user: UserModel, id: int):
-        with ScopedSession() as local_db_session:
-            stage = (
-                local_db_session.query(StageModel).filter(StageModel.id == id).first()
-            )
-            if not stage:
-                raise GraphQLError("Stage not found")
+        session = get_session()
+        stage = (
+            session.query(StageModel).filter(StageModel.id == id).first()
+        )
+        if not stage:
+            raise GraphQLError("Stage not found")
 
-            self.extract_permission(user, stage)
-
-            attribute = (
-                local_db_session.query(StageAttributeModel)
-                .filter(
-                    StageAttributeModel.stage_id == id,
-                    StageAttributeModel.name == "status",
-                )
-                .first()
-            )
-
-            if attribute is not None:
-                attribute.description = (
-                    "rehearsal" if attribute.description == "live" else "live"
-                )
-            else:
-                attribute = StageAttributeModel(
-                    stage_id=id, name="status", description="live"
-                )
-            local_db_session.add(attribute)
-            local_db_session.commit()
+        self.extract_permission(user, stage)
 
         attribute = (
-            local_db_session.query(StageAttributeModel)
+            session.query(StageAttributeModel)
+            .filter(
+                StageAttributeModel.stage_id == id,
+                StageAttributeModel.name == "status",
+            )
+            .first()
+        )
+
+        if attribute is not None:
+            attribute.description = (
+                "rehearsal" if attribute.description == "live" else "live"
+            )
+        else:
+            attribute = StageAttributeModel(
+                stage_id=id, name="status", description="live"
+            )
+            session.add(attribute)
+        session.flush()
+
+        attribute = (
+            session.query(StageAttributeModel)
             .filter(
                 StageAttributeModel.stage_id == id,
                 StageAttributeModel.name == "status",
@@ -545,37 +529,37 @@ class StageService:
         return {"result": attribute.description}
 
     def update_visibility(self, user: UserModel, id: int):
-        with ScopedSession() as local_db_session:
-            stage = (
-                local_db_session.query(StageModel).filter(StageModel.id == id).first()
-            )
-            if not stage:
-                raise GraphQLError("Stage not found")
+        session = get_session()
+        stage = (
+            session.query(StageModel).filter(StageModel.id == id).first()
+        )
+        if not stage:
+            raise GraphQLError("Stage not found")
 
-            self.extract_permission(user, stage)
-
-            attribute = (
-                local_db_session.query(StageAttributeModel)
-                .filter(
-                    StageAttributeModel.stage_id == id,
-                    StageAttributeModel.name == "visibility",
-                )
-                .first()
-            )
-
-            if attribute is not None:
-                attribute.description = (
-                    "true" if attribute.description != "true" else "false"
-                )
-            else:
-                attribute = StageAttributeModel(
-                    stage_id=id, name="visibility", description="true"
-                )
-
-            local_db_session.add(attribute)
+        self.extract_permission(user, stage)
 
         attribute = (
-            DBSession.query(StageAttributeModel)
+            session.query(StageAttributeModel)
+            .filter(
+                StageAttributeModel.stage_id == id,
+                StageAttributeModel.name == "visibility",
+            )
+            .first()
+        )
+
+        if attribute is not None:
+            attribute.description = (
+                "true" if attribute.description != "true" else "false"
+            )
+        else:
+            attribute = StageAttributeModel(
+                stage_id=id, name="visibility", description="true"
+            )
+            session.add(attribute)
+        session.flush()
+
+        attribute = (
+            session.query(StageAttributeModel)
             .filter(
                 StageAttributeModel.stage_id == id,
                 StageAttributeModel.name == "visibility",
@@ -586,77 +570,62 @@ class StageService:
         return {"result": attribute.description}
 
     def update_last_access(self, id: int):
-        with ScopedSession() as local_db_session:
-            stage = (
-                local_db_session.query(StageModel).filter(StageModel.id == id).first()
-            )
-            if not stage:
-                raise GraphQLError("Stage not found")
+        session = get_session()
+        stage = (
+            session.query(StageModel).filter(StageModel.id == id).first()
+        )
+        if not stage:
+            raise GraphQLError("Stage not found")
 
-            stage.last_access = datetime.now()
-            local_db_session.commit()
-            return {"result": stage.last_access}
+        stage.last_access = datetime.now()
+        session.flush()
+        return {"result": stage.last_access}
 
     def get_parent_stage(self):
+        session = get_session()
         return [
             convert_keys_to_camel_case(stage.to_dict())
-            for stage in DBSession.query(ParentStageModel).all()
+            for stage in session.query(ParentStageModel).all()
         ]
 
     def get_foyer_stage_list(self):
-        try:
-            # Use explicit EXISTS subquery instead of .any() to avoid transaction issues
-            visibility_filter = exists().where(
-                and_(
-                    StageAttributeModel.stage_id == StageModel.id,
-                    StageAttributeModel.name == "visibility",
-                    StageAttributeModel.description == "true"
-                )
+        session = get_session()
+        # Use explicit EXISTS subquery instead of .any() to avoid transaction issues
+        visibility_filter = exists().where(
+            and_(
+                StageAttributeModel.stage_id == StageModel.id,
+                StageAttributeModel.name == "visibility",
+                StageAttributeModel.description == "true"
             )
-            
-            stages = (
-                DBSession.query(StageModel)
-                .filter(visibility_filter)
-                .order_by(nulls_last(StageModel.last_access.desc()))
-                .all()
-            )
-            
-            return [
-                {
-                    **convert_keys_to_camel_case(stage.to_dict()),
-                    "cover": stage.cover,
-                }
-                for stage in stages
-            ]
-        except Exception as e:
-            # Rollback the transaction if it's in a failed state
-            try:
-                DBSession.rollback()
-            except:
-                pass
-            # Re-raise the original error
-            raise
+        )
+
+        stages = (
+            session.query(StageModel)
+            .filter(visibility_filter)
+            .order_by(nulls_last(StageModel.last_access.desc()))
+            .all()
+        )
+
+        return [
+            {
+                **convert_keys_to_camel_case(stage.to_dict()),
+                "cover": stage.cover,
+            }
+            for stage in stages
+        ]
 
     def get_notifications(self, user: UserModel):
-        try:
-            notifications = (
-                DBSession.query(AssetUsageModel)
-                .filter(AssetUsageModel.approved == False)
-                .filter(AssetUsageModel.asset.has(owner_id=user.id))
-                .all()
+        session = get_session()
+        notifications = (
+            session.query(AssetUsageModel)
+            .filter(AssetUsageModel.approved == False)
+            .filter(AssetUsageModel.asset.has(owner_id=user.id))
+            .all()
+        )
+
+        return [
+            convert_keys_to_camel_case(
+                {"type": NotificationType.MEDIA_USAGE.value, "mediaUsage": x.to_dict()}
             )
-            
-            return [
-                convert_keys_to_camel_case(
-                    {"type": NotificationType.MEDIA_USAGE.value, "mediaUsage": x.to_dict()}
-                )
-                for x in notifications
-            ]
-        except Exception as e:
-            # Rollback the transaction if it's in a failed state
-            try:
-                DBSession.rollback()
-            except:
-                pass
-            # Re-raise the original error
-            raise
+            for x in notifications
+        ]

@@ -10,7 +10,14 @@ if projdir2 not in sys.path:
     sys.path.append(projdir)
     sys.path.append(projdir2)
 
-from global_config.database import ScopedSession, DBSession, global_session
+from global_config.database import ScopedSession, DBSession
+from global_config.db_context import (
+    get_session,
+    set_session,
+    reset_session,
+    request_session,
+    SessionFactory,
+)
 import global_config.env
 from global_config.env import *
 from global_config.schema import config_graphql_endpoints
@@ -34,11 +41,15 @@ __all__ = [
     "ScopedSession",
     "config_graphql_endpoints",
     "DBSession",
-    "global_session",
+    "get_session",
+    "set_session",
+    "reset_session",
+    "request_session",
+    "SessionFactory",
     "camel_to_snake",
     "BaseModel",
     "authenticated",
-    "logger"
+    "logger",
 ]
 
 __all__ += [name for name in dir(global_config.env) if not name.startswith("__")]

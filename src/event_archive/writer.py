@@ -95,6 +95,7 @@ async def writer_loop(
                                 topic=topic,
                                 payload=payload,
                                 mqtt_timestamp=ts,
+                                performance_id=None,
                             )
                         )
             except Exception:

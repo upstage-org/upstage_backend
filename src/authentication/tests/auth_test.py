@@ -14,7 +14,7 @@ if projdir not in sys.path:
 
 import random
 from main import app
-from global_config.database import global_session
+from global_config.database import ScopedSession
 from global_config.env import JWT_HEADER_NAME
 import pytest
 from authentication.http.schema import auth_graphql_app
@@ -71,9 +71,8 @@ class TestAuthenticationController:
             active=True,
             role=SUPER_ADMIN,
         )
-        global_session.add(user)
-        global_session.commit()
-        global_session.flush()
+        with ScopedSession() as s:
+            s.add(user)
         variables = {"payload": {"username": email, "password": "testpassword"}}
         response = client.post(
                      "/api/studio_graphql", json={"query": self.login_query, "variables": variables}
@@ -95,9 +94,8 @@ class TestAuthenticationController:
             active=True,
             role=PLAYER,
         )
-        global_session.add(user)
-        global_session.commit()
-        global_session.close()
+        with ScopedSession() as s:
+            s.add(user)
         variables = {"payload": {"username": email, "password": "testpassword"}}
         response = client.post(
             "/api/studio_graphql", json={"query": self.login_query, "variables": variables}
@@ -119,9 +117,8 @@ class TestAuthenticationController:
             active=True,
             role=SUPER_ADMIN,
         )
-        global_session.add(user)
-        global_session.commit()
-        global_session.close()
+        with ScopedSession() as s:
+            s.add(user)
 
         variables = {"payload": {"username": email, "password": "testpassword"}}
         response = client.post(
@@ -162,9 +159,8 @@ class TestAuthenticationController:
             active=True,
             role=SUPER_ADMIN,
         )
-        global_session.add(user)
-        global_session.commit()
-        global_session.close()
+        with ScopedSession() as s:
+            s.add(user)
 
         variables = {"payload": {"username": email, "password": "testpassword"}}
         response = client.post(
@@ -214,9 +210,8 @@ class TestAuthenticationController:
             active=True,
             role=role,
         )
-        global_session.add(user)
-        global_session.commit()
-        global_session.close()
+        with ScopedSession() as s:
+            s.add(user)
 
         variables = {"payload": {"username": email, "password": "testpassword"}}
         response = client.post(

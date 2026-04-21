@@ -13,7 +13,7 @@ if projdir not in sys.path:
 from secrets import token_urlsafe
 
 from graphql import GraphQLError
-from global_config.database import ScopedSession, DBSession
+from global_config import get_session
 from global_config.helpers.object import convert_keys_to_camel_case
 from licenses.http.validation import LicenseInput
 from assets.db_models.asset_license import AssetLicenseModel
@@ -24,41 +24,41 @@ class LicenseService:
         pass
 
     def create_license(self, license_input: LicenseInput):
-        with ScopedSession() as session:
-            asset_path = token_urlsafe(16)
+        session = get_session()
+        asset_path = token_urlsafe(16)
 
-            license = AssetLicenseModel(
-                asset_id=license_input.assetId,
-                level=license_input.level,
-                permissions=license_input.permissions,
-            )
-            session.add(license)
-            session.commit()
-            session.flush()
-            license = (
-                DBSession.query(AssetLicenseModel).filter_by(id=license.id).first()
-            )
+        license = AssetLicenseModel(
+            asset_id=license_input.assetId,
+            level=license_input.level,
+            permissions=license_input.permissions,
+        )
+        session.add(license)
+        session.flush()
+        license = (
+            session.query(AssetLicenseModel).filter_by(id=license.id).first()
+        )
 
-            return {
-                **convert_keys_to_camel_case(license.to_dict()),
-                "assetPath": asset_path,
-            }
+        return {
+            **convert_keys_to_camel_case(license.to_dict()),
+            "assetPath": asset_path,
+        }
 
-    def get_license(self, l_id, session=DBSession):
+    def get_license(self, l_id, session=None):
+        if session is None:
+            session = get_session()
         return session.query(AssetLicenseModel).filter_by(id=l_id).first()
 
     async def revoke_license(self, license_id: int):
-        with ScopedSession() as session:
-            try:
-                license = self.get_license(license_id, session=session)
+        session = get_session()
+        try:
+            license = self.get_license(license_id, session=session)
 
-                if license is None:
-                    raise GraphQLError("License not found")
+            if license is None:
+                raise GraphQLError("License not found")
 
-                session.delete(license)
-                session.commit()
-                return "License revoked {}".format(license_id)
-            except Exception as e:
-                return "Failed to revoke license {}".format(license_id)
-            finally:
-                session.close()
+            session.delete(license)
+            return "License revoked {}".format(license_id)
+        except GraphQLError:
+            raise
+        except Exception:
+            return "Failed to revoke license {}".format(license_id)

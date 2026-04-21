@@ -18,7 +18,7 @@ from global_config.database import ScopedSession
 from assets.db_models.asset import AssetModel
 from main import app
 from global_config.env import JWT_HEADER_NAME
-from global_config.database import DBSession
+from global_config import get_session
 from stages.db_models.parent_stage import ParentStageModel
 from stages.db_models.stage_attribute import StageAttributeModel
 from users.db_models.user import PLAYER, SUPER_ADMIN
@@ -117,7 +117,7 @@ class TestStageController:
 
     async def test_02_update_stage(self, client):
         data = await test_AuthenticationController.test_02_login_successfully(client)
-        stage = DBSession.query(StageModel).first()
+        stage = get_session().query(StageModel).first()
         response = self.update_stage(client, stage.id, data)
         print(response)
         assert "errors" not in response
@@ -169,7 +169,7 @@ class TestStageController:
     #     asset_id = await test_MediaController.test_03_upload_media(client)
 
     #     with ScopedSession() as session:
-    #         stage = DBSession.query(StageModel).first()
+    #         stage = get_session().query(StageModel).first()
     #         item = ParentStageModel(stage_id=stage.id, child_asset_id=asset_id)
     #         session.add(item)
     #         session.commit()
@@ -210,13 +210,13 @@ class TestStageController:
     #     data = await test_AuthenticationController.test_player_login_successfully(
     #         client
     #     )
-    #     stage = DBSession.query(StageModel).first()
+    #     stage = get_session().query(StageModel).first()
     #     response = self.remove_media(client, stage.id, data)
     #     assert "errors" in response
 
     # async def test_08_delete_stage(self, client):
     #     data = await test_AuthenticationController.test_02_login_successfully(client)
-    #     stage = DBSession.query(StageModel).first()
+    #     stage = get_session().query(StageModel).first()
     #     response = self.remove_media(client, stage.id, data)
     #     assert response["data"]["deleteStage"]["success"] == True
 
@@ -245,12 +245,12 @@ class TestStageController:
     #     assert response["errors"][0]["message"] == "Stage not found"
 
     # async def test_10_sweep_stage(self, client):
-    #     stage = DBSession.query(StageModel).all()[-1]
+    #     stage = get_session().query(StageModel).all()[-1]
     #     response = await self.sweep_stage(client, stage.id)
     #     assert response["errors"][0]["message"] == "The stage is already sweeped!"
 
     # async def test_11_sweep_stage_successfully(self, client):
-    #     stage = DBSession.query(StageModel).all()[-1]
+    #     stage = get_session().query(StageModel).all()[-1]
     #     with ScopedSession() as session:
     #         event = EventModel(
     #             topic="/{}/".format(stage.file_location),
@@ -284,7 +284,7 @@ class TestStageController:
     #     assert response.json()["errors"][0]["message"] == "Stage not found"
 
     #     headers = test_AuthenticationController.get_headers(client, PLAYER)
-    #     stage = DBSession.query(StageModel).all()[-1]
+    #     stage = get_session().query(StageModel).all()[-1]
     #     variables = {"id": stage.id}
     #     response = client.post(
     #         "/api/studio_graphql",
@@ -300,7 +300,7 @@ class TestStageController:
 
     # async def test_13_update_status(self, client):
     #     headers = test_AuthenticationController.get_headers(client, SUPER_ADMIN)
-    #     stage = DBSession.query(StageModel).all()[-1]
+    #     stage = get_session().query(StageModel).all()[-1]
     #     variables = {"id": stage.id}
     #     query = """ 
     #         mutation updateStatus($id: ID!) {
@@ -369,7 +369,7 @@ class TestStageController:
     #     assert response.json()["errors"][0]["message"] == "Stage not found"
 
     #     headers = test_AuthenticationController.get_headers(client, PLAYER)
-    #     stage = DBSession.query(StageModel).all()[-1]
+    #     stage = get_session().query(StageModel).all()[-1]
     #     variables = {"id": stage.id}
     #     response = client.post(
     #         "/api/studio_graphql",
@@ -385,7 +385,7 @@ class TestStageController:
 
     # async def test_15_update_visibility(self, client):
     #     headers = test_AuthenticationController.get_headers(client, SUPER_ADMIN)
-    #     stage = DBSession.query(StageModel).all()[-1]
+    #     stage = get_session().query(StageModel).all()[-1]
     #     variables = {"id": stage.id}
     #     query = """ 
     #         mutation updateVisibility($id: ID!) {
@@ -454,7 +454,7 @@ class TestStageController:
     #     assert response.json()["errors"][0]["message"] == "Stage not found"
 
     #     headers = test_AuthenticationController.get_headers(client, PLAYER)
-    #     stage = DBSession.query(StageModel).all()[-1]
+    #     stage = get_session().query(StageModel).all()[-1]
     #     variables = {"id": stage.id}
     #     response = client.post(
     #         "/api/studio_graphql",
@@ -470,7 +470,7 @@ class TestStageController:
 
     # async def test_17_update_last_access(self, client):
     #     headers = test_AuthenticationController.get_headers(client, SUPER_ADMIN)
-    #     stage = DBSession.query(StageModel).all()[-1]
+    #     stage = get_session().query(StageModel).all()[-1]
     #     variables = {"id": stage.id}
     #     query = """ 
     #         mutation updateLastAccess($id: ID!) {

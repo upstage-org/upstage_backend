@@ -134,7 +134,7 @@ Every folder under `upstage_backend/src/` is a bounded context. They all expose 
 | [`studio_management/`](upstage_backend/src/studio_management/) | Umbrella GraphQL schema and top-level `Query` / `Mutation` wiring |
 | [`upstage_options/`](upstage_backend/src/upstage_options/) | Runtime options / config table |
 | [`upstage_stats/`](upstage_backend/src/upstage_stats/) | Separate process for aggregating statistics events |
-| [`event_archive/`](upstage_backend/src/event_archive/) | Async MQTT-to-Postgres event persistence (this guide's section 7) |
+| [`event_archive/`](upstage_backend/src/event_archive/) | Async MQTT-to-Postgres event persistence (this guide's section 8) |
 | [`global_config/`](upstage_backend/src/global_config/) | DB engine, env vars, loggers, shared base model, JWT decorator |
 | [`main.py`](upstage_backend/src/main.py) | FastAPI entrypoint, CORS, cache headers |
 
@@ -345,7 +345,7 @@ Message shapes (the `payload` field in every `Event` row):
 | `draw` | Drawing stroke append / undo / clear | `{ type: DRAW_ACTIONS.*, line?, at }` |
 | `statistics` | Periodic presence stats | `{ players, audiences }` (not persisted) |
 
-The backend's event archive preserves these payloads unchanged as JSON (see section 7).
+The backend's event archive preserves these payloads unchanged as JSON (see section 8).
 
 Example backdrop change published by the frontend: [`upstage_frontend/src/store/modules/stage/index.ts`](upstage_frontend/src/store/modules/stage/index.ts) line 1018:
 
@@ -417,7 +417,7 @@ mqtt.sendMessage(TOPICS.BOARD, {
 });
 ```
 
-The MQTT client lives at [`upstage_frontend/src/services/mqtt.ts`](upstage_frontend/src/services/mqtt.ts). `sendMessage(topic, payload)` calls `namespaceTopic` and publishes non-retained JSON. Every subscriber (other browsers) immediately receives the same message and the `event_archive` service (section 7) tees it into Postgres.
+The MQTT client lives at [`upstage_frontend/src/services/mqtt.ts`](upstage_frontend/src/services/mqtt.ts). `sendMessage(topic, payload)` calls `namespaceTopic` and publishes non-retained JSON. Every subscriber (other browsers) immediately receives the same message and the `event_archive` service (section 8) tees it into Postgres.
 
 ### 5.3 Authentication
 
@@ -434,34 +434,36 @@ The MQTT client lives at [`upstage_frontend/src/services/mqtt.ts`](upstage_front
 
 A "performance" is an archived snapshot of a stage's live event stream, created by the `sweepStage` mutation. See [`upstage_backend/src/stages/services/stage.py`](upstage_backend/src/stages/services/stage.py):
 
-```476:505:upstage_backend/src/stages/services/stage.py
+```460:489:upstage_backend/src/stages/services/stage.py
 def sweep_stage(self, user: UserModel, id: int):
-    with ScopedSession() as local_db_session:
-        stage = (
-            local_db_session.query(StageModel).filter(StageModel.id == id).first()
+    session = get_session()
+    stage = (
+        session.query(StageModel).filter(StageModel.id == id).first()
+    )
+    if not stage:
+        raise GraphQLError("Stage not found")
+
+    events = (
+        session.query(EventModel)
+        .filter(EventModel.performance_id == None)
+        .filter(EventModel.topic.ilike("%/{}/%".format(stage.file_location)))
+    )
+
+    if events.count() > 0:
+        performance = PerformanceModel(stage_id=stage.id)
+
+        session.add(performance)
+        session.flush()
+
+        events.update(
+            {EventModel.performance_id: performance.id},
+            synchronize_session="fetch",
         )
-        if not stage:
-            raise GraphQLError("Stage not found")
-
-        events = (
-            local_db_session.query(EventModel)
-            .filter(EventModel.performance_id == None)
-            .filter(EventModel.topic.ilike("%/{}/%".format(stage.file_location)))
-        )
-
-        if events.count() > 0:
-            performance = PerformanceModel(stage_id=stage.id)
-
-            local_db_session.add(performance)
-            local_db_session.flush()
-
-            events.update(
-                {EventModel.performance_id: performance.id},
-                synchronize_session="fetch",
-            )
-        else:
-            raise GraphQLError("The stage is already sweeped!")
+    else:
+        raise GraphQLError("The stage is already sweeped!")
 ```
+
+`get_session()` returns the request-scoped SQLAlchemy `Session` that the FastAPI middleware opened at the start of this GraphQL call (see section 7). The method no longer calls `.commit()`; the middleware commits on clean request exit and rolls back on any exception.
 
 Mechanism:
 
@@ -471,17 +473,19 @@ Mechanism:
 
 Event reads always come from Postgres, see [`upstage_backend/src/stages/services/stage_operation.py`](upstage_backend/src/stages/services/stage_operation.py):
 
-```90:100:upstage_backend/src/stages/services/stage_operation.py
+```91:102:upstage_backend/src/stages/services/stage_operation.py
 def get_event_list(self, input: StageStreamInput, stage: StageModel):
+    session = get_session()
     cursor = input.cursor if input.cursor else 0
     events = (
-        DBSession.query(EventModel)
+        session.query(EventModel)
         .filter(EventModel.performance_id == input.performanceId)
         .filter(EventModel.topic.like("%/{}/%".format(stage.file_location)))
         .filter(EventModel.id > cursor)
         .order_by(EventModel.mqtt_timestamp.asc())
         .all()
     )
+    return [convert_keys_to_camel_case(event.to_dict()) for event in events]
 ```
 
 ### 5.6 Recording
@@ -519,7 +523,76 @@ class EventModel(BaseModel):
 
 MongoDB is used only for time-expiring email verification tokens; see [`upstage_backend/src/event_archive/config/mongodb.py`](upstage_backend/src/event_archive/config/mongodb.py) `build_mongo_email_client` / `get_mongo_token_collection` (used by [`upstage_backend/src/mails/helpers/mail.py`](upstage_backend/src/mails/helpers/mail.py) line 49).
 
-## 7. The event archive (live-to-durable pipeline)
+## 7. Database session management (hybrid contextvar model)
+
+UpStage uses a two-track session strategy so that every DB touch has exactly one owner of its commit/rollback/close, regardless of whether it happens inside an HTTP request or in a long-running worker/script.
+
+### 7.1 Track A: request-scoped session (HTTP + GraphQL)
+
+```mermaid
+flowchart LR
+  C["Browser"] --> MW["db_request_session<br/>middleware"]
+  MW -->|"opens Session"| S["Session<br/>(per request)"]
+  MW -.->|"binds"| CV["ContextVar<br/>upstage_request_session"]
+  GQL["Ariadne resolver"] --> GS["get_session()"]
+  GS --> CV
+  CV --> S
+  Svc["service method"] --> GS
+  S --> Eng["engine (NullPool)"]
+  MW -->|"commit/rollback/close<br/>on response"| S
+```
+
+- The FastAPI middleware in [`upstage_backend/src/main.py`](upstage_backend/src/main.py) wraps every HTTP request in `request_session()` from [`src/global_config/db_context.py`](upstage_backend/src/global_config/db_context.py). That context manager calls `SessionFactory()`, binds the resulting `Session` on a `ContextVar`, commits on clean exit, rolls back on exception, and always closes.
+- The Ariadne `context_value` builder in [`src/global_config/schema.py`](upstage_backend/src/global_config/schema.py) pulls the same session off the contextvar and exposes it as `info.context["db"]` for resolvers that prefer that style.
+- Every service method and resolver body reads the session with:
+
+  ```python
+  from global_config import get_session
+  session = get_session()
+  stages = session.query(StageModel).filter(...).all()
+  ```
+
+- Services do **not** call `.commit()` themselves. `.flush()` is kept only where an auto-generated ID is needed in the same request (e.g. creating a `PerformanceModel` then bulk-updating rows with its new `id`).
+- `SessionFactory` uses `expire_on_commit=False`, so ORM instances remain attached and `lazy="dynamic"` relationships (`StageModel.attributes/assets`, `AssetModel.parent_stages/tags/usages`) and `@hybrid_property` accessors (`StageModel.cover/visibility/status`) stay queryable for the entire response serialization. This is what eliminates the `Instance <StageModel> is detached, dynamic relationship cannot return a correct result` warnings by construction.
+- A dev/prod safety net: `get_session()` raises `RuntimeError` if no session is bound to the contextvar. Toggle with the env var `STRICT_DB_CONTEXT=0` (only the test suite sets this). The middleware also emits a warning log if a request ends with a dirty session, which indicates a missed `.flush()` or a resolver that leaked objects past its commit point.
+
+### 7.2 Track B: explicit scope (scripts, workers, background tasks)
+
+Anything that is not inside a request uses the context-manager `ScopedSession` from [`src/global_config/database.py`](upstage_backend/src/global_config/database.py):
+
+```python
+from global_config.database import ScopedSession
+
+with ScopedSession() as s:
+    user = UserModel(username="alice", ...)
+    s.add(user)
+    # commit + close happen on normal exit;
+    # rollback + close happen if the block raises.
+```
+
+Used by:
+
+- Dev/seed scripts: [`src/users/scripts/create_test_users.py`](upstage_backend/src/users/scripts/create_test_users.py), [`src/stages/scripts/scaffold_base_media.py`](upstage_backend/src/stages/scripts/scaffold_base_media.py), [`scripts/devtools/wipe_dev.py`](upstage_backend/scripts/devtools/wipe_dev.py).
+- Stats worker: [`src/upstage_stats/mqtt.py`](upstage_backend/src/upstage_stats/mqtt.py) opens a fresh `ScopedSession` per persisted stat, because the `paho-mqtt` callbacks are not in a request.
+- Background email tasks: [`src/mails/helpers/mail.py`](upstage_backend/src/mails/helpers/mail.py) uses `ScopedSession` because token sending runs in `asyncio.create_task` that can outlive the HTTP request that triggered it.
+
+`ScopedSession` shares the same `SessionFactory` (and therefore the same engine config) as the request path, so test-harness overrides swap both at once.
+
+### 7.3 Track C: async event archive
+
+The `event_archive` service (section 8) is intentionally not part of either track above. It owns its own `AsyncSessionLocal` in [`src/event_archive/db.py`](upstage_backend/src/event_archive/db.py) because `aiomqtt` and `asyncpg` need the SQLAlchemy async API. One transaction per event, committed inside `async with session.begin():`. There is no contextvar bridge between the archive and the HTTP app.
+
+### 7.4 `DBSession` deprecation alias
+
+For the duration of the migration, `global_config.DBSession` still exists as a thin proxy that forwards every attribute access to `get_session()`. That keeps any call site that was missed in the refactor working without silently falling back to a module-level registry. It emits no warnings today, but new code must use `get_session()` directly; the proxy will be deleted in a follow-up cleanup.
+
+### 7.5 Tests
+
+[`tests/conftest.py`](upstage_backend/tests/conftest.py) rebinds `SessionFactory` to an in-memory SQLite engine, opens a single `Session`, pushes it on the contextvar via `set_session()`, and yields it as the `db_session` fixture (also exposed as `rebound_db["db_session"]`). The production code under test reads the exact same session through `get_session()`, and `ScopedSession()` in code-under-test reuses the same engine. Teardown resets the contextvar and truncates the tables.
+
+---
+
+## 8. The event archive (live-to-durable pipeline)
 
 Every non-retained, non-statistics MQTT message is persisted to Postgres `events` so late-joining audience and post-sweep reloads see the correct stage state. The entire subsystem is a single async process under `asyncio.TaskGroup`.
 
@@ -662,7 +735,7 @@ Runtime tunables (all optional env vars):
 
 Key properties: any exception escapes the TaskGroup and exits non-zero so Docker restarts the container; `queue.put()` awaits when full so MQTT flow-controls naturally; each event is wrapped in its own transaction so one bad payload cannot poison the next.
 
-## 8. Running the stack locally
+## 9. Running the stack locally
 
 Prereqs: Docker + docker compose, a `.env` file with the database and MQTT credentials (see [`upstage_backend/initial_scripts/environments/env_app_template.py`](upstage_backend/initial_scripts/environments/env_app_template.py) for the full list), and an external network `upstage-network-dev`.
 
@@ -684,7 +757,7 @@ Useful scripts:
 - [`upstage_backend/scripts/run_upstage_stats.py`](upstage_backend/scripts/run_upstage_stats.py) — stats aggregator.
 - [`upstage_backend/create-migration.sh`](upstage_backend/create-migration.sh) — alembic revision helper; migrations live per-module in `*/db_migrations/`.
 
-## 9. Where to look for what
+## 10. Where to look for what
 
 Quick reference for common tasks.
 
@@ -698,7 +771,7 @@ Quick reference for common tasks.
 | Change what's served as static assets | `uploads/` volume in the backend container; served via the reverse proxy |
 | Add a role or permission | [`utils/constants.ts`](upstage_frontend/src/utils/constants.ts) `ROLES` + [`global_config/decorators/authenticated.py`](upstage_backend/src/global_config/decorators/authenticated.py) |
 
-## 10. Glossary
+## 11. Glossary
 
 | Term | Meaning |
 |---|---|

@@ -27,7 +27,7 @@ from global_config.env import (
     SECRET_KEY,
     ALGORITHM,
 )
-from global_config.database import ScopedSession, DBSession
+from global_config import get_session as get_request_session
 from authentication.db_models.user_session import UserSessionModel
 
 
@@ -69,17 +69,16 @@ class AuthenticationService:
 
         user.last_login = datetime.now()
 
-        with ScopedSession() as local_db_session:
-            local_db_session.query(UserSessionModel).filter(
-                UserSessionModel.user_id == user.id
-            ).delete()
-            local_db_session.add(user_session)
-            local_db_session.flush()
+        db = get_request_session()
+        db.query(UserSessionModel).filter(
+            UserSessionModel.user_id == user.id
+        ).delete()
+        db.add(user_session)
+        db.flush()
 
-            local_db_session.query(UserModel).filter(UserModel.id == user.id).update(
-                {"last_login": datetime.now()}
-            )
-            local_db_session.commit()
+        db.query(UserModel).filter(UserModel.id == user.id).update(
+            {"last_login": datetime.now()}
+        )
 
         title_prefix = "" if ENV_TYPE == "Production" else "DEV "
         default_title = title_prefix + "Upstage"
@@ -142,15 +141,15 @@ class AuthenticationService:
             raise GraphQLError("Invalid access token")
 
         access_token = bearer_token[1]
-        with ScopedSession() as local_db_session:
-            user_session = (
-                local_db_session.query(UserSessionModel)
-                .filter(UserSessionModel.access_token == access_token)
-                .first()
-            )
-            if not user_session:
-                raise GraphQLError("Invalid access token")
-            local_db_session.delete(user_session)
+        db = get_request_session()
+        user_session = (
+            db.query(UserSessionModel)
+            .filter(UserSessionModel.access_token == access_token)
+            .first()
+        )
+        if not user_session:
+            raise GraphQLError("Invalid access token")
+        db.delete(user_session)
 
         return "Logged out"
 
@@ -159,8 +158,9 @@ class AuthenticationService:
         if not current_refresh_token:
             raise GraphQLError("Invalid refresh token")
 
+        db = get_request_session()
         session = (
-            DBSession.query(UserSessionModel)
+            db.query(UserSessionModel)
             .filter(UserSessionModel.refresh_token == current_refresh_token)
             .first()
         )
@@ -169,7 +169,7 @@ class AuthenticationService:
             raise GraphQLError("Invalid refresh token")
 
         user = (
-            DBSession.query(UserModel).filter(UserModel.id == session.user_id).first()
+            db.query(UserModel).filter(UserModel.id == session.user_id).first()
         )
 
         access_token = self.create_token(
@@ -184,33 +184,32 @@ class AuthenticationService:
             ),
         )
 
-        with ScopedSession() as local_db_session:
-            local_db_session.query(UserSessionModel).filter(
-                UserSessionModel.refresh_token == current_refresh_token
-            ).delete()
+        db.query(UserSessionModel).filter(
+            UserSessionModel.refresh_token == current_refresh_token
+        ).delete()
 
-            user_session = UserSessionModel(
-                user_id=user.id,
-                access_token=access_token,
-                refresh_token=refresh_token,
-                app_version=request.headers.get("X-Upstage-App-Version"),
-                app_os_type=request.headers.get("X-Upstage-Os-Type"),
-                app_os_version=request.headers.get("X-Upstage-Os-Version"),
-                app_device=request.headers.get("X-Upstage-Device-Model"),
-            )
-            local_db_session.add(user_session)
-            local_db_session.flush()
+        user_session = UserSessionModel(
+            user_id=user.id,
+            access_token=access_token,
+            refresh_token=refresh_token,
+            app_version=request.headers.get("X-Upstage-App-Version"),
+            app_os_type=request.headers.get("X-Upstage-Os-Type"),
+            app_os_version=request.headers.get("X-Upstage-Os-Version"),
+            app_device=request.headers.get("X-Upstage-Device-Model"),
+        )
+        db.add(user_session)
+        db.flush()
 
-            local_db_session.query(UserModel).filter(UserModel.id == user.id).update(
-                {"last_login": datetime.now()}
-            )
-            local_db_session.commit()
+        db.query(UserModel).filter(UserModel.id == user.id).update(
+            {"last_login": datetime.now()}
+        )
 
         return {"access_token": access_token, "refresh_token": refresh_token}
 
     def get_session(self, token: str, user_id: int):
+        db = get_request_session()
         return (
-            DBSession.query(UserSessionModel)
+            db.query(UserSessionModel)
             .filter(
                 UserSessionModel.user_id == user_id,
                 UserSessionModel.access_token == token,

@@ -20,7 +20,8 @@ from stages.db_models.stage import StageModel
 from stages.tests.test_stage import TestStageController
 from studio_management.http.schema import studio_graphql_app
 from users.db_models.user import GUEST, PLAYER, SUPER_ADMIN, UserModel
-from global_config.database import DBSession, ScopedSession
+from global_config import get_session
+from global_config.database import ScopedSession
 from main import app
 
 test_AuthenticationController = TestAuthenticationController()
@@ -113,7 +114,7 @@ class TestStudioController:
             username = user.username
             session.flush()
 
-        user = DBSession.query(UserModel).filter(UserModel.username == username).first()
+        user = get_session().query(UserModel).filter(UserModel.username == username).first()
 
         headers = test_AuthenticationController.get_headers(client, SUPER_ADMIN)
         query = """
@@ -221,7 +222,7 @@ class TestStudioController:
         assert "errors" in response.json()
 
 
-        user_2 = DBSession.query(UserModel).all()[-1]
+        user_2 = get_session().query(UserModel).all()[-1]
 
         variables = {
             "input": {
@@ -282,7 +283,7 @@ class TestStudioController:
 
     async def test_04_delete_user(self, client):
         headers = test_AuthenticationController.get_headers(client, SUPER_ADMIN)
-        user = DBSession.query(UserModel).all()[-1]
+        user = get_session().query(UserModel).all()[-1]
 
         query = """
             mutation deleteUser($id: ID!) {
@@ -316,7 +317,7 @@ class TestStudioController:
 
     async def test_05_change_password(self, client):
         headers = test_AuthenticationController.get_headers(client, SUPER_ADMIN)
-        user = DBSession.query(UserModel).all()[-1]
+        user = get_session().query(UserModel).all()[-1]
 
         query = """
             mutation changePassword($input: ChangePasswordInput!) {
@@ -423,7 +424,7 @@ class TestStudioController:
                 }
         """
 
-        asset = DBSession.query(AssetModel).first()
+        asset = get_session().query(AssetModel).first()
 
         variables = {
             "assetId": asset.id,
@@ -501,7 +502,7 @@ class TestStudioController:
                 }
         """
 
-        asset = DBSession.query(AssetUsageModel).all()[-1]
+        asset = get_session().query(AssetUsageModel).all()[-1]
 
         variables = {
             "id": asset.id,
@@ -566,9 +567,9 @@ class TestStudioController:
                 }
         """
 
-        asset = DBSession.query(AssetModel).first()
+        asset = get_session().query(AssetModel).first()
 
-        stage = DBSession.query(StageModel).first()
+        stage = get_session().query(StageModel).first()
 
         variables = {
             "stageIds": [stage.id],

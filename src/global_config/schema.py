@@ -12,6 +12,31 @@ from ariadne import MutationType, QueryType, make_executable_schema
 from fastapi import FastAPI
 from ariadne.asgi import GraphQL
 
+from global_config.db_context import (
+    SessionFactory,
+    current_session_or_none,
+    set_session,
+)
+
+
+def _make_graphql_context(request):
+    """
+    Expose the request-scoped SQLAlchemy session on info.context["db"].
+
+    Resolvers may call info.context["db"] or global_config.get_session()
+    interchangeably. In the normal HTTP path the FastAPI middleware has
+    already opened a session; here we just reuse it. Pure ASGI/WebSocket
+    entry points never run HTTP middleware, so as a fallback we open a
+    Session for the duration of the connection and bind it to the
+    contextvar so get_session() works inside resolvers too.
+    """
+    existing = current_session_or_none()
+    if existing is not None:
+        return {"request": request, "db": existing}
+    session = SessionFactory()
+    set_session(session)
+    return {"request": request, "db": session}
+
 
 def config_graphql_endpoints(app: FastAPI,endpoint = '/api/studio_graphql'):
     from assets.http.schema import query as asset_query, mutation as asset_mutation
@@ -198,7 +223,9 @@ def config_graphql_endpoints(app: FastAPI,endpoint = '/api/studio_graphql'):
         studio_type_defs, combined_query, combined_mutation
     )
 
-    combined_graphql_app = GraphQL(combined_schema, debug=True)
+    combined_graphql_app = GraphQL(
+        combined_schema, debug=True, context_value=_make_graphql_context
+    )
 
     print(endpoint)
     app.add_route(endpoint, combined_graphql_app)

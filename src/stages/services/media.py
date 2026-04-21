@@ -23,10 +23,7 @@ from assets.db_models.asset_usage import AssetUsageModel
 from assets.db_models.media_tag import MediaTagModel
 from assets.services.asset import AssetService
 from assets.services.asset_license import AssetLicenseService
-from global_config.database import (
-    DBSession,
-    ScopedSession,
-)
+from global_config import get_session
 from global_config.env import UPLOAD_USER_CONTENT_FOLDER
 from global_config.helpers.object import convert_keys_to_camel_case
 from files.file_handling import FileHandling
@@ -50,80 +47,78 @@ class MediaService:
         self.file_handling = FileHandling()
 
     def assign_media(self, input: AssignMediaInput, user: UserModel):
-        with ScopedSession() as local_db_session:
-            stage = local_db_session.query(StageModel).filter_by(id=input.id).first()
-            if not stage or not input.id:
-                raise GraphQLError("Stage not found")
+        session = get_session()
+        stage = session.query(StageModel).filter_by(id=input.id).first()
+        if not stage or not input.id:
+            raise GraphQLError("Stage not found")
 
-            if stage.owner_id != user.id and user.role not in [ADMIN, SUPER_ADMIN]:
-                raise GraphQLError("You are not authorized to update this stage")
+        if stage.owner_id != user.id and user.role not in [ADMIN, SUPER_ADMIN]:
+            raise GraphQLError("You are not authorized to update this stage")
 
-            local_db_session.query(ParentStageModel).filter(
-                ParentStageModel.stage_id == input.id
-            ).delete()
+        session.query(ParentStageModel).filter(
+            ParentStageModel.stage_id == input.id
+        ).delete()
 
-            for media_id in input.mediaIds:
-                media = ParentStageModel(stage_id=input.id, child_asset_id=media_id)
-                local_db_session.add(media)
+        for media_id in input.mediaIds:
+            media = ParentStageModel(stage_id=input.id, child_asset_id=media_id)
+            session.add(media)
 
-            local_db_session.flush()
-            return convert_keys_to_camel_case(stage.to_dict())
+        session.flush()
+        return convert_keys_to_camel_case(stage.to_dict())
 
     def upload_media(self, user: UserModel, input: UploadMediaInput):
-        with ScopedSession() as local_db_session:
-            asset_type = self.asset_service.validate_asset_type(input, local_db_session)
-            size = self.file_handling.get_file_size(input.base64)
-            file_location = self.file_handling.upload_file(
-                base64=input.base64,
-                file_name=input.filename,
-                absolute_path=None,
-                storage_path=storagePath,
-                sub_path=asset_type.file_location,
-            )
+        session = get_session()
+        asset_type = self.asset_service.validate_asset_type(input, session)
+        size = self.file_handling.get_file_size(input.base64)
+        file_location = self.file_handling.upload_file(
+            base64=input.base64,
+            file_name=input.filename,
+            absolute_path=None,
+            storage_path=storagePath,
+            sub_path=asset_type.file_location,
+        )
 
-            asset = self.asset_service.create_asset(
-                owner=user,
-                asset_type_id=asset_type.id,
-                name=input.name,
-                file_location=file_location,
-                size=size,
-                local_db_session=local_db_session,
-            )
+        asset = self.asset_service.create_asset(
+            owner=user,
+            asset_type_id=asset_type.id,
+            name=input.name,
+            file_location=file_location,
+            size=size,
+            local_db_session=session,
+        )
 
-            return self.asset_service.resolve_fields(asset)
+        return self.asset_service.resolve_fields(asset)
 
     def update_media(self, input: UpdateMediaInput):
-        asset = None
-        with ScopedSession() as local_db_session:
-            asset_type = self.asset_service.validate_asset_type(input, local_db_session)
+        session = get_session()
+        asset_type = self.asset_service.validate_asset_type(input, session)
 
-            asset = self.retrieve_asset(input, local_db_session)
-            asset.name = input.name
-            asset.asset_type_id = asset_type.id
-            asset.description = input.description
+        asset = self.retrieve_asset(input, session)
+        asset.name = input.name
+        asset.asset_type_id = asset_type.id
+        asset.description = input.description
 
-            file_location = self.asset_service.process_file_location(
-                {"urls": [input.fileLocation]}, local_db_session, asset
+        file_location = self.asset_service.process_file_location(
+            {"urls": [input.fileLocation]}, session, asset
+        )
+        asset.file_location = file_location
+
+        if input.base64:
+            self.file_handling.write_file(
+                base64=input.base64,
+                path=os.path.join(storagePath, asset.file_location),
             )
-            asset.file_location = file_location
 
-            if input.base64:
-                self.file_handling.write_file(
-                    base64=input.base64,
-                    path=os.path.join(storagePath, asset.file_location),
-                )
-
-            self.asset_license_service.create(
-                asset_id=asset.id,
-                player_access=input.playerAccess,
-                local_db_session=local_db_session,
-                copyright_level=input.copyrightLevel,
-            )
-            asset.description = self.process_uploaded_frames(input, asset, asset_type)
-            local_db_session.commit()
-            local_db_session.flush()
-            asset = DBSession.query(AssetModel).filter_by(id=asset.id).first()
-            return convert_keys_to_camel_case(asset.to_dict())
+        self.asset_license_service.create(
+            asset_id=asset.id,
+            player_access=input.playerAccess,
+            local_db_session=session,
+            copyright_level=input.copyrightLevel,
+        )
+        asset.description = self.process_uploaded_frames(input, asset, asset_type)
+        session.flush()
+        asset = session.query(AssetModel).filter_by(id=asset.id).first()
+        return convert_keys_to_camel_case(asset.to_dict())
 
     def retrieve_asset(self, input, local_db_session):
         if input.id:
@@ -175,31 +170,31 @@ class MediaService:
             return json.dumps(attributes)
 
     def delete_media(self, id: int):
-        with ScopedSession() as local_db_session:
-            asset = (
-                local_db_session.query(AssetModel)
-                .outerjoin(ParentStageModel)
-                .filter_by(id=id)
-                .first()
-            )
-            if not asset:
-                raise GraphQLError("Media not found")
+        session = get_session()
+        asset = (
+            session.query(AssetModel)
+            .outerjoin(ParentStageModel)
+            .filter_by(id=id)
+            .first()
+        )
+        if not asset:
+            raise GraphQLError("Media not found")
 
-            if asset.stages:
-                asset.dormant = True
-                local_db_session.flush()
-                return
+        if asset.stages:
+            asset.dormant = True
+            session.flush()
+            return
 
-            physical_path = self.remove_media_frames_and_get_path(
-                local_db_session, asset
-            )
+        physical_path = self.remove_media_frames_and_get_path(
+            session, asset
+        )
 
-            self.file_handling.delete_file(physical_path)
+        self.file_handling.delete_file(physical_path)
 
-            self.cleanup_related_entities(id, local_db_session)
-            self.remove_asset_from_frames(local_db_session, asset)
-            local_db_session.delete(asset)
-            local_db_session.flush()
+        self.cleanup_related_entities(id, session)
+        self.remove_asset_from_frames(session, asset)
+        session.delete(asset)
+        session.flush()
 
         return {"success": True, "message": "Media deleted successfully"}
 
@@ -258,15 +253,15 @@ class MediaService:
             local_db_session.flush()
 
     def assign_stages(self, input: AssignStagesInput):
-        with ScopedSession() as local_db_session:
-            local_db_session.query(ParentStageModel).filter(
-                ParentStageModel.child_asset_id == input.id
-            ).delete()
-            for stage_id in input.stageIds:
-                local_db_session.add(
-                    ParentStageModel(stage_id=stage_id, child_asset_id=input.id)
-                )
-            local_db_session.flush()
+        session = get_session()
+        session.query(ParentStageModel).filter(
+            ParentStageModel.child_asset_id == input.id
+        ).delete()
+        for stage_id in input.stageIds:
+            session.add(
+                ParentStageModel(stage_id=stage_id, child_asset_id=input.id)
+            )
+        session.flush()
 
-            asset = local_db_session.query(AssetModel).filter_by(id=input.id).first()
-            return convert_keys_to_camel_case(asset.to_dict())
+        asset = session.query(AssetModel).filter_by(id=input.id).first()
+        return convert_keys_to_camel_case(asset.to_dict())

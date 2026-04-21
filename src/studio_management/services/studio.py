@@ -21,7 +21,7 @@ from sqlalchemy import and_, or_, nulls_last
 from assets.db_models.asset_usage import AssetUsageModel
 from authentication.db_models.user_session import UserSessionModel
 from global_config.helpers.object import convert_keys_to_camel_case
-from global_config.database import ScopedSession, DBSession
+from global_config import get_session
 from global_config.env import (
     UPLOAD_USER_CONTENT_FOLDER,
     HOSTNAME,
@@ -62,7 +62,8 @@ class StudioService:
         pass
 
     def admin_players(self, params):
-        query = DBSession.query(UserModel)
+        session = get_session()
+        query = session.query(UserModel)
 
         if "usernameLike" in params:
             query = query.filter(
@@ -114,22 +115,24 @@ class StudioService:
         )
 
     def create_users(self, users: List[BatchUserInput]):
-        with ScopedSession() as session:
-            self.validate_user_information(users, session)
+        session = get_session()
+        self.validate_user_information(users, session)
 
-            for user in users:
-                user = UserModel(
-                    username=user["username"],
-                    email=user["email"],
-                    active=True,
-                    role=PLAYER,
-                    password=encrypt(user["password"]),
-                )
-                session.add(user)
+        emails = [u["email"] for u in users]
+        for user in users:
+            user = UserModel(
+                username=user["username"],
+                email=user["email"],
+                active=True,
+                role=PLAYER,
+                password=encrypt(user["password"]),
+            )
+            session.add(user)
+        session.flush()
 
         users = (
-            DBSession.query(UserModel)
-            .filter(UserModel.email.in_([user["email"] for user in users]))
+            session.query(UserModel)
+            .filter(UserModel.email.in_(emails))
             .all()
         )
 
@@ -173,16 +176,17 @@ class StudioService:
 
     async def update_user(self, input: UpdateUserInput):
         try:
-            with ScopedSession() as session:
-                self._validate_email(input)
-                user = self._get_user(session, input.id)
-                self._check_existing_email(input)
-                await self._update_user_fields(user, input)
-                session.add(user)
-                session.flush()
-                session.commit()
-                user = self._get_user(session, input.id)
-                return convert_keys_to_camel_case(user.to_dict())
+            session = get_session()
+            self._validate_email(input)
+            user = self._get_user(session, input.id)
+            self._check_existing_email(input)
+            await self._update_user_fields(user, input)
+            session.add(user)
+            session.flush()
+            user = self._get_user(session, input.id)
+            return convert_keys_to_camel_case(user.to_dict())
+        except GraphQLError:
+            raise
         except Exception as e:
             raise GraphQLError(
                 f"There was an error updating this user information: {str(e)}. Please check the logs and try again later!"
@@ -199,8 +203,9 @@ class StudioService:
         return user
 
     def _check_existing_email(self, input: UpdateUserInput):
+        session = get_session()
         existing_email = (
-            DBSession.query(UserModel)
+            session.query(UserModel)
             .filter(and_(UserModel.email == input.email, UserModel.id != input.id))
             .first()
         )
@@ -245,227 +250,230 @@ class StudioService:
             user.deactivated_on = datetime.now()
 
     def delete_user(self, id: int, current_user: UserModel):
-        with ScopedSession() as local_db_session:
-            user = local_db_session.query(UserModel).filter(UserModel.id == id).first()
-            if not user:
-                raise GraphQLError("User not found!")
+        session = get_session()
+        user = session.query(UserModel).filter(UserModel.id == id).first()
+        if not user:
+            raise GraphQLError("User not found!")
 
-            local_db_session.query(UserSessionModel).filter(
-                UserSessionModel.user_id == id
-            ).delete()
+        session.query(UserSessionModel).filter(
+            UserSessionModel.user_id == id
+        ).delete()
 
-            local_db_session.query(SceneModel).filter(SceneModel.owner_id == id).update(
-                {SceneModel.owner_id: current_user.id}
-            )
+        session.query(SceneModel).filter(SceneModel.owner_id == id).update(
+            {SceneModel.owner_id: current_user.id}
+        )
 
-            local_db_session.query(StageModel).filter(StageModel.owner_id == id).update(
-                {StageModel.owner_id: current_user.id}
-            )
-            local_db_session.query(AssetModel).filter(AssetModel.owner_id == id).update(
-                {AssetModel.owner_id: current_user.id}
-            )
+        session.query(StageModel).filter(StageModel.owner_id == id).update(
+            {StageModel.owner_id: current_user.id}
+        )
+        session.query(AssetModel).filter(AssetModel.owner_id == id).update(
+            {AssetModel.owner_id: current_user.id}
+        )
 
-            local_db_session.delete(user)
-            return convert_keys_to_camel_case(
-                {"success": True, "message": "User deleted successfully!"}
-            )
+        session.delete(user)
+        return convert_keys_to_camel_case(
+            {"success": True, "message": "User deleted successfully!"}
+        )
 
     def change_password(self, input: ChangePasswordInput):
-        with ScopedSession() as local_db_session:
-            user = (
-                local_db_session.query(UserModel)
-                .filter(UserModel.id == input.id)
-                .first()
-            )
-            if not user:
-                raise GraphQLError("User not found!")
+        session = get_session()
+        user = (
+            session.query(UserModel)
+            .filter(UserModel.id == input.id)
+            .first()
+        )
+        if not user:
+            raise GraphQLError("User not found!")
 
-            if decrypt(user.password) != input.oldPassword:
-                raise GraphQLError("Old password is incorrect!")
+        if decrypt(user.password) != input.oldPassword:
+            raise GraphQLError("Old password is incorrect!")
 
-            user.password = encrypt(input.newPassword)
-            local_db_session.flush()
-            return convert_keys_to_camel_case(
-                {"success": True, "message": "Password changed successfully!"}
-            )
+        user.password = encrypt(input.newPassword)
+        session.flush()
+        return convert_keys_to_camel_case(
+            {"success": True, "message": "Password changed successfully!"}
+        )
 
     def calc_sizes(self):
-        with ScopedSession() as local_db_session:
-            size = 0
-            for media in local_db_session.query(AssetModel).all():
-                if not media.size:
-                    full_path = os.path.join(storagePath, media.file_location)
-                    try:
-                        size = os.path.getsize(full_path)
-                    except:
-                        size = 0  # file not exist
-                    media.size = size
-                    local_db_session.flush()
-                size += media.size
+        session = get_session()
+        size = 0
+        for media in session.query(AssetModel).all():
+            if not media.size:
+                full_path = os.path.join(storagePath, media.file_location)
+                try:
+                    size = os.path.getsize(full_path)
+                except:
+                    size = 0  # file not exist
+                media.size = size
+                session.flush()
+            size += media.size
 
         return {"size": size}
 
     async def request_permission(self, user: UserModel, asset_id: int, note: str):
-        with ScopedSession() as local_db_session:
+        session = get_session()
+        asset = (
+            session.query(AssetModel)
+            .filter(AssetModel.id == asset_id)
+            .first()
+        )
+        if not asset:
+            raise GraphQLError("Asset not found!")
+        asset_usage = AssetUsageModel(
+            user_id=user.id,
+            asset_id=asset_id,
+            note=note,
+            approved=False,
+            seen=False,
+        )
+
+        if asset.copyright_level == 2:
+            asset_usage.approved = False
+            studio_url = f"https://{HOSTNAME}/media"
+            asyncio.create_task(
+                send(
+                    [asset.owner.email],
+                    f"{display_user(user)} wants to use your media {asset.name}",
+                    request_permission_for_media(
+                        user, asset, note if note else "", studio_url
+                    ),
+                )
+            )
+            asyncio.create_task(
+                send(
+                    [user.email],
+                    "Your permission request is waiting for approval",
+                    waiting_request_media_approve(user, asset),
+                )
+            )
+        else:
+            asset_usage.approved = True
+
+            description = json.loads(asset.description)
+
+            asyncio.create_task(
+                send(
+                    [user.email],
+                    f"Media acknowledgement",
+                    request_permission_acknowledgement(
+                        user,
+                        asset,
+                        note if note else "",
+                        description.get("note", ""),
+                    ),
+                )
+            )
+
+            asyncio.create_task(
+                send(
+                    [asset.owner.email],
+                    f"{display_user(user)} is using your media {asset.name}",
+                    notify_owner_of_media_request(user, asset),
+                )
+            )
+        session.add(asset_usage)
+        session.flush()
+        return {"success": True}
+
+    async def confirm_permission(self, user: UserModel, id: int, approved: bool):
+        session = get_session()
+        asset_usage = (
+            session.query(AssetUsageModel)
+            .filter(AssetUsageModel.id == id)
+            .first()
+        )
+        if not asset_usage:
+            raise GraphQLError("Asset not found!")
+        if (
+            user.role not in [SUPER_ADMIN, ADMIN]
+            and user.id != asset_usage.asset.owner_id
+        ):
+            raise GraphQLError("You are not authorized to perform this action!")
+
+        asset_id = asset_usage.asset_id
+        if approved:
+            asset_usage.approved = True
+            asset_usage.seen = True
+        else:
+            session.delete(asset_usage)
+
+        studio_url = f"https://{HOSTNAME}/media"
+        asyncio.create_task(
+            send(
+                [asset_usage.user.email],
+                f"Permission approved for media {asset_usage.asset.name}"
+                if approved
+                else f"Permission denied for media {asset_usage.asset.name}",
+                permission_response_for_media(
+                    asset_usage.user,
+                    asset_usage.asset,
+                    asset_usage.note,
+                    approved,
+                    studio_url,
+                ),
+            )
+        )
+        session.flush()
+        permissions = (
+            session.query(AssetUsageModel)
+            .filter(AssetUsageModel.asset_id == asset_id)
+            .all()
+        )
+
+        return convert_keys_to_camel_case(
+            {
+                "permissions": [
+                    convert_keys_to_camel_case(permission.to_dict())
+                    for permission in permissions
+                ],
+                "success": True,
+            },
+        )
+
+    def quick_assign_mutation(
+        self, user: UserModel, stage_ids: list[int], asset_id: int
+    ):
+        session = get_session()
+        session.query(ParentStageModel).filter(
+            ParentStageModel.child_asset_id == asset_id
+        ).delete()
+        session.flush()
+
+        for stage_id in stage_ids:
             asset = (
-                local_db_session.query(AssetModel)
+                session.query(AssetModel)
                 .filter(AssetModel.id == asset_id)
                 .first()
             )
             if not asset:
                 raise GraphQLError("Asset not found!")
-            asset_usage = AssetUsageModel(
-                user_id=user.id,
-                asset_id=asset_id,
-                note=note,
-                approved=False,
-                seen=False,
-            )
 
-            if asset.copyright_level == 2:
-                asset_usage.approved = False
-                studio_url = f"https://{HOSTNAME}/media"
-                asyncio.create_task(
-                    send(
-                        [asset.owner.email],
-                        f"{display_user(user)} wants to use your media {asset.name}",
-                        request_permission_for_media(
-                            user, asset, note if note else "", studio_url
-                        ),
-                    )
-                )
-                asyncio.create_task(
-                    send(
-                        [user.email],
-                        "Your permission request is waiting for approval",
-                        waiting_request_media_approve(user, asset),
-                    )
-                )
-            else:
-                asset_usage.approved = True
-
-                description = json.loads(asset.description)
-
-                asyncio.create_task(
-                    send(
-                        [user.email],
-                        f"Media acknowledgement",
-                        request_permission_acknowledgement(
-                            user,
-                            asset,
-                            note if note else "",
-                            description.get("note", ""),
-                        ),
-                    )
-                )
-
-                asyncio.create_task(
-                    send(
-                        [asset.owner.email],
-                        f"{display_user(user)} is using your media {asset.name}",
-                        notify_owner_of_media_request(user, asset),
-                    )
-                )
-            local_db_session.add(asset_usage)
-            local_db_session.flush()
-        return {"success": True}
-
-    async def confirm_permission(self, user: UserModel, id: int, approved: bool):
-        with ScopedSession() as local_db_session:
-            asset_usage = (
-                local_db_session.query(AssetUsageModel)
-                .filter(AssetUsageModel.id == id)
+            stage = (
+                session.query(StageModel)
+                .filter(StageModel.id == stage_id)
                 .first()
             )
-            if not asset_usage:
-                raise GraphQLError("Asset not found!")
-            if (
-                user.role not in [SUPER_ADMIN, ADMIN]
-                and user.id != asset_usage.asset.owner_id
-            ):
-                raise GraphQLError("You are not authorized to perform this action!")
+            if not stage:
+                raise GraphQLError("Stage not found!")
 
-            if approved:
-                asset_usage.approved = True
-                asset_usage.seen = True
-            else:
-                local_db_session.delete(asset_usage)
-
-            studio_url = f"https://{HOSTNAME}/media"
-            asyncio.create_task(
-                send(
-                    [asset_usage.user.email],
-                    f"Permission approved for media {asset_usage.asset.name}"
-                    if approved
-                    else f"Permission denied for media {asset_usage.asset.name}",
-                    permission_response_for_media(
-                        asset_usage.user,
-                        asset_usage.asset,
-                        asset_usage.note,
-                        approved,
-                        studio_url,
-                    ),
-                )
+            asset.stages.append(
+                ParentStageModel(stage_id=stage_id, child_asset_id=asset_id)
             )
-            local_db_session.flush()
-            permissions = (
-                local_db_session.query(AssetUsageModel)
-                .filter(AssetUsageModel.asset_id == asset_usage.asset_id)
-                .all()
-            )
-
-            return convert_keys_to_camel_case(
-                {
-                    "permissions": [
-                        convert_keys_to_camel_case(permission.to_dict())
-                        for permission in permissions
-                    ],
-                    "success": True,
-                },
-            )
-
-    def quick_assign_mutation(
-        self, user: UserModel, stage_ids: list[int], asset_id: int
-    ):
-        with ScopedSession() as local_db_session:
-            local_db_session.query(ParentStageModel).filter(
-                ParentStageModel.child_asset_id == asset_id
-            ).delete()
-            local_db_session.flush()
-
-            for stage_id in stage_ids:
-                asset = (
-                    local_db_session.query(AssetModel)
-                    .filter(AssetModel.id == asset_id)
-                    .first()
-                )
-                if not asset:
-                    raise GraphQLError("Asset not found!")
-
-                stage = (
-                    local_db_session.query(StageModel)
-                    .filter(StageModel.id == stage_id)
-                    .first()
-                )
-                if not stage:
-                    raise GraphQLError("Stage not found!")
-
-                asset.stages.append(
-                    ParentStageModel(stage_id=stage_id, child_asset_id=asset_id)
-                )
-                local_db_session.flush()
+            session.flush()
         return {"success": True}
 
     def get_users(self, active: bool):
+        session = get_session()
         return [
             convert_keys_to_camel_case(user.to_dict())
-            for user in DBSession.query(UserModel)
+            for user in session.query(UserModel)
             .filter(UserModel.active == active)
             .order_by(UserModel.username.asc())
             .all()
         ]
 
     def stages(self, user: UserModel):
+        session = get_session()
         return [
             convert_keys_to_camel_case(
                 {
@@ -475,5 +483,5 @@ class StudioService:
                     ),
                 }
             )
-            for stage in DBSession.query(StageModel).order_by(StageModel.name.asc()).all()
+            for stage in session.query(StageModel).order_by(StageModel.name.asc()).all()
         ]

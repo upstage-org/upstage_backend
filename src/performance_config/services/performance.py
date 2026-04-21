@@ -12,7 +12,7 @@ if projdir not in sys.path:
 
 from datetime import datetime
 from graphql import GraphQLError
-from global_config.database import DBSession, ScopedSession
+from global_config import get_session
 from global_config.helpers.object import convert_keys_to_camel_case
 from event_archive.db_models.event import EventModel
 from performance_config.db_models.performance import PerformanceModel
@@ -31,127 +31,128 @@ class PerformanceService:
         pass
 
     def get_performance_communication(self):
+        session = get_session()
         return [
             convert_keys_to_camel_case(performance.to_dict())
-            for performance in DBSession.query(PerformanceMQTTConfigModel).all()
+            for performance in session.query(PerformanceMQTTConfigModel).all()
         ]
 
     def get_performance_config(self):
+        session = get_session()
         return [
             convert_keys_to_camel_case(performance.to_dict())
-            for performance in DBSession.query(PerformanceConfigModel).all()
+            for performance in session.query(PerformanceConfigModel).all()
         ]
 
     def create_performance(self, user: UserModel, input: RecordInput):
-        with ScopedSession() as local_db_session:
-            stage = (
-                local_db_session.query(StageModel).filter_by(id=input.stageId).first()
-            )
-            if not stage:
-                raise GraphQLError("Stage not found")
+        session = get_session()
+        stage = (
+            session.query(StageModel).filter_by(id=input.stageId).first()
+        )
+        if not stage:
+            raise GraphQLError("Stage not found")
 
-            if user.role not in [SUPER_ADMIN, ADMIN] and user.id != stage.owner_id:
-                raise GraphQLError("You are not allowed to record for this stage")
+        if user.role not in [SUPER_ADMIN, ADMIN] and user.id != stage.owner_id:
+            raise GraphQLError("You are not allowed to record for this stage")
 
-            performance = PerformanceModel(
-                name=input.name,
-                description=input.description,
-                recording=True,
-                stage_id=input.stageId,
-            )
+        performance = PerformanceModel(
+            name=input.name,
+            description=input.description,
+            recording=True,
+            stage_id=input.stageId,
+        )
 
-            local_db_session.add(performance)
-            local_db_session.commit()
-            local_db_session.flush()
-            performance = (
-                DBSession.query(PerformanceModel).filter_by(id=performance.id).first()
-            )
-            return convert_keys_to_camel_case(performance)
+        session.add(performance)
+        session.flush()
+        performance = (
+            session.query(PerformanceModel).filter_by(id=performance.id).first()
+        )
+        return convert_keys_to_camel_case(performance)
 
     def update_performance(self, user: UserModel, input: PerformanceInput):
-        with ScopedSession() as local_db_session:
-            performance = (
-                local_db_session.query(PerformanceModel).filter_by(id=input.id).first()
-            )
+        session = get_session()
+        performance = (
+            session.query(PerformanceModel).filter_by(id=input.id).first()
+        )
 
-            if not performance:
-                raise GraphQLError("Performance not found")
+        if not performance:
+            raise GraphQLError("Performance not found")
 
-            if (
-                user.role not in [SUPER_ADMIN, ADMIN]
-                and user.id != performance.stage.owner_id
-            ):
-                raise GraphQLError("You are not allowed to update this performance")
+        if (
+            user.role not in [SUPER_ADMIN, ADMIN]
+            and user.id != performance.stage.owner_id
+        ):
+            raise GraphQLError("You are not allowed to update this performance")
 
-            performance.name = input.name
-            performance.description = input.description
-            local_db_session.flush()
+        performance.name = input.name
+        performance.description = input.description
+        session.flush()
 
-            return {"success": True}
+        return {"success": True}
 
     def delete_performance(self, user: UserModel, id: int):
-        with ScopedSession() as local_db_session:
-            performance = (
-                local_db_session.query(PerformanceModel).filter_by(id=id).first()
-            )
-            if not performance:
-                raise GraphQLError("Performance not found")
+        session = get_session()
+        performance = (
+            session.query(PerformanceModel).filter_by(id=id).first()
+        )
+        if not performance:
+            raise GraphQLError("Performance not found")
 
-            if (
-                user.role not in [SUPER_ADMIN, ADMIN]
-                and user.id != performance.stage.owner_id
-            ):
-                raise GraphQLError("You are not allowed to delete this performance")
+        if (
+            user.role not in [SUPER_ADMIN, ADMIN]
+            and user.id != performance.stage.owner_id
+        ):
+            raise GraphQLError("You are not allowed to delete this performance")
 
-            local_db_session.query(EventModel).filter(
-                EventModel.performance_id == id
-            ).delete(synchronize_session=False)
-            local_db_session.delete(performance)
-            return {"success": True}
+        session.query(EventModel).filter(
+            EventModel.performance_id == id
+        ).delete(synchronize_session=False)
+        session.delete(performance)
+        return {"success": True}
 
     def save_recording(self, user: UserModel, id: int):
-        with ScopedSession() as local_db_session:
-            performance = (
-                local_db_session.query(PerformanceModel).filter_by(id=id).first()
-            )
-            if not performance:
-                raise GraphQLError("Performance not found")
+        session = get_session()
+        performance = (
+            session.query(PerformanceModel).filter_by(id=id).first()
+        )
+        if not performance:
+            raise GraphQLError("Performance not found")
 
-            if (
-                user.role not in [SUPER_ADMIN, ADMIN]
-                and user.id != performance.stage.owner_id
-            ):
-                raise GraphQLError("Only stage owner or Admin can save a recording!")
-            saved_on = datetime.now()
+        if (
+            user.role not in [SUPER_ADMIN, ADMIN]
+            and user.id != performance.stage.owner_id
+        ):
+            raise GraphQLError("Only stage owner or Admin can save a recording!")
+        saved_on = datetime.now()
 
-            events = (
-                local_db_session.query(EventModel)
-                .filter(
-                    EventModel.topic.ilike(
-                        "%/{}/%".format(performance.stage.file_location)
-                    )
+        events = (
+            session.query(EventModel)
+            .filter(
+                EventModel.topic.ilike(
+                    "%/{}/%".format(performance.stage.file_location)
                 )
-                .filter(EventModel.created > performance.created_on)
-                .filter(EventModel.created < saved_on)
             )
+            .filter(EventModel.created > performance.created_on)
+            .filter(EventModel.created < saved_on)
+        )
 
-            if events.count() > 0:
-                for event in events.all():
-                    local_db_session.expunge(event)
-                    make_transient(event)
-                    event.id = None
-                    event.performance_id = performance.id
-                    local_db_session.add(event)
-            else:
-                raise GraphQLError("Nothing to record!")
+        if events.count() > 0:
+            for event in events.all():
+                session.expunge(event)
+                make_transient(event)
+                event.id = None
+                event.performance_id = performance.id
+                session.add(event)
+        else:
+            raise GraphQLError("Nothing to record!")
 
-            performance.saved_on = saved_on
-            performance.recording = False
-            local_db_session.flush()
+        performance.saved_on = saved_on
+        performance.recording = False
+        session.flush()
 
-            return (
-                DBSession.query(PerformanceModel)
-                .filter_by(id=performance.id)
-                .first()
-                .to_dict()
-            )
+        return (
+            session.query(PerformanceModel)
+            .filter_by(id=performance.id)
+            .first()
+            .to_dict()
+        )

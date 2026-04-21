@@ -18,11 +18,7 @@ from fastapi import Request
 from graphql import GraphQLError
 import pyotp
 import requests
-from global_config.database import (
-   
-    DBSession,
-    ScopedSession,
-)
+from global_config import get_session
 from global_config.env import (ENV_TYPE,
     CLOUDFLARE_CAPTCHA_SECRETKEY,
     CLOUDFLARE_CAPTCHA_VERIFY_ENDPOINT,
@@ -46,15 +42,17 @@ class UserService:
         self.stage_operation_service = StageOperationService()
 
     def find_one(self, username: str, email: str):
+        session = get_session()
         return (
-            DBSession.query(UserModel)
+            session.query(UserModel)
             .filter(or_(UserModel.username == username, UserModel.email == email))
             .first()
         )
 
     def find_by_id(self, user_id: int):
+        session = get_session()
         return (
-            DBSession.query(UserModel)
+            session.query(UserModel)
             .filter(UserModel.id == user_id, UserModel.active.is_(True))
             .first()
         )
@@ -67,24 +65,23 @@ class UserService:
         if existing_user:
             raise GraphQLError("User already exists")
 
+        from global_config.helpers.fernet_crypto import encrypt
+
+        session = get_session()
         user = UserModel()
-
-        with ScopedSession() as local_db_session:
-            from global_config.helpers.fernet_crypto import encrypt
-
-            user.password = encrypt(data["password"])
-            user.role = PLAYER if not user.role else user.role
-            user.active = True if user.role == SUPER_ADMIN else False
-            user.email = data.get("email", "")
-            user.first_name = data.get("firstName", "")
-            user.last_name = data.get("lastName", "")
-            user.username = data.get("username", "")
-            user.intro = data.get("intro", "")
-            local_db_session.add(user)
-            local_db_session.flush()
+        user.password = encrypt(data["password"])
+        user.role = PLAYER if not user.role else user.role
+        user.active = True if user.role == SUPER_ADMIN else False
+        user.email = data.get("email", "")
+        user.first_name = data.get("firstName", "")
+        user.last_name = data.get("lastName", "")
+        user.username = data.get("username", "")
+        user.intro = data.get("intro", "")
+        session.add(user)
+        session.flush()
 
         user = (
-            DBSession.query(UserModel)
+            session.query(UserModel)
             .filter(UserModel.username == data["username"])
             .first()
         )
@@ -137,93 +134,93 @@ class UserService:
             )
 
     def update(self, user: UserModel):
-        DBSession.query(UserModel).filter(UserModel.id == user.id).update(
+        session = get_session()
+        session.query(UserModel).filter(UserModel.id == user.id).update(
             {**user.to_dict()}
         )
-        DBSession.commit()
-        DBSession.flush()
+        session.flush()
 
     async def request_password_reset(self, email: str):
-        with ScopedSession() as local_db_session:
-            user = (
-                local_db_session.query(UserModel)
-                .filter(or_(UserModel.email == email, UserModel.username == email))
-                .first()
+        session = get_session()
+        user = (
+            session.query(UserModel)
+            .filter(or_(UserModel.email == email, UserModel.username == email))
+            .first()
+        )
+
+        if not user:
+            raise GraphQLError("User does not exist")
+        totp = pyotp.TOTP(pyotp.random_base32())
+        otp = totp.now()
+
+        session.query(OneTimeTOTPModel).filter(
+            OneTimeTOTPModel.user_id == user.id
+        ).delete()
+
+        session.flush()
+        session.add(OneTimeTOTPModel(user_id=user.id, code=otp))
+        session.flush()
+
+        asyncio.create_task(
+            send(
+                [user.email],
+                f"Password reset for account {user.username}",
+                password_reset(user, otp),
             )
+        )
 
-            if not user:
-                raise GraphQLError("User does not exist")
-            totp = pyotp.TOTP(pyotp.random_base32())
-            otp = totp.now()
-
-            local_db_session.query(OneTimeTOTPModel).filter(
-                OneTimeTOTPModel.user_id == user.id
-            ).delete()
-
-            local_db_session.flush()
-            local_db_session.add(OneTimeTOTPModel(user_id=user.id, code=otp))
-            local_db_session.flush()
-
-            asyncio.create_task(
-                send(
-                    [user.email],
-                    f"Password reset for account {user.username}",
-                    password_reset(user, otp),
-                )
-            )
-
-            return {
-                "success": True,
-                "message": f"We've sent an email with a code to reset your password to {email}.",
-            }
+        return {
+            "success": True,
+            "message": f"We've sent an email with a code to reset your password to {email}.",
+        }
 
     async def verify_password_reset(self, input):
-        with ScopedSession() as local_db_session:
-            otp = (
-                local_db_session.query(OneTimeTOTPModel)
-                .filter(OneTimeTOTPModel.code == input["token"])
-                .first()
-            )
+        session = get_session()
+        otp = (
+            session.query(OneTimeTOTPModel)
+            .filter(OneTimeTOTPModel.code == input["token"])
+            .first()
+        )
 
-            if not otp:
-                raise GraphQLError("Invalid token")
+        if not otp:
+            raise GraphQLError("Invalid token")
 
-            user = (
-                local_db_session.query(UserModel)
-                .filter(UserModel.id == otp.user_id)
-                .first()
-            )
+        user = (
+            session.query(UserModel)
+            .filter(UserModel.id == otp.user_id)
+            .first()
+        )
 
-            if not user:
-                raise GraphQLError("Invalid token")
+        if not user:
+            raise GraphQLError("Invalid token")
 
-            return {
-                "success": True,
-                "message": "Token verified. Please reset your password.",
-            }
+        return {
+            "success": True,
+            "message": "Token verified. Please reset your password.",
+        }
 
     async def reset_password(self, input):
-        with ScopedSession() as local_db_session:
-            otp = (
-                local_db_session.query(OneTimeTOTPModel)
-                .filter(OneTimeTOTPModel.code == input["token"])
-                .first()
-            )
+        session = get_session()
+        otp = (
+            session.query(OneTimeTOTPModel)
+            .filter(OneTimeTOTPModel.code == input["token"])
+            .first()
+        )
 
-            if not otp:
-                raise GraphQLError("Invalid token")
+        if not otp:
+            raise GraphQLError("Invalid token")
 
-            user = (
-                local_db_session.query(UserModel)
-                .filter(UserModel.id == otp.user_id)
-                .first()
-            )
+        user = (
+            session.query(UserModel)
+            .filter(UserModel.id == otp.user_id)
+            .first()
+        )
 
-            if not user:
-                raise GraphQLError("Invalid token")
+        if not user:
+            raise GraphQLError("Invalid token")
 
-            from global_config.helpers.fernet_crypto import encrypt
+        from global_config.helpers.fernet_crypto import encrypt
 
-            user.password = encrypt(input["password"])
-            local_db_session.delete(otp)
-            return {"success": True, "message": "Password reset successfully."}
+        user.password = encrypt(input["password"])
+        session.delete(otp)
+        return {"success": True, "message": "Password reset successfully."}

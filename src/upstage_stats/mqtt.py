@@ -17,7 +17,7 @@ from datetime import datetime, timedelta
 import paho.mqtt.client as mqtt
 
 from global_config.env import MQTT_TRANSPORT
-from global_config.database import DBSession, ScopedSession
+from global_config.database import ScopedSession
 from upstage_stats.db_models.receive_stat import ReceiveStatModel
 from upstage_stats.db_models.connection_stat import ConnectionStatModel
 
@@ -61,9 +61,6 @@ def on_message(client: mqtt.Client, userdata, msg: mqtt.MQTTMessage):
                     session.add(connection_stat)
             except Exception as error:
                 logger.error(error)
-            finally:
-                if session is not None:
-                    session.close()
         else:
             client_messages[client_id] = client_messages[client_id] + 1
 
@@ -92,9 +89,6 @@ def on_message(client: mqtt.Client, userdata, msg: mqtt.MQTTMessage):
                         )
             except Exception as error:
                 logger.error(error)
-            finally:
-                if session is not None:
-                    session.close()
 
 
 def on_disconnect(client, userdata, rc):
@@ -116,9 +110,10 @@ def build_client(client_id=get_client_id(), transport=MQTT_TRANSPORT):
 
 def get_not_alive_users():
     two_minute_ago = datetime.now() - timedelta(minutes=2)
-    not_alive_clients = (
-        DBSession.query(ReceiveStatModel)
-        .filter(ReceiveStatModel.mqtt_timestamp < two_minute_ago)
-        .all()
-    )
-    return [x.received_id for x in not_alive_clients]
+    with ScopedSession() as session:
+        not_alive_clients = (
+            session.query(ReceiveStatModel)
+            .filter(ReceiveStatModel.mqtt_timestamp < two_minute_ago)
+            .all()
+        )
+        return [x.received_id for x in not_alive_clients]
