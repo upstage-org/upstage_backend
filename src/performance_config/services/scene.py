@@ -11,7 +11,7 @@ if projdir not in sys.path:
     sys.path.append(projdir2)
 
 from graphql import GraphQLError
-from global_config.database import DBSession, ScopedSession
+from global_config import get_session
 from global_config.helpers.object import convert_keys_to_camel_case
 from performance_config.db_models.scene import SceneModel
 from stages.http.validation import SceneInput
@@ -23,64 +23,64 @@ class SceneService:
         pass
 
     def get_scene(self):
+        session = get_session()
         return [
             convert_keys_to_camel_case(scene.to_dict())
-            for scene in DBSession.query(SceneModel).all()
+            for scene in session.query(SceneModel).all()
         ]
 
     def create_scene(self, user: UserModel, input: SceneInput):
-        with ScopedSession() as local_db_session:
-            scene = SceneModel(
-                owner_id=user.id,
-                stage_id=input.stageId,
-                payload=input.payload,
-                scene_preview=input.preview,
-            )
+        session = get_session()
+        scene = SceneModel(
+            owner_id=user.id,
+            stage_id=input.stageId,
+            payload=input.payload,
+            scene_preview=input.preview,
+        )
 
-            scene_order = (
-                local_db_session.query(SceneModel)
+        scene_order = (
+            session.query(SceneModel)
+            .filter(SceneModel.stage_id == input.stageId)
+            .count()
+            + 1
+        )
+
+        scene.scene_order = scene_order
+
+        if input.name:
+            existed_scene = (
+                session.query(SceneModel)
                 .filter(SceneModel.stage_id == input.stageId)
-                .count()
-                + 1
+                .filter(SceneModel.active == True)
+                .filter(SceneModel.name == input.name)
+                .first()
             )
-
-            scene.scene_order = scene_order
-
-            if input.name:
-                existed_scene = (
-                    local_db_session.query(SceneModel)
-                    .filter(SceneModel.stage_id == input.stageId)
-                    .filter(SceneModel.active == True)
-                    .filter(SceneModel.name == input.name)
-                    .first()
-                )
-                if existed_scene:
-                    raise GraphQLError(
-                        'Scene "{}" already existed. Please choose another name!'.format(
-                            input.name
-                        )
+            if existed_scene:
+                raise GraphQLError(
+                    'Scene "{}" already existed. Please choose another name!'.format(
+                        input.name
                     )
-                scene.name = input.name
-            else:
-                scene.name = f"Scene {scene_order}"
+                )
+            scene.name = input.name
+        else:
+            scene.name = f"Scene {scene_order}"
 
-            local_db_session.add(scene)
-            local_db_session.commit()
-            local_db_session.flush()
-            scene = DBSession.query(SceneModel).filter_by(id=scene.id).first()
-            return convert_keys_to_camel_case(scene)
+        session.add(scene)
+        session.flush()
+        scene = session.query(SceneModel).filter_by(id=scene.id).first()
+        return convert_keys_to_camel_case(scene)
 
     def delete_scene(self, user: UserModel, id: int):
-        with ScopedSession() as local_db_session:
-            scene = local_db_session.query(SceneModel).filter_by(id=id).first()
-            if not scene:
-                raise GraphQLError("Scene not found")
+        session = get_session()
+        scene = session.query(SceneModel).filter_by(id=id).first()
+        if not scene:
+            raise GraphQLError("Scene not found")
 
-            if user.role not in [SUPER_ADMIN, ADMIN] and scene.owner_id != user.id:
-                raise GraphQLError(
-                    "You are not allowed to delete this scene",
-                )
+        if user.role not in [SUPER_ADMIN, ADMIN] and scene.owner_id != user.id:
+            raise GraphQLError(
+                "You are not allowed to delete this scene",
+            )
 
-            scene.active = False
-            local_db_session.flush()
-            return {"success": True, "message": "Scene deleted successfully"}
+        scene.active = False
+        session.flush()
+        return {"success": True, "message": "Scene deleted successfully"}

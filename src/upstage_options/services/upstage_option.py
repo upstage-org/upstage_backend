@@ -14,7 +14,7 @@ if projdir not in sys.path:
 from global_config.env import CLIENT_MAX_BODY_SIZE
 
 from global_config.helpers.object import convert_keys_to_camel_case
-from global_config.database import ScopedSession, DBSession
+from global_config import get_session
 from mails.helpers.mail import send
 from upstage_options.db_models.config import ConfigModel
 from upstage_options.http.validation import ConfigInput, SystemEmailInput
@@ -32,7 +32,9 @@ ADDING_EMAIL_SIGNATURE = "ADDING_EMAIL_SIGNATURE"
 
 
 class SettingService:
-    def get_config(self, name: str, session=DBSession):
+    def get_config(self, name: str, session=None):
+        if session is None:
+            session = get_session()
         return session.query(ConfigModel).filter_by(name=name).first()
 
     def upload_limit(self):
@@ -86,32 +88,32 @@ class SettingService:
         )
 
     def update_terms_of_service(self, url: str):
-        with ScopedSession() as local_db_session:
-            config = self.get_config(TERMS_OF_SERVICE, local_db_session)
-            if not config:
-                config = ConfigModel(name=TERMS_OF_SERVICE, value=url)
-                local_db_session.add(config)
-            else:
-                config.value = url
-            local_db_session.flush()
-        config = self.get_config(TERMS_OF_SERVICE)
+        session = get_session()
+        config = self.get_config(TERMS_OF_SERVICE, session)
+        if not config:
+            config = ConfigModel(name=TERMS_OF_SERVICE, value=url)
+            session.add(config)
+        else:
+            config.value = url
+        session.flush()
+        config = self.get_config(TERMS_OF_SERVICE, session)
         return convert_keys_to_camel_case(config.to_dict())
 
     def save_config(self, input: ConfigInput):
-        with ScopedSession() as local_db_session:
-            config = self.get_config(input.name, local_db_session)
-            if not config:
-                config = ConfigModel(name=input.name, value=input.value)
-                local_db_session.add(config)
+        session = get_session()
+        config = self.get_config(input.name, session)
+        if not config:
+            config = ConfigModel(name=input.name, value=input.value)
+            session.add(config)
+        else:
+            if input.name == ENABLE_DONATE or input.name == SHOW_REGISTRATION:
+                config.value = "true" if input.enabled else "false"
             else:
-                if input.name == ENABLE_DONATE or input.name == SHOW_REGISTRATION:
-                    config.value = "true" if input.enabled else "false"
-                else:
-                    config.value = input.value
+                config.value = input.value
 
-            local_db_session.flush()
+        session.flush()
 
-        config = self.get_config(input.name)
+        config = self.get_config(input.name, session)
         return convert_keys_to_camel_case(config)
 
     async def send_email(self, input: SystemEmailInput):

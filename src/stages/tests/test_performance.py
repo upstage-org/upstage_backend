@@ -12,7 +12,8 @@ if projdir not in sys.path:
 
 import pytest
 from authentication.tests.auth_test import TestAuthenticationController
-from global_config.database import DBSession, ScopedSession
+from global_config import get_session
+from global_config.database import ScopedSession
 from event_archive.db_models.event import EventModel
 from main import app
 from performance_config.db_models.performance import PerformanceModel
@@ -172,7 +173,7 @@ class TestPerformanceController:
         assert "errors" in data
         assert data["errors"][0]["message"] == "Performance not found"
 
-        performance = DBSession.query(PerformanceModel).first()
+        performance = get_session().query(PerformanceModel).first()
         variables = {
             "input": {
                 "id": performance.id,
@@ -197,7 +198,7 @@ class TestPerformanceController:
 
     async def test_05_save_recording(self, client):
         headers = test_AuthenticationController.get_headers(client, SUPER_ADMIN)
-        performance = DBSession.query(PerformanceModel).first()
+        performance = get_session().query(PerformanceModel).first()
         variables = {"id": performance.id}
 
         query = """
@@ -218,7 +219,7 @@ class TestPerformanceController:
         assert "errors" in data
         assert data["errors"][0]["message"] == "Nothing to record!"
 
-        stage = DBSession.query(StageModel).filter_by(id=performance.stage_id).first()
+        stage = get_session().query(StageModel).filter_by(id=performance.stage_id).first()
         with ScopedSession() as session:
             event = EventModel(
                 topic="/{}/".format(stage.file_location),
@@ -262,7 +263,7 @@ class TestPerformanceController:
         assert "errors" in data
         assert data["errors"][0]["message"] == "Performance not found"
 
-        performance = DBSession.query(PerformanceModel).first()
+        performance = get_session().query(PerformanceModel).first()
         variables = {"id": performance.id}
 
         headers = test_AuthenticationController.get_headers(client, PLAYER)
@@ -281,7 +282,7 @@ class TestPerformanceController:
 
     async def test_07_delete_performance(self, client):
         headers = test_AuthenticationController.get_headers(client, SUPER_ADMIN)
-        performance = DBSession.query(PerformanceModel).first()
+        performance = get_session().query(PerformanceModel).first()
         variables = {"id": performance.id}
 
         query = """
@@ -326,7 +327,7 @@ class TestPerformanceController:
         assert "errors" in data
         assert data["errors"][0]["message"] == "Performance not found"
 
-        performance = DBSession.query(PerformanceModel).first()
+        performance = get_session().query(PerformanceModel).first()
         variables = {"id": performance.id}
 
         headers = test_AuthenticationController.get_headers(client, PLAYER)
@@ -418,7 +419,7 @@ class TestPerformanceController:
 
     async def test_10_delete_scene(self, client):
         headers = test_AuthenticationController.get_headers(client, SUPER_ADMIN)
-        scene = DBSession.query(SceneModel).first()
+        scene = get_session().query(SceneModel).first()
         variables = {"id": scene.id}
 
         query = """
@@ -462,7 +463,7 @@ class TestPerformanceController:
         assert "errors" in data
         assert data["errors"][0]["message"] == "Scene not found"
 
-        scene = DBSession.query(SceneModel).first()
+        scene = get_session().query(SceneModel).first()
         variables = {"id": scene.id}
 
         headers = test_AuthenticationController.get_headers(client, PLAYER)

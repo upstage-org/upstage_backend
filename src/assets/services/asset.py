@@ -21,7 +21,7 @@ import time
 from graphql import GraphQLError
 
 
-from global_config.database import ScopedSession, DBSession
+from global_config import get_session
 from global_config.env import (
     UPLOAD_USER_CONTENT_FOLDER,
     STREAM_EXPIRY_DAYS,
@@ -57,8 +57,9 @@ class AssetService:
         pass
 
     def get_all_medias(self, user: UserModel, filter: dict = None):
+        session = get_session()
         query = (
-            DBSession.query(AssetModel)
+            session.query(AssetModel)
             .join(AssetTypeModel)
             .join(UserModel)
             .outerjoin(AssetLicenseModel)
@@ -81,8 +82,9 @@ class AssetService:
         return [self.resolve_fields(asset, user) for asset in assets]
 
     def search_assets(self, user: UserModel, search_assets: MediaTableInput):
+        session = get_session()
         query = (
-            DBSession.query(AssetModel)
+            session.query(AssetModel)
             .join(UserModel)
             .join(AssetTypeModel)
             .outerjoin(AssetLicenseModel)
@@ -186,40 +188,38 @@ class AssetService:
         return {"url": file_location}
 
     def save_media(self, owner: UserModel, input: SaveMediaInput):
-        asset = None
-        with ScopedSession() as local_db_session:
-            asset_type = self.validate_asset_type(input, local_db_session)
+        session = get_session()
+        asset_type = self.validate_asset_type(input, session)
 
-            if input.id:
-                asset = (
-                    local_db_session.query(AssetModel)
-                    .filter(AssetModel.id == input.id)
-                    .first()
-                )
-                if (
-                    owner.role not in [SUPER_ADMIN, ADMIN]
-                    and asset.owner_id != owner.id
-                ):
-                    raise GraphQLError("You are not allowed to update this asset")
-            else:
-                asset = AssetModel(owner_id=owner.id)
-                local_db_session.add(asset)
+        if input.id:
+            asset = (
+                session.query(AssetModel)
+                .filter(AssetModel.id == input.id)
+                .first()
+            )
+            if (
+                owner.role not in [SUPER_ADMIN, ADMIN]
+                and asset.owner_id != owner.id
+            ):
+                raise GraphQLError("You are not allowed to update this asset")
+        else:
+            asset = AssetModel(owner_id=owner.id)
+            session.add(asset)
 
-            asset.name = input.name
-            asset.asset_type_id = asset_type.id
-            asset.copyright_level = input.copyrightLevel
-            file_location = self.process_file_location(input, local_db_session, asset)
+        asset.name = input.name
+        asset.asset_type_id = asset_type.id
+        asset.copyright_level = input.copyrightLevel
+        file_location = self.process_file_location(input, session, asset)
 
-            self.change_owner(input.owner, local_db_session, asset)
+        self.change_owner(input.owner, session, asset)
 
-            self.process_urls(input, local_db_session, asset_type, asset, file_location)
+        self.process_urls(input, session, asset_type, asset, file_location)
 
-            self.update_asset_permissions(input, local_db_session, asset)
-            asset = self.update_asset_tags(input, local_db_session, asset)
-            local_db_session.commit()
-            local_db_session.flush()
+        self.update_asset_permissions(input, session, asset)
+        asset = self.update_asset_tags(input, session, asset)
+        session.flush()
 
-            return convert_keys_to_camel_case({"asset": {"id": asset.id}})
+        return convert_keys_to_camel_case({"asset": {"id": asset.id}})
 
     def update_asset_tags(
         self, input: SaveMediaInput, local_db_session, asset: AssetModel
@@ -375,7 +375,7 @@ class AssetService:
                     ParentStageModel(stage_id=id, child_asset_id=asset.id)
                 )
 
-    def change_owner(self, owner: str, local_db_session: ScopedSession, asset: AssetModel):
+    def change_owner(self, owner: str, local_db_session, asset: AssetModel):
         if owner:
             new_owner = (
                 local_db_session.query(UserModel)
@@ -429,26 +429,26 @@ class AssetService:
         return asset_type
 
     def delete_media(self, owner: UserModel, id: int):
-        with ScopedSession() as local_db_session:
-            asset = (
-                local_db_session.query(AssetModel)
-                .outerjoin(ParentStageModel)
-                .filter(AssetModel.id == id)
-                .first()
-            )
+        session = get_session()
+        asset = (
+            session.query(AssetModel)
+            .outerjoin(ParentStageModel)
+            .filter(AssetModel.id == id)
+            .first()
+        )
 
-            if not asset:
-                raise GraphQLError("Media not found")
+        if not asset:
+            raise GraphQLError("Media not found")
 
-            if owner.role not in (ADMIN, SUPER_ADMIN) and owner.id != asset.owner_id:
-                return {
-                    "success": False,
-                    "message": "Only media owner or admin can delete this media!",
-                }
+        if owner.role not in (ADMIN, SUPER_ADMIN) and owner.id != asset.owner_id:
+            return {
+                "success": False,
+                "message": "Only media owner or admin can delete this media!",
+            }
 
-            self.cleanup_assets(local_db_session, asset)
-            local_db_session.delete(asset)
-            local_db_session.flush()
+        self.cleanup_assets(session, asset)
+        session.delete(asset)
+        session.flush()
 
         return {
             "success": True,
@@ -459,28 +459,28 @@ class AssetService:
         if (input.status.value == MediaStatusEnum.ACTIVE.value) or (
             input.status.value == MediaStatusEnum.DORMANT.value
         ):
-            with ScopedSession() as local_db_session:
-                asset = (
-                    local_db_session.query(AssetModel)
-                    .outerjoin(ParentStageModel)
-                    .filter(AssetModel.id == input.id)
-                    .first()
-                )
+            session = get_session()
+            asset = (
+                session.query(AssetModel)
+                .outerjoin(ParentStageModel)
+                .filter(AssetModel.id == input.id)
+                .first()
+            )
 
-                if not asset:
-                    raise GraphQLError("Media not found")
+            if not asset:
+                raise GraphQLError("Media not found")
 
-                asset.dormant = input.status.value == MediaStatusEnum.DORMANT.value
-                local_db_session.flush()
+            asset.dormant = input.status.value == MediaStatusEnum.DORMANT.value
+            session.flush()
 
-                if input.status.value == MediaStatusEnum.ACTIVE.value:
-                    asyncio.create_task(
-                        send(
-                            [asset.owner.email],
-                            "Your dormant media item has been reactivated",
-                            notify_mark_media_active(asset),
-                        )
+            if input.status.value == MediaStatusEnum.ACTIVE.value:
+                asyncio.create_task(
+                    send(
+                        [asset.owner.email],
+                        "Your dormant media item has been reactivated",
+                        notify_mark_media_active(asset),
                     )
+                )
 
             return {
                 "success": True,
@@ -594,23 +594,26 @@ class AssetService:
         }
 
     def get_media_types(self):
+        session = get_session()
         return [
             convert_keys_to_camel_case(type.to_dict())
-            for type in DBSession.query(AssetTypeModel)
+            for type in session.query(AssetTypeModel)
             .order_by(AssetTypeModel.name.asc())
             .all()
         ]
 
     def get_tags(self):
+        session = get_session()
         return [
             convert_keys_to_camel_case(tag.to_dict())
-            for tag in DBSession.query(TagModel).order_by(TagModel.name.asc()).all()
+            for tag in session.query(TagModel).order_by(TagModel.name.asc()).all()
         ]
 
     def get_voices(self):
+        session = get_session()
         voices = []
         for media in (
-            DBSession.query(AssetModel)
+            session.query(AssetModel)
             .filter(AssetModel.asset_type.has(AssetTypeModel.name == "avatar"))
             .all()
         ):
@@ -642,8 +645,9 @@ class AssetService:
             return Previlege.APPROVED.value
         if asset.copyright_level == 3:
             return Previlege.NONE.value
+        session = get_session()
         usage = (
-            DBSession.query(AssetUsageModel)
+            session.query(AssetUsageModel)
             .filter(AssetUsageModel.asset_id == asset.id)
             .filter(AssetUsageModel.user_id == user_id)
             .first()
@@ -657,8 +661,9 @@ class AssetService:
             return Previlege.REQUIRE_APPROVAL.value
 
     def resolve_permissions(self, asset_id: int):
+        session = get_session()
         return (
-            DBSession.query(AssetUsageModel)
+            session.query(AssetUsageModel)
             .filter(AssetUsageModel.asset_id == asset_id)
             .order_by(AssetUsageModel.created_on.desc())
             .all()

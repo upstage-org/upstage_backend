@@ -14,7 +14,6 @@ if projdir not in sys.path:
 
 import json
 import shutil
-#from graphql_server import json_encode
 from PIL import Image
 
 from assets.db_models.asset_type import AssetTypeModel
@@ -26,9 +25,7 @@ from users.db_models.user import UserModel, ADMIN, GUEST
 from upstage_options.db_models.config import ConfigModel
 from global_config.helpers.fernet_crypto import encrypt
 from global_config.env import UPLOAD_USER_CONTENT_FOLDER, DEMO_MEDIA_FOLDER
-from global_config.database import global_session
-
-DBSession = global_session
+from global_config.database import ScopedSession
 
 
 class bcolors:
@@ -43,18 +40,6 @@ class bcolors:
     UNDERLINE = "\033[4m"
 
 
-"""
-if ENV_TYPE == 'Production':
-    print(bcolors.FAIL + "This script is not meant to be run in production." + bcolors.ENDC)
-    exit()
-"""
-
-owner_id = 0
-
-owner = DBSession.query(UserModel).filter(UserModel.username == "admin").first()
-owner_id = owner.id
-
-
 def scan_demo_folder():
     for type in os.listdir(DEMO_MEDIA_FOLDER):
         if "." not in type:
@@ -62,7 +47,6 @@ def scan_demo_folder():
                 yield type, media
 
 
-created_media_ids = []
 upload_assets_folder = "{}".format(UPLOAD_USER_CONTENT_FOLDER)
 
 
@@ -101,21 +85,20 @@ def down_size(size):
     return w, h
 
 
-def create_media(type, path):
+def create_media(session, type, path, owner_id, created_media_ids):
     asset_type = (
-        DBSession.query(AssetTypeModel).filter(AssetTypeModel.name == type).first()
+        session.query(AssetTypeModel).filter(AssetTypeModel.name == type).first()
     )
     if not asset_type:
         asset_type = AssetTypeModel(name=type, file_location="")
-        DBSession.add(asset_type)
-        DBSession.commit()
+        session.add(asset_type)
+        session.flush()
 
     asset = AssetModel(asset_type=asset_type, owner_id=owner_id, file_location="")
     attributes = {}
     size = 0
     if "." in path:
         asset.name = os.path.basename(path).split(".")[0]
-        # copy asset to uploads folder
         src_path = os.path.join(DEMO_MEDIA_FOLDER, type, path)
         dest_path = os.path.join(type, path)
         logger.warning(src_path, dest_path)
@@ -140,8 +123,8 @@ def create_media(type, path):
 
     asset.description = json.dumps(attributes)
     asset.size = size
-    DBSession.add(asset)
-    DBSession.commit()
+    session.add(asset)
+    session.flush()
     created_media_ids.append(asset.id)
     logger.warning(
         "✅ Created{} {} {}".format(
@@ -150,13 +133,13 @@ def create_media(type, path):
     )
 
 
-def create_demo_media():
+def create_demo_media(session, owner_id, created_media_ids):
     for type, path in scan_demo_folder():
-        create_media(type, path)
+        create_media(session, type, path, owner_id, created_media_ids)
 
 
-def create_demo_stage():
-    if DBSession.query(StageModel).filter(StageModel.name == "Demo").first():
+def create_demo_stage(session, owner_id, created_media_ids):
+    if session.query(StageModel).filter(StageModel.name == "Demo").first():
         logger.warning('⏩ A stage named "Demo" already exists.')
         return
     stage = StageModel(
@@ -177,25 +160,22 @@ def create_demo_stage():
     cover = StageAttributeModel(name="cover", description=cover_path, stage=stage)
     stage.attributes.append(cover)
 
-    all_users = [x.id for x in DBSession.query(UserModel.id).all()]
+    all_users = [x.id for x in session.query(UserModel.id).all()]
     accesses = [[], all_users]
     player_access = StageAttributeModel(
         name="playerAccess", description=json.dumps(accesses), stage=stage
     )
     stage.attributes.append(player_access)
 
-    DBSession.add(stage)
-    DBSession.commit()
+    session.add(stage)
+    session.flush()
     for media_id in created_media_ids:
-        DBSession.add(ParentStageModel(stage_id=stage.id, child_asset_id=media_id))
-    DBSession.commit()
+        session.add(ParentStageModel(stage_id=stage.id, child_asset_id=media_id))
+    session.flush()
     logger.warning("✅ Created demo stage")
 
 
-def create_demo_users():
-    # - Super Admin: with email address support@upstage.live
-    # - Guest: one guest account?
-    # - Probably no other users as default
+def create_demo_users(session):
     admin_username = "admin"
     guest_username = "guest"
     admin_email = "support@upstage.live"
@@ -203,8 +183,8 @@ def create_demo_users():
     test_user_password = "12345678"
 
     if (
-        DBSession.query(UserModel).filter(UserModel.username == admin_username).first()
-        or DBSession.query(UserModel).filter(UserModel.email == admin_email).first()
+        session.query(UserModel).filter(UserModel.username == admin_username).first()
+        or session.query(UserModel).filter(UserModel.email == admin_email).first()
     ):
         logger.warning(
             '⏩ An admin user with email "{}" already exists.'.format(admin_email)
@@ -216,7 +196,7 @@ def create_demo_users():
         admin.email = admin_email
         admin.role = ADMIN
         admin.active = True
-        DBSession.add(admin)
+        session.add(admin)
         logger.warning(
             '✅ Created admin account with credentials: "{}" and password "{}"'.format(
                 admin_username, test_user_password
@@ -224,8 +204,8 @@ def create_demo_users():
         )
 
     if (
-        DBSession.query(UserModel).filter(UserModel.username == guest_username).first()
-        or DBSession.query(UserModel).filter(UserModel.email == guest_email).first()
+        session.query(UserModel).filter(UserModel.username == guest_username).first()
+        or session.query(UserModel).filter(UserModel.email == guest_email).first()
     ):
         logger.warning(
             '⏩ A guest user with email "{}" already exists.'.format(guest_username)
@@ -237,46 +217,57 @@ def create_demo_users():
         guest.email = guest_email
         guest.role = GUEST
         guest.active = True
-        DBSession.add(guest)
+        session.add(guest)
         logger.warning(
             '✅ Created guest account with credentials: "{}" and password "{}"'.format(
                 guest_username, test_user_password
             )
         )
+    session.flush()
 
-    DBSession.commit()
 
-
-def save_config(name, value):
-    config = DBSession.query(ConfigModel).filter(ConfigModel.name == name).first()
+def save_config(session, name, value):
+    config = session.query(ConfigModel).filter(ConfigModel.name == name).first()
     if config:
         config.value = value
     else:
         config = ConfigModel(name=name, value=value)
-        DBSession.add(config)
-    DBSession.commit()
+        session.add(config)
+    session.flush()
 
 
-def scaffold_foyer():
-    save_config("FOYER_TITLE", "Your New UpStage")
+def scaffold_foyer(session):
+    save_config(session, "FOYER_TITLE", "Your New UpStage")
     save_config(
+        session,
         "FOYER_DESCRIPTION",
         "Welcome to your new UpStage! Log in to get started.",
     )
     logger.warning("✅ Foyer Scaffolding Completed")
 
 
-def scaffold_system_configuration():
+def scaffold_system_configuration(session):
     save_config(
+        session,
         "TERMS_OF_SERVICE",
         "https://raw.githubusercontent.com/upstage-org/upstage/main/LICENSE",
     )
-    save_config("MANUAL", "https://docs.upstage.live")
+    save_config(session, "MANUAL", "https://docs.upstage.live")
     logger.warning("✅ System Configuration Scaffolding Completed")
 
 
-create_demo_media()
-create_demo_stage()
-create_demo_users()
-scaffold_foyer()
-scaffold_system_configuration()
+def main():
+    created_media_ids = []
+    with ScopedSession() as s:
+        owner = s.query(UserModel).filter(UserModel.username == "admin").first()
+        owner_id = owner.id if owner else 0
+
+        create_demo_media(s, owner_id, created_media_ids)
+        create_demo_stage(s, owner_id, created_media_ids)
+        create_demo_users(s)
+        scaffold_foyer(s)
+        scaffold_system_configuration(s)
+
+
+if __name__ == "__main__":
+    main()
