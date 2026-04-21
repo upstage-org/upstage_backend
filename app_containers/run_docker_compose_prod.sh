@@ -5,6 +5,7 @@ export HARDCODED_HOSTNAME=upstage.live
 
 set -a
 
+cp -r ../pyproject.toml /app_code
 cp -r ../src /app_code
 cp -r ../alembic /app_code
 cp -r ../scripts /app_code
