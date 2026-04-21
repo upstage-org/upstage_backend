@@ -1,3 +1,4 @@
+aiomqtt
 aiosmtplib
 alembic 
 ariadne

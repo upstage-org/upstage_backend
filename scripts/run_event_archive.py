@@ -1,21 +1,35 @@
 #!/usr/bin/env python
 # -*- coding: iso8859-15 -*-
+"""
+Entry point for the event_archive service.
+
+Hands control to src.event_archive.main.main(), which runs a single
+asyncio.TaskGroup containing the MQTT subscriber and N Postgres writers.
+Non-zero exit on any task failure so Docker restarts the container.
+
+Runs from any CWD, with or without PYTHONPATH set: this script resolves
+its own location via __file__ and puts the project root and src/ on
+sys.path before any project imports.
+"""
 import os
 import sys
 
-appdir = os.path.abspath(os.path.dirname(__file__))
-projdir = os.path.abspath(os.path.join(appdir, ".."))
-if projdir not in sys.path:
-    sys.path.append(appdir)
-    sys.path.append(projdir)
+_here = os.path.abspath(os.path.dirname(__file__))
+_project_root = os.path.abspath(os.path.join(_here, ".."))
+_src_dir = os.path.join(_project_root, "src")
+for _p in (_here, _project_root, _src_dir):
+    if _p not in sys.path:
+        sys.path.insert(0, _p)
 
-from src.global_config import MQTT_ADMIN_USER, MQTT_ADMIN_PASSWORD, MQTT_BROKER, MQTT_ADMIN_PORT
-from src.event_archive.systems.system import run
-from src.event_archive.messages.mqtt import build_client
+import asyncio
+
+from src.event_archive.main import main
+
 
 if __name__ == "__main__":
-    run()
-    mqtt_client = build_client()
-    mqtt_client.username_pw_set(MQTT_ADMIN_USER, MQTT_ADMIN_PASSWORD)
-    mqtt_client.connect(MQTT_BROKER, MQTT_ADMIN_PORT)
-    mqtt_client.loop_forever()
+    try:
+        asyncio.run(main())
+    except KeyboardInterrupt:
+        sys.exit(0)
+    except BaseException:
+        sys.exit(1)

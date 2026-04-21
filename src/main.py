@@ -13,6 +13,7 @@ from fastapi_exception import FastApiException
 from fastapi_global_variable import GlobalVariable
 from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
+from starlette.requests import Request
 
 from src.global_config import ENV_TYPE, config_graphql_endpoints, HOSTNAME
 
@@ -50,5 +51,17 @@ def start_app():
 
 app = FastAPI(title="upstage", lifespan=lifespan)
 GlobalVariable.set("app", app)
+
+
+@app.middleware("http")
+async def no_store_api_responses(request: Request, call_next):
+    """Prevent CDN/browser caching of dynamic API responses (e.g. Cloudflare POST cache rules)."""
+    response = await call_next(request)
+    path = request.url.path
+    if path.startswith("/api/"):
+        response.headers["Cache-Control"] = "private, no-store, must-revalidate"
+        response.headers["Pragma"] = "no-cache"
+    return response
+
 
 start_app()
