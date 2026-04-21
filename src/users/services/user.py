@@ -133,7 +133,7 @@ class UserService:
 
         if not outcome["success"]:
             raise GraphQLError(
-                "We think you are not a human! " + ", ".join(outcome["error-codes"] + " " + outcome)
+                "We think you are not a human! " + ", ".join(outcome["error-codes"])
             )
 
     def update(self, user: UserModel):
