@@ -19,16 +19,19 @@ from global_config.db_context import (
 )
 
 
-def _make_graphql_context(request):
+def _make_graphql_context(request, data=None):
     """
     Expose the request-scoped SQLAlchemy session on info.context["db"].
 
-    Resolvers may call info.context["db"] or global_config.get_session()
-    interchangeably. In the normal HTTP path the FastAPI middleware has
-    already opened a session; here we just reuse it. Pure ASGI/WebSocket
-    entry points never run HTTP middleware, so as a fallback we open a
-    Session for the duration of the connection and bind it to the
-    contextvar so get_session() works inside resolvers too.
+    Ariadne's ASGI handler calls this with (request, data) for HTTP and
+    (websocket, data) for subscriptions, so we accept both positional
+    shapes. Resolvers may use info.context["db"] or
+    global_config.get_session() interchangeably.
+
+    On the normal HTTP path the FastAPI middleware has already opened a
+    session; here we just reuse it. Pure ASGI/WebSocket entry points
+    never run HTTP middleware, so as a fallback we open a Session and
+    bind it to the contextvar so get_session() works in resolvers too.
     """
     existing = current_session_or_none()
     if existing is not None:
