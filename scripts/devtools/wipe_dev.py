@@ -3,25 +3,19 @@ import sys
 
 import pathlib
 
-appdir = os.path.abspath(os.path.dirname(__file__))
-projdir = os.path.abspath(os.path.join(appdir, "../.."))
-if projdir not in sys.path:
-    sys.path.append(appdir)
-    sys.path.append(projdir)
-
 from sqlalchemy import not_
 from terminal_colors import bcolors
-from src.global_config import UPLOAD_USER_CONTENT_FOLDER, ScopedSession, logger
-from src.assets.db_models.asset import AssetModel
-from src.assets.db_models.asset_license import AssetLicenseModel
-from src.assets.db_models.asset_usage import AssetUsageModel
-from src.assets.db_models.media_tag import MediaTagModel
-from src.event_archive.db_models.event import EventModel
-from src.performance_config.db_models.performance import PerformanceModel
-from src.stages.db_models.stage import StageModel
-from src.stages.db_models.parent_stage import ParentStageModel
-from src.stages.db_models.stage_attribute import StageAttributeModel
-from src.performance_config.db_models.scene import SceneModel
+from upstage_backend.global_config import UPLOAD_USER_CONTENT_FOLDER, ScopedSession, logger
+from upstage_backend.assets.db_models.asset import AssetModel
+from upstage_backend.assets.db_models.asset_license import AssetLicenseModel
+from upstage_backend.assets.db_models.asset_usage import AssetUsageModel
+from upstage_backend.assets.db_models.media_tag import MediaTagModel
+from upstage_backend.event_archive.db_models.event import EventModel
+from upstage_backend.performance_config.db_models.performance import PerformanceModel
+from upstage_backend.stages.db_models.stage import StageModel
+from upstage_backend.stages.db_models.parent_stage import ParentStageModel
+from upstage_backend.stages.db_models.stage_attribute import StageAttributeModel
+from upstage_backend.performance_config.db_models.scene import SceneModel
 
 stages_to_be_kepts = ["8thMarch"]
 

@@ -2,18 +2,12 @@
 import os
 import sys
 
-appdir = os.path.abspath(os.path.dirname(__file__))
-projdir = os.path.abspath(os.path.join(appdir, "./src"))
-if projdir not in sys.path:
-    sys.path.append(appdir)
-    sys.path.append(projdir)
-
 import time
 import pytest
 from sqlalchemy import create_engine, text
 from starlette.testclient import TestClient
-from src.global_config import env, logger
-from src.main import app
+from upstage_backend.global_config import env, logger
+from upstage_backend.main import app
 
 
 @pytest.fixture(scope='session')

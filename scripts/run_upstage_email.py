@@ -3,13 +3,7 @@
 import os
 import sys
 
-appdir = os.path.abspath(os.path.dirname(__file__))
-projdir = os.path.abspath(os.path.join(appdir, ".."))
-if projdir not in sys.path:
-    sys.path.append(appdir)
-    sys.path.append(projdir)
-
-from src.mails.helpers.mail import generate_email_token_clients
+from upstage_backend.mails.helpers.mail import generate_email_token_clients
 import asyncio
 
 if __name__ == "__main__":

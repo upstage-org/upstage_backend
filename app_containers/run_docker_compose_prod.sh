@@ -10,6 +10,7 @@ cp -r ../alembic /app_code
 cp -r ../scripts /app_code
 cp -r ../dashboard/demo /app_code
 cp -r ../requirements.txt /app_code
+cp -r ../pyproject.toml /app_code
 cp -r ../migration_scripts /app_code
 
 docker compose -f ./docker-compose-prod.yaml -p upstage-backend-prod down

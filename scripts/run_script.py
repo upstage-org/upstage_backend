@@ -2,7 +2,7 @@
 from os import listdir
 import sys
 import devtools.wipe_dev
-from src.global_config import logger
+from upstage_backend.global_config import logger
 
 
 class bcolors:

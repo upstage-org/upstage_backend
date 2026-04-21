@@ -1,0 +1,55 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "upstage-backend"
+version = "0.0.0"
+description = "UpStage backend (FastAPI + Ariadne GraphQL + SQLAlchemy + aiomqtt)."
+requires-python = ">=3.12"
+# Mirrors requirements.txt verbatim. Keeping it unpinned here so behaviour
+# matches the existing dev/prod containers; tighten later in a separate PR.
+dependencies = [
+    "aiomqtt",
+    "aiosmtplib",
+    "alembic",
+    "ariadne",
+    "arrow",
+    "asyncpg",
+    "coverage",
+    "cryptography",
+    "databases",
+    "email-validator",
+    "faker",
+    "fastapi",
+    "fastapi_exception",
+    "fastapi_global_variable",
+    "fastapi_pagination",
+    "graphql_server",
+    "hypercorn",
+    "loguru",
+    "paho-mqtt",
+    "Pillow",
+    "psycopg2-binary",
+    "pydash",
+    "pyjwt",
+    "pymongo",
+    "pyotp",
+    "pytest",
+    "python-dotenv",
+    "ruff",
+    "sentry_sdk",
+    "sqlalchemy",
+    "stripe",
+    "terminal_colors",
+    "typing_inspect",
+    "uvicorn",
+    "PyMuPDF",
+    "reportlab",
+]
+
+# `pip install -e .` makes `upstage_backend` importable from anywhere; no
+# PYTHONPATH manipulation, no sys.path headers, no `from src.X` imports.
+[tool.setuptools.packages.find]
+where = ["src"]
+include = ["upstage_backend*"]

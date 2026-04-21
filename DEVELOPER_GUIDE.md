@@ -11,8 +11,8 @@ Technically, UpStage is three cooperating runtimes:
 | Runtime | Purpose | Lives in |
 |---|---|---|
 | Frontend SPA | Vue 3 + Vuex UI for players and audience, talks GraphQL + MQTT over WebSocket | [`prod_copy/upstage_frontend/`](upstage_frontend/) |
-| HTTP / GraphQL backend | FastAPI + Ariadne schema, JWT auth, media storage, stage CRUD, recording | [`prod_copy/upstage_backend/src/`](upstage_backend/src/) |
-| Event archive worker | Async MQTT subscriber that persists live events into Postgres | [`prod_copy/upstage_backend/src/event_archive/`](upstage_backend/src/event_archive/) |
+| HTTP / GraphQL backend | FastAPI + Ariadne schema, JWT auth, media storage, stage CRUD, recording | [`prod_copy/upstage_backend/src/upstage_backend/`](upstage_backend/src/upstage_backend/) |
+| Event archive worker | Async MQTT subscriber that persists live events into Postgres | [`prod_copy/upstage_backend/src/upstage_backend/event_archive/`](upstage_backend/src/upstage_backend/event_archive/) |
 
 Infrastructure: Mosquitto (MQTT broker), Postgres (primary data store, including the live event log), MongoDB (email-token collection only), and an object/file store for uploaded media.
 
@@ -56,6 +56,19 @@ Two transport channels exist between the browser and the server:
 
 ## 3. Services and deployment
 
+### 3.0. Local setup: one editable install
+
+The backend is a standard src-layout Python package, declared in [`upstage_backend/pyproject.toml`](upstage_backend/pyproject.toml). Once per workstation:
+
+```bash
+cd prod_copy/upstage_backend
+pip install -e .
+```
+
+That makes `upstage_backend` importable from any directory, so `uvicorn upstage_backend.main:app`, `pytest`, `alembic`, and ad-hoc `python3 -m scripts.run_event_archive` all work with no `PYTHONPATH` exports, no `sys.path` headers, and no `from src.X` imports. The container images do the same: `requirements.txt` is a one-line `-e .`, which triggers the editable install at container start.
+
+### 3.1. Compose services
+
 The backend compose file declares three app services that share one network:
 
 ```50:112:upstage_backend/app_containers/docker-compose-dev.yaml
@@ -66,7 +79,6 @@ services:
     command: >
       /bin/bash -c "
       cd /usr/app &&
-      export PYTHONPATH=$(pwd)/src &&
       pip install --upgrade pip &&
       pip install -r ./requirements.txt &&
       export HARDCODED_HOSTNAME=${HARDCODED_HOSTNAME} &&
@@ -88,12 +100,12 @@ services:
 [`upstage_backend/scripts/start_upstage.sh`](upstage_backend/scripts/start_upstage.sh) pins it together:
 
 ```1:5:upstage_backend/scripts/start_upstage.sh
-uvicorn src.main:app --proxy-headers --forwarded-allow-ips='*' --host 0.0.0.0 --port 3000
+uvicorn upstage_backend.main:app --proxy-headers --forwarded-allow-ips='*' --host 0.0.0.0 --port 3000
 ```
 
-The ASGI app is defined in [`upstage_backend/src/main.py`](upstage_backend/src/main.py):
+The ASGI app is defined in [`upstage_backend/src/upstage_backend/main.py`](upstage_backend/src/upstage_backend/main.py):
 
-```45:67:upstage_backend/src/main.py
+```45:67:upstage_backend/src/upstage_backend/main.py
 def start_app():
     bootstrap = Bootstrap(app)
     add_cors_middleware(app)
@@ -122,21 +134,21 @@ Every folder under `upstage_backend/src/` is a bounded context. They all expose 
 
 | Module | Responsibility |
 |---|---|
-| [`authentication/`](upstage_backend/src/authentication/) | JWT-based login, password reset, user registration helpers |
-| [`users/`](upstage_backend/src/users/) | User CRUD, roles, licences association |
-| [`stages/`](upstage_backend/src/stages/) | Stage CRUD, join/load, event replay, sweep, duplicate, scenes |
-| [`assets/`](upstage_backend/src/assets/) | Media catalogue, asset usage, copyright levels |
-| [`files/`](upstage_backend/src/files/) | Upload handling, thumbnails |
-| [`mails/`](upstage_backend/src/mails/) | System email, email-token Mongo collection |
-| [`licenses/`](upstage_backend/src/licenses/) | Licence keys, access checks |
-| [`payments/`](upstage_backend/src/payments/) | Stripe integration |
-| [`performance_config/`](upstage_backend/src/performance_config/) | Performances (archived stage snapshots) and recordings |
-| [`studio_management/`](upstage_backend/src/studio_management/) | Umbrella GraphQL schema and top-level `Query` / `Mutation` wiring |
-| [`upstage_options/`](upstage_backend/src/upstage_options/) | Runtime options / config table |
-| [`upstage_stats/`](upstage_backend/src/upstage_stats/) | Separate process for aggregating statistics events |
-| [`event_archive/`](upstage_backend/src/event_archive/) | Async MQTT-to-Postgres event persistence (this guide's section 8) |
-| [`global_config/`](upstage_backend/src/global_config/) | DB engine, env vars, loggers, shared base model, JWT decorator |
-| [`main.py`](upstage_backend/src/main.py) | FastAPI entrypoint, CORS, cache headers |
+| [`authentication/`](upstage_backend/src/upstage_backend/authentication/) | JWT-based login, password reset, user registration helpers |
+| [`users/`](upstage_backend/src/upstage_backend/users/) | User CRUD, roles, licences association |
+| [`stages/`](upstage_backend/src/upstage_backend/stages/) | Stage CRUD, join/load, event replay, sweep, duplicate, scenes |
+| [`assets/`](upstage_backend/src/upstage_backend/assets/) | Media catalogue, asset usage, copyright levels |
+| [`files/`](upstage_backend/src/upstage_backend/files/) | Upload handling, thumbnails |
+| [`mails/`](upstage_backend/src/upstage_backend/mails/) | System email, email-token Mongo collection |
+| [`licenses/`](upstage_backend/src/upstage_backend/licenses/) | Licence keys, access checks |
+| [`payments/`](upstage_backend/src/upstage_backend/payments/) | Stripe integration |
+| [`performance_config/`](upstage_backend/src/upstage_backend/performance_config/) | Performances (archived stage snapshots) and recordings |
+| [`studio_management/`](upstage_backend/src/upstage_backend/studio_management/) | Umbrella GraphQL schema and top-level `Query` / `Mutation` wiring |
+| [`upstage_options/`](upstage_backend/src/upstage_backend/upstage_options/) | Runtime options / config table |
+| [`upstage_stats/`](upstage_backend/src/upstage_backend/upstage_stats/) | Separate process for aggregating statistics events |
+| [`event_archive/`](upstage_backend/src/upstage_backend/event_archive/) | Async MQTT-to-Postgres event persistence (this guide's section 8) |
+| [`global_config/`](upstage_backend/src/upstage_backend/global_config/) | DB engine, env vars, loggers, shared base model, JWT decorator |
+| [`main.py`](upstage_backend/src/upstage_backend/main.py) | FastAPI entrypoint, CORS, cache headers |
 
 ### Frontend module layout
 
@@ -159,11 +171,11 @@ Every folder under `upstage_backend/src/` is a bounded context. They all expose 
 
 ### 4.1 GraphQL endpoint
 
-Exposed at `/api/graphql` on the backend, with the schema composed in [`upstage_backend/src/studio_management/http/graphql.py`](upstage_backend/src/studio_management/http/graphql.py). It contains one root `Query`, one root `Mutation`, and shared type definitions like `Stage`, `Event`, `Performance`, `Asset`, `User`, `Scene`, and `License`.
+Exposed at `/api/graphql` on the backend, with the schema composed in [`upstage_backend/src/upstage_backend/studio_management/http/graphql.py`](upstage_backend/src/upstage_backend/studio_management/http/graphql.py). It contains one root `Query`, one root `Mutation`, and shared type definitions like `Stage`, `Event`, `Performance`, `Asset`, `User`, `Scene`, and `License`.
 
-Representative mutations (see [`upstage_backend/src/studio_management/http/graphql.py`](upstage_backend/src/studio_management/http/graphql.py) lines 632-690):
+Representative mutations (see [`upstage_backend/src/upstage_backend/studio_management/http/graphql.py`](upstage_backend/src/upstage_backend/studio_management/http/graphql.py) lines 632-690):
 
-```632:691:upstage_backend/src/studio_management/http/graphql.py
+```632:691:upstage_backend/src/upstage_backend/studio_management/http/graphql.py
 type Mutation {
     batchUserCreation(users: [BatchUserInput]!): BatchUserCreationPayload
     updateUser(input: UpdateUserInput!): User
@@ -194,7 +206,7 @@ type Mutation {
 
 Representative queries (lines 695-730):
 
-```695:730:upstage_backend/src/studio_management/http/graphql.py
+```695:730:upstage_backend/src/upstage_backend/studio_management/http/graphql.py
 type Query {
     ...
     media(input: MediaTableInput!): AssetConnection!
@@ -210,7 +222,7 @@ type Query {
 
 The `Stage` type embeds live event data so a single `stageList` query reconstructs everything needed to render a stage:
 
-```339:355:upstage_backend/src/studio_management/http/graphql.py
+```339:355:upstage_backend/src/upstage_backend/studio_management/http/graphql.py
 status: String
 visibility: Boolean
 cover: String
@@ -358,7 +370,7 @@ mqtt.sendMessage(TOPICS.BACKGROUND, {
 
 ### 4.3 HTTP
 
-- `POST /api/graphql` — the sole GraphQL endpoint. The middleware in [`upstage_backend/src/main.py`](upstage_backend/src/main.py) lines 56-64 sets `Cache-Control: private, no-store, must-revalidate` on every `/api/*` response so proxies and browsers never cache authenticated responses.
+- `POST /api/graphql` — the sole GraphQL endpoint. The middleware in [`upstage_backend/src/upstage_backend/main.py`](upstage_backend/src/upstage_backend/main.py) lines 56-64 sets `Cache-Control: private, no-store, must-revalidate` on every `/api/*` response so proxies and browsers never cache authenticated responses.
 - CORS allows any origin in non-production, locked down to the configured `HOSTNAME` in production (lines 26-34).
 - Uploaded media are served statically from the `uploads/` volume (see [`docker-compose-dev.yaml`](upstage_backend/app_containers/docker-compose-dev.yaml) line 63).
 
@@ -421,20 +433,20 @@ The MQTT client lives at [`upstage_frontend/src/services/mqtt.ts`](upstage_front
 
 ### 5.3 Authentication
 
-[`upstage_backend/src/authentication/services/auth.py`](upstage_backend/src/authentication/services/auth.py) implements JWT login and token refresh. The `@authenticated` decorator in [`upstage_backend/src/global_config/decorators/authenticated.py`](upstage_backend/src/global_config/decorators/authenticated.py) guards resolvers; the frontend stores tokens and injects them via [`upstage_frontend/src/apollo.ts`](upstage_frontend/src/apollo.ts) (Apollo client) or `graphql-request` wrappers per module.
+[`upstage_backend/src/upstage_backend/authentication/services/auth.py`](upstage_backend/src/upstage_backend/authentication/services/auth.py) implements JWT login and token refresh. The `@authenticated` decorator in [`upstage_backend/src/upstage_backend/global_config/decorators/authenticated.py`](upstage_backend/src/upstage_backend/global_config/decorators/authenticated.py) guards resolvers; the frontend stores tokens and injects them via [`upstage_frontend/src/apollo.ts`](upstage_frontend/src/apollo.ts) (Apollo client) or `graphql-request` wrappers per module.
 
 ### 5.4 Media upload and assignment
 
 1. Browser base64-encodes the file and calls `uploadMedia(input: UploadMediaInput!)` or `uploadFile(base64, filename)`.
-2. [`upstage_backend/src/stages/services/media.py`](upstage_backend/src/stages/services/media.py) writes to `uploads/` (see `_get_physical_path`, lines 226-230).
+2. [`upstage_backend/src/upstage_backend/stages/services/media.py`](upstage_backend/src/upstage_backend/stages/services/media.py) writes to `uploads/` (see `_get_physical_path`, lines 226-230).
 3. `AssetModel` rows record filename, copyright level, owner.
 4. `assignMedia` / `assignStages` cross-link an asset to a stage.
 
 ### 5.5 Sweep and performances
 
-A "performance" is an archived snapshot of a stage's live event stream, created by the `sweepStage` mutation. See [`upstage_backend/src/stages/services/stage.py`](upstage_backend/src/stages/services/stage.py):
+A "performance" is an archived snapshot of a stage's live event stream, created by the `sweepStage` mutation. See [`upstage_backend/src/upstage_backend/stages/services/stage.py`](upstage_backend/src/upstage_backend/stages/services/stage.py):
 
-```460:489:upstage_backend/src/stages/services/stage.py
+```460:489:upstage_backend/src/upstage_backend/stages/services/stage.py
 def sweep_stage(self, user: UserModel, id: int):
     session = get_session()
     stage = (
@@ -471,9 +483,9 @@ Mechanism:
 - During sweep: all matching NULL rows are bulk-assigned a new `PerformanceModel.id`.
 - After sweep: the live view sees zero rows (fresh stage). Operators can replay the archive by calling `stageList(input: { fileLocation, performanceId })`.
 
-Event reads always come from Postgres, see [`upstage_backend/src/stages/services/stage_operation.py`](upstage_backend/src/stages/services/stage_operation.py):
+Event reads always come from Postgres, see [`upstage_backend/src/upstage_backend/stages/services/stage_operation.py`](upstage_backend/src/upstage_backend/stages/services/stage_operation.py):
 
-```91:102:upstage_backend/src/stages/services/stage_operation.py
+```91:102:upstage_backend/src/upstage_backend/stages/services/stage_operation.py
 def get_event_list(self, input: StageStreamInput, stage: StageModel):
     session = get_session()
     cursor = input.cursor if input.cursor else 0
@@ -490,11 +502,11 @@ def get_event_list(self, input: StageStreamInput, stage: StageModel):
 
 ### 5.6 Recording
 
-`startRecording` creates a performance row and flags recording mode; subsequent live events are still archived but the frontend also marks the session on the performance. `saveRecording` finalises the row. See [`upstage_backend/src/performance_config/services/performance.py`](upstage_backend/src/performance_config/services/performance.py).
+`startRecording` creates a performance row and flags recording mode; subsequent live events are still archived but the frontend also marks the session on the performance. `saveRecording` finalises the row. See [`upstage_backend/src/upstage_backend/performance_config/services/performance.py`](upstage_backend/src/upstage_backend/performance_config/services/performance.py).
 
 ## 6. Data model
 
-All tables share [`upstage_backend/src/global_config/db_models/base.py`](upstage_backend/src/global_config/db_models/base.py)'s `BaseModel`.
+All tables share [`upstage_backend/src/upstage_backend/global_config/db_models/base.py`](upstage_backend/src/upstage_backend/global_config/db_models/base.py)'s `BaseModel`.
 
 | Table | Module | Key columns | Purpose |
 |---|---|---|---|
@@ -510,7 +522,7 @@ All tables share [`upstage_backend/src/global_config/db_models/base.py`](upstage
 
 The `EventModel` is the only row any writer (live archive) or reader (stage load, sweep) of the event log ever touches:
 
-```21:28:upstage_backend/src/event_archive/db_models/event.py
+```21:28:upstage_backend/src/upstage_backend/event_archive/db_models/event.py
 class EventModel(BaseModel):
     __tablename__ = "events"
     id = Column(Integer, primary_key=True)
@@ -521,7 +533,7 @@ class EventModel(BaseModel):
     created = Column(DateTime, default=datetime.datetime.now, index=True)
 ```
 
-MongoDB is used only for time-expiring email verification tokens; see [`upstage_backend/src/event_archive/config/mongodb.py`](upstage_backend/src/event_archive/config/mongodb.py) `build_mongo_email_client` / `get_mongo_token_collection` (used by [`upstage_backend/src/mails/helpers/mail.py`](upstage_backend/src/mails/helpers/mail.py) line 49).
+MongoDB is used only for time-expiring email verification tokens; see [`upstage_backend/src/upstage_backend/event_archive/config/mongodb.py`](upstage_backend/src/upstage_backend/event_archive/config/mongodb.py) `build_mongo_email_client` / `get_mongo_token_collection` (used by [`upstage_backend/src/upstage_backend/mails/helpers/mail.py`](upstage_backend/src/upstage_backend/mails/helpers/mail.py) line 49).
 
 ## 7. Database session management (hybrid contextvar model)
 
@@ -542,8 +554,8 @@ flowchart LR
   MW -->|"commit/rollback/close<br/>on response"| S
 ```
 
-- The FastAPI middleware in [`upstage_backend/src/main.py`](upstage_backend/src/main.py) wraps every HTTP request in `request_session()` from [`src/global_config/db_context.py`](upstage_backend/src/global_config/db_context.py). That context manager calls `SessionFactory()`, binds the resulting `Session` on a `ContextVar`, commits on clean exit, rolls back on exception, and always closes.
-- The Ariadne `context_value` builder in [`src/global_config/schema.py`](upstage_backend/src/global_config/schema.py) pulls the same session off the contextvar and exposes it as `info.context["db"]` for resolvers that prefer that style.
+- The FastAPI middleware in [`upstage_backend/src/upstage_backend/main.py`](upstage_backend/src/upstage_backend/main.py) wraps every HTTP request in `request_session()` from [`src/upstage_backend/global_config/db_context.py`](upstage_backend/src/upstage_backend/global_config/db_context.py). That context manager calls `SessionFactory()`, binds the resulting `Session` on a `ContextVar`, commits on clean exit, rolls back on exception, and always closes.
+- The Ariadne `context_value` builder in [`src/upstage_backend/global_config/schema.py`](upstage_backend/src/upstage_backend/global_config/schema.py) pulls the same session off the contextvar and exposes it as `info.context["db"]` for resolvers that prefer that style.
 - Every service method and resolver body reads the session with:
 
   ```python
@@ -558,7 +570,7 @@ flowchart LR
 
 ### 7.2 Track B: explicit scope (scripts, workers, background tasks)
 
-Anything that is not inside a request uses the context-manager `ScopedSession` from [`src/global_config/database.py`](upstage_backend/src/global_config/database.py):
+Anything that is not inside a request uses the context-manager `ScopedSession` from [`src/upstage_backend/global_config/database.py`](upstage_backend/src/upstage_backend/global_config/database.py):
 
 ```python
 from global_config.database import ScopedSession
@@ -572,15 +584,15 @@ with ScopedSession() as s:
 
 Used by:
 
-- Dev/seed scripts: [`src/users/scripts/create_test_users.py`](upstage_backend/src/users/scripts/create_test_users.py), [`src/stages/scripts/scaffold_base_media.py`](upstage_backend/src/stages/scripts/scaffold_base_media.py), [`scripts/devtools/wipe_dev.py`](upstage_backend/scripts/devtools/wipe_dev.py).
-- Stats worker: [`src/upstage_stats/mqtt.py`](upstage_backend/src/upstage_stats/mqtt.py) opens a fresh `ScopedSession` per persisted stat, because the `paho-mqtt` callbacks are not in a request.
-- Background email tasks: [`src/mails/helpers/mail.py`](upstage_backend/src/mails/helpers/mail.py) uses `ScopedSession` because token sending runs in `asyncio.create_task` that can outlive the HTTP request that triggered it.
+- Dev/seed scripts: [`src/upstage_backend/users/scripts/create_test_users.py`](upstage_backend/src/upstage_backend/users/scripts/create_test_users.py), [`src/upstage_backend/stages/scripts/scaffold_base_media.py`](upstage_backend/src/upstage_backend/stages/scripts/scaffold_base_media.py), [`scripts/devtools/wipe_dev.py`](upstage_backend/scripts/devtools/wipe_dev.py).
+- Stats worker: [`src/upstage_backend/upstage_stats/mqtt.py`](upstage_backend/src/upstage_backend/upstage_stats/mqtt.py) opens a fresh `ScopedSession` per persisted stat, because the `paho-mqtt` callbacks are not in a request.
+- Background email tasks: [`src/upstage_backend/mails/helpers/mail.py`](upstage_backend/src/upstage_backend/mails/helpers/mail.py) uses `ScopedSession` because token sending runs in `asyncio.create_task` that can outlive the HTTP request that triggered it.
 
 `ScopedSession` shares the same `SessionFactory` (and therefore the same engine config) as the request path, so test-harness overrides swap both at once.
 
 ### 7.3 Track C: async event archive
 
-The `event_archive` service (section 8) is intentionally not part of either track above. It owns its own `AsyncSessionLocal` in [`src/event_archive/db.py`](upstage_backend/src/event_archive/db.py) because `aiomqtt` and `asyncpg` need the SQLAlchemy async API. One transaction per event, committed inside `async with session.begin():`. There is no contextvar bridge between the archive and the HTTP app.
+The `event_archive` service (section 8) is intentionally not part of either track above. It owns its own `AsyncSessionLocal` in [`src/upstage_backend/event_archive/db.py`](upstage_backend/src/upstage_backend/event_archive/db.py) because `aiomqtt` and `asyncpg` need the SQLAlchemy async API. One transaction per event, committed inside `async with session.begin():`. There is no contextvar bridge between the archive and the HTTP app.
 
 ### 7.4 `DBSession` deprecation alias
 
@@ -629,7 +641,7 @@ flowchart LR
 Entrypoint: [`upstage_backend/scripts/run_event_archive.py`](upstage_backend/scripts/run_event_archive.py):
 
 ```26:34:upstage_backend/scripts/run_event_archive.py
-from src.event_archive.main import main
+from upstage_backend.event_archive.main import main
 
 
 if __name__ == "__main__":
@@ -641,9 +653,9 @@ if __name__ == "__main__":
         sys.exit(1)
 ```
 
-TaskGroup in [`upstage_backend/src/event_archive/main.py`](upstage_backend/src/event_archive/main.py):
+TaskGroup in [`upstage_backend/src/upstage_backend/event_archive/main.py`](upstage_backend/src/upstage_backend/event_archive/main.py):
 
-```56:82:upstage_backend/src/event_archive/main.py
+```56:82:upstage_backend/src/upstage_backend/event_archive/main.py
 async def main() -> None:
     queue: asyncio.Queue = asyncio.Queue(maxsize=QUEUE_CAPACITY)
     stop = asyncio.Event()
@@ -665,9 +677,9 @@ async def main() -> None:
                 ...
 ```
 
-MQTT subscriber in [`upstage_backend/src/event_archive/subscriber.py`](upstage_backend/src/event_archive/subscriber.py):
+MQTT subscriber in [`upstage_backend/src/upstage_backend/event_archive/subscriber.py`](upstage_backend/src/upstage_backend/event_archive/subscriber.py):
 
-```42:73:upstage_backend/src/event_archive/subscriber.py
+```42:73:upstage_backend/src/upstage_backend/event_archive/subscriber.py
 async def subscribe_loop(queue: asyncio.Queue, stop: asyncio.Event) -> None:
     while not stop.is_set():
         try:
@@ -699,9 +711,9 @@ async def subscribe_loop(queue: asyncio.Queue, stop: asyncio.Event) -> None:
                     )
 ```
 
-Postgres writer in [`upstage_backend/src/event_archive/writer.py`](upstage_backend/src/event_archive/writer.py):
+Postgres writer in [`upstage_backend/src/upstage_backend/event_archive/writer.py`](upstage_backend/src/upstage_backend/event_archive/writer.py):
 
-```73:94:upstage_backend/src/event_archive/writer.py
+```73:94:upstage_backend/src/upstage_backend/event_archive/writer.py
             try:
                 async with AsyncSessionLocal() as session:
                     async with session.begin():
@@ -764,12 +776,12 @@ Quick reference for common tasks.
 | I want to... | Look here |
 |---|---|
 | Add a new MQTT interaction | Add a constant to [`utils/constants.ts`](upstage_frontend/src/utils/constants.ts), dispatch/handle in [`store/modules/stage/index.ts`](upstage_frontend/src/store/modules/stage/index.ts); nothing to change server-side because the archive persists any new topic matching `PERFORMANCE_TOPIC_RULE` |
-| Add a new GraphQL query/mutation | Schema SDL in the relevant module's `http/graphql.py`, resolver wiring in `http/schema.py`, business logic in `services/*.py`; then expose via [`studio_management/http/graphql.py`](upstage_backend/src/studio_management/http/graphql.py) if it's not already |
-| Add a column to `events` | Extend [`upstage_backend/src/event_archive/db_models/event.py`](upstage_backend/src/event_archive/db_models/event.py), create an alembic migration in [`event_archive/db_migrations/`](upstage_backend/src/event_archive/db_migrations/), update [`event_archive/writer.py`](upstage_backend/src/event_archive/writer.py) to set it, update the GraphQL `Event` type |
+| Add a new GraphQL query/mutation | Schema SDL in the relevant module's `http/graphql.py`, resolver wiring in `http/schema.py`, business logic in `services/*.py`; then expose via [`studio_management/http/graphql.py`](upstage_backend/src/upstage_backend/studio_management/http/graphql.py) if it's not already |
+| Add a column to `events` | Extend [`upstage_backend/src/upstage_backend/event_archive/db_models/event.py`](upstage_backend/src/upstage_backend/event_archive/db_models/event.py), create an alembic migration in [`event_archive/db_migrations/`](upstage_backend/src/upstage_backend/event_archive/db_migrations/), update [`event_archive/writer.py`](upstage_backend/src/upstage_backend/event_archive/writer.py) to set it, update the GraphQL `Event` type |
 | Debug "stage looks blank" | Check `events.payload` in Postgres for the stage (`topic LIKE '%/<fileLocation>/%' AND performance_id IS NULL`); if zero rows, inspect the `event_archive` container logs for subscriber errors; confirm MQTT broker reachable |
 | Add a new backend service | Copy the `upstage_event_archive_dev` stanza in [`docker-compose-dev.yaml`](upstage_backend/app_containers/docker-compose-dev.yaml) |
 | Change what's served as static assets | `uploads/` volume in the backend container; served via the reverse proxy |
-| Add a role or permission | [`utils/constants.ts`](upstage_frontend/src/utils/constants.ts) `ROLES` + [`global_config/decorators/authenticated.py`](upstage_backend/src/global_config/decorators/authenticated.py) |
+| Add a role or permission | [`utils/constants.ts`](upstage_frontend/src/utils/constants.ts) `ROLES` + [`global_config/decorators/authenticated.py`](upstage_backend/src/upstage_backend/global_config/decorators/authenticated.py) |
 
 ## 11. Glossary
 
@@ -780,7 +792,7 @@ Quick reference for common tasks.
 | Player | Authenticated user with permission to drive action on a stage |
 | Audience | Unauthenticated or non-player viewer |
 | Performance | An archived snapshot of event history; created by sweep or recording |
-| Sweep | The mutation that atomically moves all live events for a stage into a new performance; see [`stages/services/stage.py`](upstage_backend/src/stages/services/stage.py) `sweep_stage` |
+| Sweep | The mutation that atomically moves all live events for a stage into a new performance; see [`stages/services/stage.py`](upstage_backend/src/upstage_backend/stages/services/stage.py) `sweep_stage` |
 | Board | The live canvas on which avatars / media objects are placed; object metadata travels on the `board` MQTT topic |
 | Scene | A reusable "preset" of backdrop + board objects, selectable via `BACKGROUND_ACTIONS.SWITCH_SCENE` |
 | Namespace | The MQTT topic prefix (`production/`, `staging/`, ...) configured by `MQTT_NAMESPACE` |

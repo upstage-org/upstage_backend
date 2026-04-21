@@ -2,23 +2,15 @@
 import os
 import sys
 
-from src.global_config import logger
-from src.global_config.env import DATABASE_HOST, DATABASE_NAME, DATABASE_PASSWORD, DATABASE_PORT, DATABASE_USER
-
-appdir = os.path.abspath(os.path.dirname(__file__))
-projdir = os.path.abspath(os.path.join(appdir, ".."))
-projdir2 = os.path.abspath(os.path.join(appdir, "../.."))
-if projdir not in sys.path:
-    sys.path.append(appdir)
-    sys.path.append(projdir)
-    sys.path.append(projdir2)
+from upstage_backend.global_config import logger
+from upstage_backend.global_config.env import DATABASE_HOST, DATABASE_NAME, DATABASE_PASSWORD, DATABASE_PORT, DATABASE_USER
 
 import sys
 import json
 from sqlalchemy import create_engine, text
 from sqlalchemy.exc import SQLAlchemyError
 
-from src.global_config.helpers.fernet_crypto import encrypt
+from upstage_backend.global_config.helpers.fernet_crypto import encrypt
 
 # Disable SQLAlchemy engine logging for less verbosity
 def get_new_table_columns(new_engine, table_name):

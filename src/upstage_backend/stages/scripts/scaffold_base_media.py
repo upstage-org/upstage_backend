@@ -1,0 +1,265 @@
+# -*- coding: iso8859-15 -*-
+import os
+import sys
+
+from upstage_backend.global_config import logger
+
+import json
+import shutil
+from PIL import Image
+
+from upstage_backend.assets.db_models.asset_type import AssetTypeModel
+from upstage_backend.assets.db_models.asset import AssetModel
+from upstage_backend.stages.db_models.stage import StageModel
+from upstage_backend.stages.db_models.stage_attribute import StageAttributeModel
+from upstage_backend.stages.db_models.parent_stage import ParentStageModel
+from upstage_backend.users.db_models.user import UserModel, ADMIN, GUEST
+from upstage_backend.upstage_options.db_models.config import ConfigModel
+from upstage_backend.global_config.helpers.fernet_crypto import encrypt
+from upstage_backend.global_config.env import UPLOAD_USER_CONTENT_FOLDER, DEMO_MEDIA_FOLDER
+from upstage_backend.global_config.database import ScopedSession
+
+
+class bcolors:
+    HEADER = "\033[95m"
+    OKBLUE = "\033[94m"
+    OKCYAN = "\033[96m"
+    OKGREEN = "\033[92m"
+    WARNING = "\033[93m"
+    FAIL = "\033[91m"
+    ENDC = "\033[0m"
+    BOLD = "\033[1m"
+    UNDERLINE = "\033[4m"
+
+
+def scan_demo_folder():
+    for type in os.listdir(DEMO_MEDIA_FOLDER):
+        if "." not in type:
+            for media in os.listdir("{}/{}".format(DEMO_MEDIA_FOLDER, type)):
+                yield type, media
+
+
+upload_assets_folder = "{}".format(UPLOAD_USER_CONTENT_FOLDER)
+
+
+def copy_file(src_path, dest_path, type):
+    if not os.path.exists(os.path.join(upload_assets_folder, type)):
+        os.makedirs(os.path.join(upload_assets_folder, type))
+    shutil.copyfile(src_path, os.path.join(upload_assets_folder, dest_path))
+
+
+def detect_size(type, path):
+    if type == "video":
+        size = path.split(".")[0].split("_")[-1].split("x")
+        if len(size) == 2:
+            return down_size(size)
+        else:
+            logger.warning(
+                '❌ Please put the video dimension in the stream name, otherwise stream will have square frame. For example "Demo stream_800x600.mp4". Current name: {}{}{}'.format(
+                    bcolors.FAIL, path, bcolors.ENDC
+                )
+            )
+            return 100, 100
+    else:
+        with Image.open(path) as img:
+            return down_size(img.size)
+
+
+def down_size(size):
+    w = int(size[0])
+    h = int(size[1])
+    if w > h:
+        h = 100 * h / w
+        w = 100
+    else:
+        w = 100 * w / h
+        h = 100
+    return w, h
+
+
+def create_media(session, type, path, owner_id, created_media_ids):
+    asset_type = (
+        session.query(AssetTypeModel).filter(AssetTypeModel.name == type).first()
+    )
+    if not asset_type:
+        asset_type = AssetTypeModel(name=type, file_location="")
+        session.add(asset_type)
+        session.flush()
+
+    asset = AssetModel(asset_type=asset_type, owner_id=owner_id, file_location="")
+    attributes = {}
+    size = 0
+    if "." in path:
+        asset.name = os.path.basename(path).split(".")[0]
+        src_path = os.path.join(DEMO_MEDIA_FOLDER, type, path)
+        dest_path = os.path.join(type, path)
+        logger.warning(src_path, dest_path)
+        copy_file(src_path, dest_path, type)
+        asset.file_location = dest_path
+        size += os.path.getsize(src_path)
+        if type != "audio" and path[0] != ".":
+            attributes["w"], attributes["h"] = detect_size(type, src_path)
+    else:
+        attributes["multi"] = True
+        asset.name = path
+        for frame in os.listdir(os.path.join(DEMO_MEDIA_FOLDER, type, path)):
+            src_path = os.path.join(DEMO_MEDIA_FOLDER, type, path, frame)
+            dest_path = os.path.join(type, "{}_{}".format(path, frame))
+            copy_file(src_path, dest_path, type)
+            size += os.path.getsize(src_path)
+            if not asset.file_location:
+                asset.file_location = dest_path
+                attributes["frames"] = []
+                attributes["w"], attributes["h"] = detect_size(type, src_path)
+            attributes["frames"].append(dest_path)
+
+    asset.description = json.dumps(attributes)
+    asset.size = size
+    session.add(asset)
+    session.flush()
+    created_media_ids.append(asset.id)
+    logger.warning(
+        "✅ Created{} {} {}".format(
+            " multi-frame" if "multi" in attributes else "", type, path
+        )
+    )
+
+
+def create_demo_media(session, owner_id, created_media_ids):
+    for type, path in scan_demo_folder():
+        create_media(session, type, path, owner_id, created_media_ids)
+
+
+def create_demo_stage(session, owner_id, created_media_ids):
+    if session.query(StageModel).filter(StageModel.name == "Demo").first():
+        logger.warning('⏩ A stage named "Demo" already exists.')
+        return
+    stage = StageModel(
+        name="Demo Stage",
+        owner_id=owner_id,
+        description="This is a demo stage to help you learn how to use and customise UpStage for your own performances.",
+        file_location="demo",
+    )
+    status = StageAttributeModel(name="status", description="live", stage=stage)
+    stage.attributes.append(status)
+
+    visibility = StageAttributeModel(name="visibility", description="true", stage=stage)
+    stage.attributes.append(visibility)
+
+    cover_src = os.path.join(DEMO_MEDIA_FOLDER, "demo-stage-cover.jpg")
+    cover_path = os.path.join("media", "demo-stage-cover.jpg")
+    copy_file(cover_src, cover_path, "media")
+    cover = StageAttributeModel(name="cover", description=cover_path, stage=stage)
+    stage.attributes.append(cover)
+
+    all_users = [x.id for x in session.query(UserModel.id).all()]
+    accesses = [[], all_users]
+    player_access = StageAttributeModel(
+        name="playerAccess", description=json.dumps(accesses), stage=stage
+    )
+    stage.attributes.append(player_access)
+
+    session.add(stage)
+    session.flush()
+    for media_id in created_media_ids:
+        session.add(ParentStageModel(stage_id=stage.id, child_asset_id=media_id))
+    session.flush()
+    logger.warning("✅ Created demo stage")
+
+
+def create_demo_users(session):
+    admin_username = "admin"
+    guest_username = "guest"
+    admin_email = "support@upstage.live"
+    guest_email = "guest@upstage.live"
+    test_user_password = "12345678"
+
+    if (
+        session.query(UserModel).filter(UserModel.username == admin_username).first()
+        or session.query(UserModel).filter(UserModel.email == admin_email).first()
+    ):
+        logger.warning(
+            '⏩ An admin user with email "{}" already exists.'.format(admin_email)
+        )
+    else:
+        admin = UserModel()
+        admin.username = admin_username
+        admin.password = encrypt(test_user_password)
+        admin.email = admin_email
+        admin.role = ADMIN
+        admin.active = True
+        session.add(admin)
+        logger.warning(
+            '✅ Created admin account with credentials: "{}" and password "{}"'.format(
+                admin_username, test_user_password
+            )
+        )
+
+    if (
+        session.query(UserModel).filter(UserModel.username == guest_username).first()
+        or session.query(UserModel).filter(UserModel.email == guest_email).first()
+    ):
+        logger.warning(
+            '⏩ A guest user with email "{}" already exists.'.format(guest_username)
+        )
+    else:
+        guest = UserModel()
+        guest.username = guest_username
+        guest.password = encrypt(test_user_password)
+        guest.email = guest_email
+        guest.role = GUEST
+        guest.active = True
+        session.add(guest)
+        logger.warning(
+            '✅ Created guest account with credentials: "{}" and password "{}"'.format(
+                guest_username, test_user_password
+            )
+        )
+    session.flush()
+
+
+def save_config(session, name, value):
+    config = session.query(ConfigModel).filter(ConfigModel.name == name).first()
+    if config:
+        config.value = value
+    else:
+        config = ConfigModel(name=name, value=value)
+        session.add(config)
+    session.flush()
+
+
+def scaffold_foyer(session):
+    save_config(session, "FOYER_TITLE", "Your New UpStage")
+    save_config(
+        session,
+        "FOYER_DESCRIPTION",
+        "Welcome to your new UpStage! Log in to get started.",
+    )
+    logger.warning("✅ Foyer Scaffolding Completed")
+
+
+def scaffold_system_configuration(session):
+    save_config(
+        session,
+        "TERMS_OF_SERVICE",
+        "https://raw.githubusercontent.com/upstage-org/upstage/main/LICENSE",
+    )
+    save_config(session, "MANUAL", "https://docs.upstage.live")
+    logger.warning("✅ System Configuration Scaffolding Completed")
+
+
+def main():
+    created_media_ids = []
+    with ScopedSession() as s:
+        owner = s.query(UserModel).filter(UserModel.username == "admin").first()
+        owner_id = owner.id if owner else 0
+
+        create_demo_media(s, owner_id, created_media_ids)
+        create_demo_stage(s, owner_id, created_media_ids)
+        create_demo_users(s)
+        scaffold_foyer(s)
+        scaffold_system_configuration(s)
+
+
+if __name__ == "__main__":
+    main()

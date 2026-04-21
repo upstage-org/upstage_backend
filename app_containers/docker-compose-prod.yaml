@@ -10,6 +10,7 @@ services:
     volumes:
       - /app_code/alembic:/usr/app/alembic
       - /app_code/src:/usr/app/src
+      - /app_code/pyproject.toml:/usr/app/pyproject.toml
       - /app_code/requirements.txt:/usr/app/requirements.txt
       - /app_code/uploads:/usr/app/uploads
       - /app_code/demo:/usr/app/dashboard/demo
@@ -18,7 +19,6 @@ services:
     command: >
       /bin/bash -c "
       cd /usr/app &&
-      export PYTHONPATH=$(pwd)/src &&
       pip install --upgrade pip &&
       pip install -r ./requirements.txt &&
       export HARDCODED_HOSTNAME=${HARDCODED_HOSTNAME} &&
@@ -31,13 +31,13 @@ services:
     container_name: upstage_event_archive
     volumes:
       - /app_code/src:/usr/app/src
+      - /app_code/pyproject.toml:/usr/app/pyproject.toml
       - /app_code/requirements.txt:/usr/app/requirements.txt
       - /app_code/scripts:/usr/app/scripts
 
     command: >
       /bin/bash -c "
       cd /usr/app &&
-      export PYTHONPATH=$(pwd)/src &&
       pip install --upgrade pip &&
       pip install -r requirements.txt &&
       export HARDCODED_HOSTNAME=${HARDCODED_HOSTNAME} &&
@@ -50,12 +50,12 @@ services:
     container_name: upstage_stats
     volumes:
       - /app_code/src:/usr/app/src
+      - /app_code/pyproject.toml:/usr/app/pyproject.toml
       - /app_code/requirements.txt:/usr/app/requirements.txt
       - /app_code/scripts:/usr/app/scripts
     command: >
       /bin/bash -c "
       cd /usr/app &&
-      export PYTHONPATH=$(pwd)/src &&
       pip install --upgrade pip &&
       pip install -r requirements.txt &&
       export HARDCODED_HOSTNAME=${HARDCODED_HOSTNAME} &&
@@ -72,6 +72,7 @@ services:
       dockerfile: Dockerfile_backups
     volumes:
       - /app_code/src:/usr/app/src
+      - /app_code/pyproject.toml:/usr/app/pyproject.toml
       - /app_code/requirements.txt:/usr/app/requirements.txt
       - /app_code/uploads:/usr/app/uploads
       - /app_code/scripts:/usr/app/scripts
@@ -79,7 +80,6 @@ services:
     command: >
       /bin/bash -c "
       cd /usr/app &&
-      export PYTHONPATH=$(pwd)/src &&
       pip install --upgrade pip &&
       pip install --no-cache-dir -r requirements.txt &&
       export HARDCODED_HOSTNAME=${HARDCODED_HOSTNAME} &&
@@ -93,12 +93,12 @@ services:
     container_name: upstage_external_email_tokens
     volumes:
       - /app_code/src:/usr/app/src
+      - /app_code/pyproject.toml:/usr/app/pyproject.toml
       - /app_code/requirements.txt:/usr/app/requirements.txt
       - /app_code/scripts:/usr/app/scripts
     command: >
       /bin/bash -c "
       cd /usr/app &&
-      export PYTHONPATH=$(pwd)/src &&
       pip install --upgrade pip &&
       pip install -r requirements.txt &&
       export HARDCODED_HOSTNAME=${HARDCODED_HOSTNAME} &&
