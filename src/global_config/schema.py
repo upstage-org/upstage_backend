@@ -202,4 +202,4 @@ def config_graphql_endpoints(app: FastAPI,endpoint = '/api/studio_graphql'):
 
     print(endpoint)
     app.add_route(endpoint, combined_graphql_app)
-    app.add_websocket_route(endpoint, combined_graphql_app)
+    app.add_api_websocket_route(endpoint, combined_graphql_app)
