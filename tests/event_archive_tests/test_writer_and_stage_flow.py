@@ -6,15 +6,6 @@ StageService.sweep_stage.
 """
 import os
 import sys
-
-appdir = os.path.abspath(os.path.dirname(__file__))
-projdir = os.path.abspath(os.path.join(appdir, ".."))
-projdir2 = os.path.abspath(os.path.join(appdir, "../.."))
-srcdir = os.path.abspath(os.path.join(projdir2, "src"))
-for _p in (appdir, projdir, projdir2, srcdir):
-    if _p and _p not in sys.path:
-        sys.path.insert(0, _p)
-
 import json
 import types
 
@@ -37,8 +28,8 @@ def _persist_via_writer_logic(session, topic: str, raw_payload, ts: float):
     async plumbing. If writer.py's decode+construct contract drifts, this
     function will need to change in lockstep with it.
     """
-    from event_archive.writer import _decode_payload, _PayloadDecodeError
-    from event_archive.db_models.event import EventModel
+    from upstage_backend.event_archive.writer import _decode_payload, _PayloadDecodeError
+    from upstage_backend.event_archive.db_models.event import EventModel
 
     try:
         payload = _decode_payload(raw_payload)
@@ -56,7 +47,7 @@ def _persist_via_writer_logic(session, topic: str, raw_payload, ts: float):
 
 
 def _seed_stage(session, file_location: str, name: str = "Test Stage"):
-    from stages.db_models.stage import StageModel
+    from upstage_backend.stages.db_models.stage import StageModel
 
     stage = StageModel(
         name=name,
@@ -72,7 +63,7 @@ class TestWriterDecodeShape:
     """Pure-function tests that don't need a session."""
 
     def test_decodes_bytes_json_to_dict(self):
-        from event_archive.writer import _decode_payload
+        from upstage_backend.event_archive.writer import _decode_payload
 
         assert _decode_payload(b'{"type":"chat","text":"hi"}') == {
             "type": "chat",
@@ -80,29 +71,29 @@ class TestWriterDecodeShape:
         }
 
     def test_decodes_str_json_to_dict(self):
-        from event_archive.writer import _decode_payload
+        from upstage_backend.event_archive.writer import _decode_payload
 
         assert _decode_payload('{"a":1}') == {"a": 1}
 
     def test_accepts_json_array(self):
-        from event_archive.writer import _decode_payload
+        from upstage_backend.event_archive.writer import _decode_payload
 
         assert _decode_payload(b"[1,2,3]") == [1, 2, 3]
 
     def test_rejects_invalid_utf8_bytes(self):
-        from event_archive.writer import _decode_payload, _PayloadDecodeError
+        from upstage_backend.event_archive.writer import _decode_payload, _PayloadDecodeError
 
         with pytest.raises(_PayloadDecodeError):
             _decode_payload(b"\xff\xfe\x00bad")
 
     def test_rejects_non_json_text(self):
-        from event_archive.writer import _decode_payload, _PayloadDecodeError
+        from upstage_backend.event_archive.writer import _decode_payload, _PayloadDecodeError
 
         with pytest.raises(_PayloadDecodeError):
             _decode_payload(b"not json at all")
 
     def test_rejects_unsupported_payload_type(self):
-        from event_archive.writer import _decode_payload, _PayloadDecodeError
+        from upstage_backend.event_archive.writer import _decode_payload, _PayloadDecodeError
 
         with pytest.raises(_PayloadDecodeError):
             _decode_payload(12345)
@@ -115,7 +106,7 @@ class TestWriterPersistAndRead:
     """
 
     def test_writer_output_is_consumable_by_stage_load_and_sweep(self, rebound_db):
-        from global_config import get_session
+        from upstage_backend.global_config import get_session
 
         setup_session = rebound_db["db_session"]
         stage = _seed_stage(setup_session, file_location=WRITER_ID)
@@ -173,7 +164,7 @@ class TestWriterPersistAndRead:
         assert dropped == 1, "malformed payload should be dropped, matching legacy worker"
         assert len(persisted_ids) == 4
 
-        from event_archive.db_models.event import EventModel
+        from upstage_backend.event_archive.db_models.event import EventModel
 
         rows = (
             get_session()
@@ -188,8 +179,8 @@ class TestWriterPersistAndRead:
                 "so that the GraphQL layer serializes it correctly"
             )
 
-        from stages.services.stage_operation import StageOperationService
-        from stages.http.validation import StageStreamInput
+        from upstage_backend.stages.services.stage_operation import StageOperationService
+        from upstage_backend.stages.http.validation import StageStreamInput
 
         op = StageOperationService()
 
@@ -218,7 +209,7 @@ class TestWriterPersistAndRead:
         )
         assert len(other_live) == 1, "file_location LIKE must isolate stages"
 
-        from stages.services.stage import StageService
+        from upstage_backend.stages.services.stage import StageService
 
         svc = StageService()
         fake_user = types.SimpleNamespace(id=1)

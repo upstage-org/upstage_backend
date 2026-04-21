@@ -1,6 +1,6 @@
 import os
 
-from src.global_config import logger
+from upstage_backend.global_config import logger
 
 hook_file_path = ".git/hooks/pre-commit"
 

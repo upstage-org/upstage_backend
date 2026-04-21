@@ -9,13 +9,6 @@ rather than trying to connect to a real Postgres at import time.
 import os
 import sys
 
-appdir = os.path.abspath(os.path.dirname(__file__))
-projdir = os.path.abspath(os.path.join(appdir, ".."))
-srcdir = os.path.abspath(os.path.join(projdir, "src"))
-for _p in (appdir, projdir, srcdir):
-    if _p not in sys.path:
-        sys.path.insert(0, _p)
-
 os.environ.setdefault("DATABASE_URL", "sqlite:///:memory:")
 os.environ.setdefault("ALGORITHM", "HS256")
 os.environ.setdefault("SECRET_KEY", "test-secret")
@@ -60,12 +53,12 @@ def sqlite_engine():
     One in-memory SQLite engine, shared across the whole test session by
     StaticPool so that every Session sees the same database.
     """
-    from event_archive.db_models.event import EventModel
-    from stages.db_models.stage import StageModel
-    from stages.db_models.stage_attribute import StageAttributeModel
-    from stages.db_models.parent_stage import ParentStageModel
-    from performance_config.db_models.performance import PerformanceModel
-    from performance_config.db_models.scene import SceneModel
+    from upstage_backend.event_archive.db_models.event import EventModel
+    from upstage_backend.stages.db_models.stage import StageModel
+    from upstage_backend.stages.db_models.stage_attribute import StageAttributeModel
+    from upstage_backend.stages.db_models.parent_stage import ParentStageModel
+    from upstage_backend.performance_config.db_models.performance import PerformanceModel
+    from upstage_backend.performance_config.db_models.scene import SceneModel
 
     EventModel.__table__.c.payload.type = GenericJSON()
 
@@ -111,8 +104,8 @@ def rebound_db(sqlite_engine, monkeypatch):
     it as ``db_session`` equivalent. Tests can either access it via
     ``rebound_db['db_session']`` or simply call ``get_session()``.
     """
-    import global_config.database as db_module
-    import global_config.db_context as ctx_module
+    import upstage_backend.global_config.database as db_module
+    import upstage_backend.global_config.db_context as ctx_module
 
     monkeypatch.setattr(db_module, "engine", sqlite_engine, raising=True)
 
@@ -148,9 +141,9 @@ def rebound_db(sqlite_engine, monkeypatch):
     ctx_module.reset_session(token)
 
     with sqlite_engine.begin() as conn:
-        from event_archive.db_models.event import EventModel
-        from stages.db_models.stage import StageModel
-        from performance_config.db_models.performance import PerformanceModel
+        from upstage_backend.event_archive.db_models.event import EventModel
+        from upstage_backend.stages.db_models.stage import StageModel
+        from upstage_backend.performance_config.db_models.performance import PerformanceModel
 
         for tbl in (
             EventModel.__table__,

@@ -10,6 +10,7 @@ services:
     volumes:
       - /app_code_dev/alembic:/usr/app/alembic
       - /app_code_dev/src:/usr/app/src
+      - /app_code_dev/pyproject.toml:/usr/app/pyproject.toml
       - /app_code_dev/requirements.txt:/usr/app/requirements.txt
       - /app_code_dev/uploads:/usr/app/uploads
       - /app_code_dev/demo:/usr/app/dashboard/demo
@@ -18,7 +19,6 @@ services:
     command: >
       /bin/bash -c "
       cd /usr/app &&
-      export PYTHONPATH=$(pwd)/src &&
       pip install --upgrade pip &&
       pip install -r ./requirements.txt &&
       export HARDCODED_HOSTNAME=${HARDCODED_HOSTNAME} &&
@@ -31,13 +31,13 @@ services:
     container_name: upstage_event_archive_dev
     volumes:
       - /app_code_dev/src:/usr/app/src
+      - /app_code_dev/pyproject.toml:/usr/app/pyproject.toml
       - /app_code_dev/requirements.txt:/usr/app/requirements.txt
       - /app_code_dev/scripts:/usr/app/scripts
 
     command: >
       /bin/bash -c "
       cd /usr/app &&
-      export PYTHONPATH=$(pwd)/src &&
       pip install --upgrade pip &&
       pip install -r requirements.txt &&
       export HARDCODED_HOSTNAME=${HARDCODED_HOSTNAME} &&
@@ -50,12 +50,12 @@ services:
     container_name: upstage_stats_dev
     volumes:
       - /app_code_dev/src:/usr/app/src
+      - /app_code_dev/pyproject.toml:/usr/app/pyproject.toml
       - /app_code_dev/requirements.txt:/usr/app/requirements.txt
       - /app_code_dev/scripts:/usr/app/scripts
     command: >
       /bin/bash -c "
       cd /usr/app &&
-      export PYTHONPATH=$(pwd)/src &&
       pip install --upgrade pip &&
       pip install -r requirements.txt &&
       export HARDCODED_HOSTNAME=${HARDCODED_HOSTNAME} &&

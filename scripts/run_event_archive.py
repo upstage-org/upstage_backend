@@ -14,16 +14,9 @@ sys.path before any project imports.
 import os
 import sys
 
-_here = os.path.abspath(os.path.dirname(__file__))
-_project_root = os.path.abspath(os.path.join(_here, ".."))
-_src_dir = os.path.join(_project_root, "src")
-for _p in (_here, _project_root, _src_dir):
-    if _p not in sys.path:
-        sys.path.insert(0, _p)
-
 import asyncio
 
-from src.event_archive.main import main
+from upstage_backend.event_archive.main import main
 
 
 if __name__ == "__main__":
