@@ -40,6 +40,7 @@ services:
       export PYTHONPATH=$(pwd)/src &&
       pip install --upgrade pip &&
       pip install -r requirements.txt &&
+      export HARDCODED_HOSTNAME=${HARDCODED_HOSTNAME} &&
       python3 -m scripts.run_event_archive"
     networks:
       - upstage-network
@@ -57,6 +58,7 @@ services:
       export PYTHONPATH=$(pwd)/src &&
       pip install --upgrade pip &&
       pip install -r requirements.txt &&
+      export HARDCODED_HOSTNAME=${HARDCODED_HOSTNAME} &&
       python3 -m scripts.run_upstage_stats"
     networks:
       - upstage-network
@@ -80,6 +82,7 @@ services:
       export PYTHONPATH=$(pwd)/src &&
       pip install --upgrade pip &&
       pip install --no-cache-dir -r requirements.txt &&
+      export HARDCODED_HOSTNAME=${HARDCODED_HOSTNAME} &&
       python3 -m scripts.backup_to_local_drive"
     networks:
       - upstage-network
@@ -98,6 +101,7 @@ services:
       export PYTHONPATH=$(pwd)/src &&
       pip install --upgrade pip &&
       pip install -r requirements.txt &&
+      export HARDCODED_HOSTNAME=${HARDCODED_HOSTNAME} &&
       python3 -m scripts.run_upstage_email"
     networks:
       - upstage-network
