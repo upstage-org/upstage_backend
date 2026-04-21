@@ -44,4 +44,5 @@ __all__ = [
     "logger",
 ]
 
-__all__ += [name for name in dir(upstage_backend.global_config.env) if not name.startswith("__")]
+__all__ += [name for name in dir(sys.modules["upstage_backend.global_config.env"]) if not name.startswith("__")]
+
