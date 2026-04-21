@@ -3,6 +3,7 @@ services:
   upstage_backend_dev:
     image: registry.access.redhat.com/ubi9/python-312:latest
     container_name: upstage_backend_dev
+    user: "0:0"
     ports:
       - "3001:3000"
     #extra_hosts:
@@ -29,6 +30,7 @@ services:
   upstage_event_archive_dev:
     image: registry.access.redhat.com/ubi9/python-312:latest
     container_name: upstage_event_archive_dev
+    user: "0:0"
     volumes:
       - /app_code_dev/src:/usr/app/src
       - /app_code_dev/pyproject.toml:/usr/app/pyproject.toml
@@ -48,6 +50,7 @@ services:
   upstage_stats_dev:
     image: registry.access.redhat.com/ubi9/python-312:latest
     container_name: upstage_stats_dev
+    user: "0:0"
     volumes:
       - /app_code_dev/src:/usr/app/src
       - /app_code_dev/pyproject.toml:/usr/app/pyproject.toml

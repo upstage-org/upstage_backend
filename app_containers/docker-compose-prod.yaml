@@ -3,6 +3,7 @@ services:
   upstage_backend:
     image: registry.access.redhat.com/ubi9/python-312:latest
     container_name: upstage_backend
+    user: "0:0"
     ports:
       - "3000:3000"
     #extra_hosts:
@@ -28,6 +29,7 @@ services:
 
   upstage_event_archive:
     image: registry.access.redhat.com/ubi9/python-312:latest
+    user: "0:0"
     container_name: upstage_event_archive
     volumes:
       - /app_code/src:/usr/app/src
@@ -47,6 +49,7 @@ services:
 
   upstage_stats:
     image: registry.access.redhat.com/ubi9/python-312:latest
+    user: "0:0"
     container_name: upstage_stats
     volumes:
       - /app_code/src:/usr/app/src
@@ -67,6 +70,7 @@ services:
   # Backups happen on a conventional mounted disk, because all image disks are SSD.
   upstage_backups:
     image: registry.access.redhat.com/ubi9/python-312:latest
+    user: "0:0"
     container_name: upstage_backups
     build:
       dockerfile: Dockerfile_backups
@@ -91,6 +95,7 @@ services:
   upstage_emails:
     image: registry.access.redhat.com/ubi9/python-312:latest
     container_name: upstage_external_email_tokens
+    user: "0:0"
     volumes:
       - /app_code/src:/usr/app/src
       - /app_code/pyproject.toml:/usr/app/pyproject.toml
