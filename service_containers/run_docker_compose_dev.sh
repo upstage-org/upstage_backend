@@ -5,8 +5,8 @@
 
 set -a
 
-export POSTGRES_PASSWORD=t3zNqfh5lLcx
-export MONGO_INITDB_ROOT_PASSWORD=c7rOw4Sqm09V1
+export POSTGRES_PASSWORD=changeme
+export MONGO_INITDB_ROOT_PASSWORD=changeme
 
 echo "
 If you need to run this installation more than once, and generated passwords have changed,
