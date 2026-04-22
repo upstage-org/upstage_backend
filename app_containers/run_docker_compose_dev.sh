@@ -12,6 +12,8 @@ cp -r ../scripts /app_code_dev
 cp -r ../dashboard/demo /app_code_dev
 cp -r ../requirements.txt /app_code_dev
 cp -r ../migration_scripts /app_code_dev
+chown -R 1001:0 /app_code
+chmod -R g+rwX /app_code
 
 docker compose -f docker-compose-dev.yaml -p docker-backend-dev down --remove-orphans
 #docker compose rm -f
