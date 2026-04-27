@@ -169,7 +169,12 @@ class AssetService:
     def upload_file(self, user: UserModel, base64: str, filename: str):
         file_size = self.file_handing.get_file_size(base64)
 
-        if file_size > user.upload_limit:
+        # Per-user cap is optional. NULL means "no per-user override"; the
+        # global per-extension caps in FileHandling.validate_file_size still
+        # apply. Without this guard a freshly-seeded user (whose row was
+        # inserted without upload_limit, e.g. via batch creation) gets a
+        # TypeError on the comparison and the request returns 400.
+        if user.upload_limit is not None and file_size > user.upload_limit:
             raise GraphQLError(
                 f"File size must be under {self.file_handing.convert_KB_to_MB(user.upload_limit)}MB."
             )

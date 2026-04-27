@@ -1,10 +1,30 @@
 FROM fedora:43
 
-USER root
+# Build steps run as root so the venv ends up in /opt and is world-readable.
+# Runtime user is supplied by compose via `user: ${HOST_UID}:${HOST_GID}`, so
+# the actual backup process never runs as root.
 
-RUN dnf install -y https://download.postgresql.org/pub/repos/yum/reporpms/F-$(rpm -E %fedora)-x86_64/pgdg-fedora-repo-latest.noarch.rpm && \
-    dnf install -y postgresql18 postgresql18-server python3-pip && \
-    dnf clean all && \
-    rm -rf /var/cache/dnf/*
+RUN dnf install -y https://download.postgresql.org/pub/repos/yum/reporpms/F-$(rpm -E %fedora)-x86_64/pgdg-fedora-repo-latest.noarch.rpm \
+ && dnf install -y postgresql18 postgresql18-server python3-pip python3-virtualenv gcc python3-devel \
+ && dnf clean all \
+ && rm -rf /var/cache/dnf/*
 
 RUN /usr/bin/pg_dump --version
+
+WORKDIR /usr/app
+
+COPY ./requirements.txt /tmp/requirements.txt
+COPY ./pyproject.toml /usr/app/pyproject.toml
+COPY ./src /usr/app/src
+
+RUN python3 -m venv /opt/upstage-venv \
+ && /opt/upstage-venv/bin/pip install --upgrade pip \
+ && /opt/upstage-venv/bin/pip install --no-cache-dir -r /tmp/requirements.txt \
+ && chmod -R a+rX /opt/upstage-venv \
+ && rm -f /tmp/requirements.txt
+
+ENV PATH="/opt/upstage-venv/bin:${PATH}" \
+    VIRTUAL_ENV="/opt/upstage-venv" \
+    PYTHONPATH="/usr/app/src" \
+    PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1

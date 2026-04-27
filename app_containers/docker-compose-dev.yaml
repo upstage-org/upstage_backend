@@ -1,72 +1,129 @@
 name: upstage-backend-dev
+
+# ====================== Common Build (Simplified & Reliable) ======================
+x-common-build: &common_build |
+  # syntax=docker/dockerfile:1
+  FROM python:3.12-slim-bookworm AS builder
+
+  # Install uv
+  COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /bin/
+
+  WORKDIR /app
+
+  ENV UV_COMPILE_BYTECODE=1 \
+      UV_LINK_MODE=copy \
+      UV_PYTHON_DOWNLOADS=never \
+      UV_NO_CACHE=1 \
+      PYTHONDONTWRITEBYTECODE=1 \
+      PYTHONUNBUFFERED=1
+
+  COPY pyproject.toml ./
+  COPY uv.lock* ./
+
+  RUN --mount=type=cache,target=/root/.cache/uv \
+      uv sync --frozen --no-dev --no-install-project || \
+      uv sync --no-dev --no-install-project
+
+  # === Runtime stage ===
+  FROM python:3.12-slim-bookworm
+
+  WORKDIR /usr/app
+
+  # uv: available at runtime in every service image (builder stage does not carry over)
+  COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /bin/
+
+  # Copy venv from builder
+  COPY --from=builder /app/.venv /usr/app/.venv
+
+  ENV PATH="/usr/app/.venv/bin:$PATH" \
+      PYTHONDONTWRITEBYTECODE=1 \
+      PYTHONUNBUFFERED=1
+
+  # bookworm: shadow-utils; binaries live in /usr/sbin (PATH in RUN can omit it → 127)
+  ARG HOST_UID=1000
+  ARG HOST_GID=1000
+  RUN /usr/sbin/groupadd --gid ${HOST_GID} appuser && \
+      /usr/sbin/useradd --uid ${HOST_UID} --gid ${HOST_GID} \
+              --create-home --shell /bin/bash appuser && \
+      chown -R appuser:appuser /usr/app
+
+  # Copy source code
+  COPY --chown=appuser:appuser . .
+
+  USER appuser
+
+  CMD ["/bin/bash", "./scripts/start_upstage.sh"]
+
+# ====================== Services ======================
 services:
   upstage_backend_dev:
-    image: registry.access.redhat.com/ubi9/python-312:latest
+    build:
+      context: ../
+      dockerfile_inline: *common_build
+    image: upstage/backend:local
     container_name: upstage_backend_dev
-    user: "0:0"
+    user: "${HOST_UID:-1000}:${HOST_GID:-1000}"
     ports:
       - "3001:3000"
-    #extra_hosts:
-    #  - "dev.upstage.live:10.116.0.8"
     volumes:
-      - /app_code_dev/alembic:/usr/app/alembic
       - /app_code_dev/src:/usr/app/src
       - /app_code_dev/pyproject.toml:/usr/app/pyproject.toml
-      - /app_code_dev/requirements.txt:/usr/app/requirements.txt
+      - /app_code_dev/uv.lock:/usr/app/uv.lock
       - /app_code_dev/uploads:/usr/app/uploads
       - /app_code_dev/demo:/usr/app/dashboard/demo
       - /app_code_dev/scripts:/usr/app/scripts
       - /app_code_dev/migration_scripts:/usr/app/migration_scripts
+      - /app_code_dev/alembic:/usr/app/alembic
     command: >
       /bin/bash -c "
       cd /usr/app &&
-      pip install --upgrade pip &&
-      pip install -r ./requirements.txt &&
       export HARDCODED_HOSTNAME=${HARDCODED_HOSTNAME} &&
       ./scripts/start_upstage.sh"
     networks:
       - upstage-network-dev
 
   upstage_event_archive_dev:
-    image: registry.access.redhat.com/ubi9/python-312:latest
+    build:
+      context: ../
+      dockerfile_inline: *common_build
+    image: upstage/event-archive:local
     container_name: upstage_event_archive_dev
-    user: "0:0"
+    user: "${HOST_UID:-1000}:${HOST_GID:-1000}"
     volumes:
       - /app_code_dev/src:/usr/app/src
       - /app_code_dev/pyproject.toml:/usr/app/pyproject.toml
-      - /app_code_dev/requirements.txt:/usr/app/requirements.txt
+      - /app_code_dev/uv.lock:/usr/app/uv.lock
       - /app_code_dev/scripts:/usr/app/scripts
-
     command: >
       /bin/bash -c "
       cd /usr/app &&
-      pip install --upgrade pip &&
-      pip install -r requirements.txt &&
       export HARDCODED_HOSTNAME=${HARDCODED_HOSTNAME} &&
-      python3 -m scripts.run_event_archive"
+      uv run python -m scripts.run_event_archive"
     networks:
       - upstage-network-dev
 
   upstage_stats_dev:
-    image: registry.access.redhat.com/ubi9/python-312:latest
+    build:
+      context: ../
+      dockerfile_inline: *common_build
+    image: upstage/stats:local
     container_name: upstage_stats_dev
-    user: "0:0"
+    user: "${HOST_UID:-1000}:${HOST_GID:-1000}"
     volumes:
       - /app_code_dev/src:/usr/app/src
       - /app_code_dev/pyproject.toml:/usr/app/pyproject.toml
-      - /app_code_dev/requirements.txt:/usr/app/requirements.txt
+      - /app_code_dev/uv.lock:/usr/app/uv.lock
       - /app_code_dev/scripts:/usr/app/scripts
     command: >
       /bin/bash -c "
       cd /usr/app &&
-      pip install --upgrade pip &&
-      pip install -r requirements.txt &&
       export HARDCODED_HOSTNAME=${HARDCODED_HOSTNAME} &&
-      python3 -m scripts.run_upstage_stats"
+      ./scripts/run_upstage_stats.sh"
     networks:
       - upstage-network-dev
 
 networks:
   upstage-network-dev:
+    name: upstage-network-dev
     driver: bridge
     external: true

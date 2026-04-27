@@ -17,20 +17,6 @@ services:
       - upstage-network
     command: postgres -c listen_addresses='*'
 
-  mongodb:
-    image: mongo:latest
-    container_name: mongodb_container
-    environment:
-      MONGO_INITDB_ROOT_USERNAME: admin
-      MONGO_INITDB_ROOT_PASSWORD: ${MONGO_INITDB_ROOT_PASSWORD}
-    #ports:
-    #  - "127.0.0.1:27018:27017"
-    volumes:
-      - /mongodb_data_volume:/data
-    restart: unless-stopped
-    networks:
-      - upstage-network
-
   mosquitto:
     image: eclipse-mosquitto:latest
     container_name: mosquitto_container
@@ -64,5 +50,4 @@ networks:
     external: true
 volumes:
   postgresql_files:
-  mongodb_data_volume:
   mosquitto_files:

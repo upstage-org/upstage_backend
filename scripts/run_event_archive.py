@@ -14,6 +14,7 @@ sys.path before any project imports.
 import os
 import sys
 
+import loguru  # noqa: F401  # entrypoint: load loguru before upstage (see app_containers compose)
 import asyncio
 
 from upstage_backend.event_archive.main import main

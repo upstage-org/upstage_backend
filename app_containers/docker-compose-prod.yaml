@@ -1,9 +1,12 @@
 name: upstage-backend-prod
 services:
   upstage_backend:
-    image: registry.access.redhat.com/ubi9/python-312:latest
+    build:
+      context: ../
+      dockerfile: app_containers/Dockerfile
+    image: upstage/backend:local
     container_name: upstage_backend
-    user: "0:0"
+    user: "${HOST_UID:-1000}:${HOST_GID:-1000}"
     ports:
       - "3000:3000"
     #extra_hosts:
@@ -20,16 +23,17 @@ services:
     command: >
       /bin/bash -c "
       cd /usr/app &&
-      pip install --upgrade pip &&
-      pip install -r ./requirements.txt &&
       export HARDCODED_HOSTNAME=${HARDCODED_HOSTNAME} &&
       ./scripts/start_upstage.sh"
     networks:
       - upstage-network
 
   upstage_event_archive:
-    image: registry.access.redhat.com/ubi9/python-312:latest
-    user: "0:0"
+    build:
+      context: ../
+      dockerfile: app_containers/Dockerfile
+    image: upstage/backend:local
+    user: "${HOST_UID:-1000}:${HOST_GID:-1000}"
     container_name: upstage_event_archive
     volumes:
       - /app_code/src:/usr/app/src
@@ -40,16 +44,17 @@ services:
     command: >
       /bin/bash -c "
       cd /usr/app &&
-      pip install --upgrade pip &&
-      pip install -r requirements.txt &&
       export HARDCODED_HOSTNAME=${HARDCODED_HOSTNAME} &&
       python3 -m scripts.run_event_archive"
     networks:
       - upstage-network
 
   upstage_stats:
-    image: registry.access.redhat.com/ubi9/python-312:latest
-    user: "0:0"
+    build:
+      context: ../
+      dockerfile: app_containers/Dockerfile
+    image: upstage/backend:local
+    user: "${HOST_UID:-1000}:${HOST_GID:-1000}"
     container_name: upstage_stats
     volumes:
       - /app_code/src:/usr/app/src
@@ -59,8 +64,6 @@ services:
     command: >
       /bin/bash -c "
       cd /usr/app &&
-      pip install --upgrade pip &&
-      pip install -r requirements.txt &&
       export HARDCODED_HOSTNAME=${HARDCODED_HOSTNAME} &&
       python3 -m scripts.run_upstage_stats"
     networks:
@@ -69,11 +72,12 @@ services:
   # For Upstage internal use. Maybe some clients will need this as well.
   # Backups happen on a conventional mounted disk, because all image disks are SSD.
   upstage_backups:
-    image: registry.access.redhat.com/ubi9/python-312:latest
-    user: "0:0"
-    container_name: upstage_backups
     build:
-      dockerfile: Dockerfile_backups
+      context: ../
+      dockerfile: app_containers/Dockerfile_backups
+    image: upstage/backups:local
+    user: "${HOST_UID:-1000}:${HOST_GID:-1000}"
+    container_name: upstage_backups
     volumes:
       - /app_code/src:/usr/app/src
       - /app_code/pyproject.toml:/usr/app/pyproject.toml
@@ -84,8 +88,6 @@ services:
     command: >
       /bin/bash -c "
       cd /usr/app &&
-      pip install --upgrade pip &&
-      pip install --no-cache-dir -r requirements.txt &&
       export HARDCODED_HOSTNAME=${HARDCODED_HOSTNAME} &&
       python3 -m scripts.backup_to_local_drive"
     networks:
@@ -93,9 +95,12 @@ services:
 
   # For Upstage internal use. Maybe some clients will need this as well.
   upstage_emails:
-    image: registry.access.redhat.com/ubi9/python-312:latest
+    build:
+      context: ../
+      dockerfile: app_containers/Dockerfile
+    image: upstage/backend:local
     container_name: upstage_external_email_tokens
-    user: "0:0"
+    user: "${HOST_UID:-1000}:${HOST_GID:-1000}"
     volumes:
       - /app_code/src:/usr/app/src
       - /app_code/pyproject.toml:/usr/app/pyproject.toml
@@ -104,8 +109,6 @@ services:
     command: >
       /bin/bash -c "
       cd /usr/app &&
-      pip install --upgrade pip &&
-      pip install -r requirements.txt &&
       export HARDCODED_HOSTNAME=${HARDCODED_HOSTNAME} &&
       python3 -m scripts.run_upstage_email"
     networks:
