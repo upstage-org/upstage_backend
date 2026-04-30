@@ -6,7 +6,8 @@ __pycache__/
 # C extensions
 *.so
 
-src/upstage_backend/global_config/load_env.py
+load_env.py
+pw.backup
 
 # Distribution / packaging
 .Python

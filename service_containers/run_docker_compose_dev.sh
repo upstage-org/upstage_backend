@@ -1,7 +1,9 @@
 #!/bin/bash
 
-# This file is generated. Do not change the generated copy. It will be
-# overwritten.
+PG_DATA_DIR=/postgres_data_dev
+MQ_DATA_DIR=/mosquitto_files_dev
+DOCKERFILE=docker-compose-services-dev.yaml
+SERVICES=upstage-services-dev
 
 set -a
 
@@ -10,12 +12,29 @@ set -a
 
 POSTGRES_PASSWORD=$POSTGRES_PASSWORD_DEV
 
-echo "
-If you need to run this installation more than once, and generated passwords have changed,
-be sure to remove and recreate the /postgresql_data/* dirs.
-"
+check_mqtt_pw=`grep admin deployment_config/etc_mosquitto/pw.backup | grep performance | awk -F: '{print $2}'`
+if [ ${check_mqtt_pw} == 'changeme' ]; then
+    echo "Change the performance and admin passwords in this file: `pwd`/deployment_config/etc_mosquitto/pw.backup"
+    exit 1
+fi
 
-docker compose -f docker-compose-services-dev.yaml -p upstage-services-dev down --remove-orphans
+check_mqtt_pw=`grep admin deployment_config/etc_mosquitto/pw.backup | grep admin | awk -F: '{print $2}'`
+if [ ${check_mqtt_pw} == 'changeme' ]; then
+    echo "Change the performance and admin passwords in this file: `pwd`/deployment_config/etc_mosquitto/pw.backup"
+    exit 1
+fi
+
+if [ ! -d "${PG_DATA_DIR}" ]; then
+    sudo mkdir -p ${PG_DATA_DIR} && sudo chown -R 999:999 ${PG_DATA_DIR}
+fi
+
+if [ ! -d "${MQ_DATA_DIR}" ]; then
+    sudo mkdir -p ${MQ_DATA_DIR} && sudo chown -R 1883:1883 ${MQ_DATA_DIR}
+    sudo mkdir -p ${MQ_DATA_DIR}/etc && sudo chown -R 1883:1883 ${MQ_DATA_DIR}/etc
+    sudo cp -r deployment_config/etc_mosquitto/ ${MQ_DATA_DIR}/etc/mosquitto && sudo chown -R 1883:1883 ${MQ_DATA_DIR}/etc
+fi
+
+docker compose -f ${DOCKERFILE} -p ${SERVICES} down --remove-orphans
 #docker compose rm -f
-docker compose -f docker-compose-services-dev.yaml -p upstage-services-dev up -d
-docker compose -f docker-compose-services-dev.yaml -p upstage-services-dev ps
+docker compose -f ${DOCKERFILE} -p ${SERVICES} up -d
+docker compose -f ${DOCKERFILE} -p ${SERVICES} ps
