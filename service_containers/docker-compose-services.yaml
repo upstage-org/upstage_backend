@@ -1,0 +1,54 @@
+name: upstage-services-dev
+services:
+  postgres-dev:
+    image: postgres:latest
+    container_name: postgres_container_dev
+    user: "999:999"
+    volumes:
+      - ${PG_DATA_DIR}/var:/var/lib/postgresql
+      - /postgresql_data_dev/data:/data/postgres
+    #ports:
+    #  - "127.0.0.1:5433:5432"
+    environment:
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_USER: postgres
+      POSTGRES_DB: upstage
+      PGDATA: /data/postgres
+    networks:
+      - upstage-network-dev
+    command: postgres -c listen_addresses='*'
+
+  mosquitto-dev:
+    image: eclipse-mosquitto:latest
+    container_name: mosquitto_container_dev
+    user: "1883:1883"
+    ports:
+      #- "2096:1883" docker containers use the internal port when on the same machine and network.
+      - "2087:9001"
+    volumes:
+      - /mosquitto_files_dev/etc/mosquitto:/etc/mosquitto
+      - /mosquitto_files_dev/var/lib/mosquitto:/var/lib/mosquitto
+      - /etc/letsencrypt:/etc/letsencrypt
+    networks:
+      - upstage-network-dev
+    command:
+      # Resync the password in the pw.txt file referenced below:
+      /bin/sh -c "cp /etc/mosquitto/pw.backup /etc/mosquitto/pw.txt &&
+      chmod 0700 /etc/mosquitto/pw.txt &&
+      chown root:root /etc/mosquitto/pw.txt &&
+      mosquitto_passwd -U /etc/mosquitto/pw.txt &&
+      chown mosquitto:mosquitto /etc/mosquitto/pw.txt &&
+      chown mosquitto:mosquitto /var/lib/mosquitto &&
+      /etc/mosquitto/cron/add_mqtt_cert_crontab.sh &&
+      mkdir -p /etc/http &&
+      mosquitto -c /etc/mosquitto/mosquitto.conf"
+    restart: no
+
+networks:
+  upstage-network-dev:
+    name: upstage-network-dev
+    driver: bridge
+    #external: true
+volumes:
+  postgresql_files:
+  mosquitto_files:
