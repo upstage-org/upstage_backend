@@ -24,13 +24,13 @@ services:
       #- "2096:1883" docker containers use the internal port when on the same machine and network.
       - "2087:9001"
     volumes:
-      # Auto-change the password in the pw.txt file referenced below:
       - /mosquitto_files_dev/etc/mosquitto:/etc/mosquitto
       - /mosquitto_files_dev/var/lib/mosquitto:/var/lib/mosquitto
       - /etc/letsencrypt:/etc/letsencrypt
     networks:
       - upstage-network-dev
     command:
+      # Resync the password in the pw.txt file referenced below:
       /bin/sh -c "cp /etc/mosquitto/pw.backup /etc/mosquitto/pw.txt &&
       chmod 0700 /etc/mosquitto/pw.txt &&
       chown root:root /etc/mosquitto/pw.txt &&
@@ -40,7 +40,6 @@ services:
       /etc/mosquitto/cron/add_mqtt_cert_crontab.sh &&
       mkdir -p /etc/http &&
       mosquitto -c /etc/mosquitto/mosquitto.conf"
-      #/bin/sh -c "/bin/sh"
     restart: no
 
 networks:
