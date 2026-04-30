@@ -17,20 +17,6 @@ services:
       - upstage-network
     command: postgres -c listen_addresses='*'
 
-  mongodb:
-    image: mongo:latest
-    container_name: mongodb_container
-    environment:
-      MONGO_INITDB_ROOT_USERNAME: admin
-      MONGO_INITDB_ROOT_PASSWORD: ${MONGO_INITDB_ROOT_PASSWORD}
-    #ports:
-    #  - "127.0.0.1:27018:27017"
-    volumes:
-      - /mongodb_data_volume:/data
-    restart: unless-stopped
-    networks:
-      - upstage-network
-
   mosquitto:
     image: eclipse-mosquitto:latest
     container_name: mosquitto_container
@@ -38,13 +24,13 @@ services:
       - "2096:9001"
       #- "2087:1883" docker containers use the internal port when on the same machine and network.
     volumes:
-      # Auto-change the password in the pw.txt file referenced below:
       - /mosquitto_files/etc/mosquitto:/etc/mosquitto
       - /mosquitto_files/var/lib/mosquitto:/var/lib/mosquitto
       - /etc/letsencrypt:/etc/letsencrypt
     networks:
       - upstage-network
     command:
+      # Resync the password in the pw.txt file referenced below:
       /bin/sh -c "cp /etc/mosquitto/pw.backup /etc/mosquitto/pw.txt &&
       chmod 0700 /etc/mosquitto/pw.txt &&
       chown root:root /etc/mosquitto/pw.txt &&
@@ -54,7 +40,6 @@ services:
       /etc/mosquitto/cron/add_mqtt_cert_crontab.sh &&
       mkdir -p /etc/http &&
       mosquitto -c /etc/mosquitto/mosquitto.conf"
-      #/bin/sh -c "/bin/sh"
     restart: no
 
 networks:
@@ -64,5 +49,4 @@ networks:
     external: true
 volumes:
   postgresql_files:
-  mongodb_data_volume:
   mosquitto_files:
