@@ -57,3 +57,8 @@ docker compose -f ${DOCKERFILE} -p ${SERVICES} down --remove-orphans
 #docker compose rm -f
 docker compose -f ${DOCKERFILE} -p ${SERVICES} up -d
 docker compose -f ${DOCKERFILE} -p ${SERVICES} ps
+
+firstrun_fail=`docker logs postgres 2>&1 | grep -i "permission\|initdb\|could not change permissions"`
+if [[ ! -z $VAR ]]; then:
+    docker restart postgres-container-${SUFFIX}
+fi
