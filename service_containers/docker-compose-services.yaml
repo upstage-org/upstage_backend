@@ -1,8 +1,8 @@
-name: upstage-services-dev
+name: upstage-services-${SUFFIX}
 services:
-  postgres-dev:
+  postgres-${SUFFIX}:
     image: postgres:latest
-    container_name: postgres_container_dev
+    container_name: postgres_container_${SUFFIX}
     user: "999:999"
     volumes:
       - ${PG_DATA_DIR}/var:/var/lib/postgresql
@@ -15,12 +15,12 @@ services:
       POSTGRES_DB: upstage
       PGDATA: /data/postgres
     networks:
-      - upstage-network-dev
+      - upstage-network-${SUFFIX}
     command: postgres -c listen_addresses='*'
 
-  mosquitto-dev:
+  mosquitto-${SUFFIX}:
     image: eclipse-mosquitto:latest
-    container_name: mosquitto_container_dev
+    container_name: mosquitto_container_${SUFFIX}
     user: "1883:1883"
     ports:
       #- "2096:1883" docker containers use the internal port when on the same machine and network.
@@ -30,7 +30,7 @@ services:
       - ${MQ_DATA_DIR}/var/lib/mosquitto:/var/lib/mosquitto
       - /etc/letsencrypt:/etc/letsencrypt
     networks:
-      - upstage-network-dev
+      - upstage-network-${SUFFIX}
     command:
       # Resync the password in the pw.txt file referenced below:
       /bin/sh -c "cp /etc/mosquitto/pw.backup /etc/mosquitto/pw.txt &&
@@ -45,8 +45,8 @@ services:
     restart: no
 
 networks:
-  upstage-network-dev:
-    name: upstage-network-dev
+  upstage-network-${SUFFIX}:
+    name: upstage-network-${SUFFIX}
     driver: bridge
     #external: true
 volumes:

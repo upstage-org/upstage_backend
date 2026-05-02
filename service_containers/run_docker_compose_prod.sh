@@ -7,8 +7,9 @@ SERVICES=upstage-services-prod
 
 set -a
 
-PG_DATA_DIR=/postgres_data_prod
-MQ_DATA_DIR=/mosquitto_files_prod
+SUFFIX=prod
+PG_DATA_DIR=/postgres_data_${SUFFIX}
+MQ_DATA_DIR=/mosquitto_files_${SUFFIX}
 
 # Set this in your environment.
 : "${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is not set or is empty}" || exit 1
@@ -32,6 +33,8 @@ else
         exit 1
     fi
 fi
+
+sudo chown -R 1883:1883 ${MQ_DATA_DIR}
 
 if [ ! -d "${PG_DATA_DIR}" ]; then
     sudo mkdir -p ${PG_DATA_DIR}

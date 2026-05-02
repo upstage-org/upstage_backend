@@ -7,8 +7,9 @@ SERVICES=upstage-services-dev
 
 set -a
 
-PG_DATA_DIR=/postgres_data_dev
-MQ_DATA_DIR=/mosquitto_files_dev
+SUFFIX=dev
+PG_DATA_DIR=/postgres_data_${SUFFIX}
+MQ_DATA_DIR=/mosquitto_files_${SUFFIX}
 
 # Set this in your environment.
 : "${POSTGRES_PASSWORD_DEV:?POSTGRES_PASSWORD_DEV is not set or is empty}" || exit 1
@@ -35,8 +36,11 @@ else
     fi
 fi
 
+sudo chown -R 1883:1883 ${MQ_DATA_DIR}
+
 if [ ! -d "${PG_DATA_DIR}" ]; then
     sudo mkdir -p ${PG_DATA_DIR}
+    docker logs 
 fi
 sudo chown -R 999:999 ${PG_DATA_DIR}
 
