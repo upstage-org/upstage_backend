@@ -1,6 +1,6 @@
 name: upstage-services-${SUFFIX}
 services:
-  postgres-${SUFFIX}:
+  postgres:
     image: postgres:latest
     container_name: postgres_container_${SUFFIX}
     user: "999:999"
@@ -15,10 +15,10 @@ services:
       POSTGRES_DB: upstage
       PGDATA: /data/postgres
     networks:
-      - upstage-network-${SUFFIX}
+      - upstage-network
     command: postgres -c listen_addresses='*'
 
-  mosquitto-${SUFFIX}:
+  mosquitto:
     image: eclipse-mosquitto:latest
     container_name: mosquitto_container_${SUFFIX}
     user: "1883:1883"
@@ -30,12 +30,11 @@ services:
       - ${MQ_DATA_DIR}/var/lib/mosquitto:/var/lib/mosquitto
       - /etc/letsencrypt:/etc/letsencrypt
     networks:
-      - upstage-network-${SUFFIX}
+      - upstage-network
     command:
       # Resync the password in the pw.txt file referenced below:
       /bin/sh -c "cp /etc/mosquitto/pw.backup /etc/mosquitto/pw.txt &&
       chmod 0700 /etc/mosquitto/pw.txt &&
-      chown root:root /etc/mosquitto/pw.txt &&
       mosquitto_passwd -U /etc/mosquitto/pw.txt &&
       chown mosquitto:mosquitto /etc/mosquitto/pw.txt &&
       chown mosquitto:mosquitto /var/lib/mosquitto &&
@@ -45,10 +44,10 @@ services:
     restart: no
 
 networks:
-  upstage-network-${SUFFIX}:
+  upstage-network:
     name: upstage-network-${SUFFIX}
     driver: bridge
-    #external: true
+    external: true
 volumes:
   postgresql_files:
   mosquitto_files:
