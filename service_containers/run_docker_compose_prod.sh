@@ -2,12 +2,13 @@
 
 echo "This script may require root privileges."
 
-DOCKERFILE=docker-compose-services.yaml
-SERVICES=upstage-services-prod
-
 set -a
 
 SUFFIX=prod
+DOCKERFILE=docker-compose-services.yaml
+SERVICES=upstage-services-${SUFFIX}
+
+HARDCODED_HOSTNAME=upstage.live
 PG_DATA_DIR=/postgres_data_${SUFFIX}
 MQ_DATA_DIR=/mosquitto_files_${SUFFIX}
 
