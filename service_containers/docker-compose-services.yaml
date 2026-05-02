@@ -6,7 +6,7 @@ services:
     user: "999:999"
     volumes:
       - ${PG_DATA_DIR}/var:/var/lib/postgresql
-      - /postgresql_data_dev/data:/data/postgres
+      - ${PG_DATA_DIR}/data:/data/postgres
     #ports:
     #  - "127.0.0.1:5433:5432"
     environment:
@@ -26,8 +26,8 @@ services:
       #- "2096:1883" docker containers use the internal port when on the same machine and network.
       - "2087:9001"
     volumes:
-      - /mosquitto_files_dev/etc/mosquitto:/etc/mosquitto
-      - /mosquitto_files_dev/var/lib/mosquitto:/var/lib/mosquitto
+      - ${MQ_DATA_DIR}/etc/mosquitto:/etc/mosquitto
+      - ${MQ_DATA_DIR}/var/lib/mosquitto:/var/lib/mosquitto
       - /etc/letsencrypt:/etc/letsencrypt
     networks:
       - upstage-network-dev
