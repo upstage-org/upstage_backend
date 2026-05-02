@@ -26,9 +26,11 @@ if [ ! -d "${MQ_DATA_DIR}" ]; then
     echo "Change the performance and admin passwords in this file: ${MQ_DATA_DIR}/etc/mosquitto/pw.backup"
     # We update mosquitto certs in a Let's Encrypt renenwal hook
     # script on the host server itself.
-    #echo '0 0 * * * "cp /etc/letsencrypt/live/*/* /etc/mosquitto/ca_certificates/ && chown mosquitto:mosquitto /etc/mosquitto/ca_certificates/*"' > /tmp/mqttcron
-    #crontab /tmp/mqttcron
-    #rm -rf /tmp/mqttcron
+    sudo certbot certonly \
+     --webroot \
+     --webroot-path /var/www/html \
+     -d ${HARDCODED_HOSTNAME} \
+     --deploy-hook "systemctl reload nginx && cp /etc/letsencrypt/live/${HARDCODED_HOSTNAME}/* ${MQ_DATA_DIR}/etc/mosquitto/ca_certificates/ && chown 1883:1883 ${MQ_DATA_DIR}/etc/mosquitto/ca_certificates/*"
     exit 0
 else
     check_mqtt_pw=`grep performance ${MQ_DATA_DIR}/etc/mosquitto/pw.backup | grep performance | awk -F: '{print $2}'`
