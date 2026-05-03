@@ -39,7 +39,6 @@ services:
       chown mosquitto:mosquitto /etc/mosquitto/pw.txt &&
       chown mosquitto:mosquitto /var/lib/mosquitto &&
       if [[ ! -z ${SSL} ]]; then HARDCODED_HOSTNAME=${HARDCODED_HOSTNAME} /etc/mosquitto/add_certs_onetime.sh; fi &&
-      mkdir -p /etc/http &&
       mosquitto -c /etc/mosquitto/mosquitto.conf"
     restart: no
 
