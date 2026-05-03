@@ -88,8 +88,7 @@ services:
       cd /usr/app &&
       export HARDCODED_HOSTNAME=${HARDCODED_HOSTNAME} &&
       ./scripts/start_upstage.sh"
-    restart:
-      - unless-stopped
+    restart: unless-stopped
     networks:
       - upstage-network-dev
 
@@ -105,8 +104,7 @@ services:
       cd /usr/app &&
       export HARDCODED_HOSTNAME=${HARDCODED_HOSTNAME} &&
       ./scripts/run_event_archive.sh"
-    restart:
-      - unless-stopped
+    restart: unless-stopped
     networks:
       - upstage-network-dev
 
@@ -122,8 +120,7 @@ services:
       cd /usr/app &&
       export HARDCODED_HOSTNAME=${HARDCODED_HOSTNAME} &&
       ./scripts/run_upstage_stats.sh"
-    restart:
-      - unless-stopped
+    restart: unless-stopped
     networks:
       - upstage-network-dev
 
