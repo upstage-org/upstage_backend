@@ -841,34 +841,6 @@ Example Response:
 }
 ```
 
-**sendEmailExternal**
-Example Mutation:
-```graphql
-mutation {
-    sendEmailExternal(emailInfo: {
-        subject: "Meeting Reminder",
-        body: "Don't forget about the meeting tomorrow at 10 AM.",
-        recipients: ["john.doe@example.com"],
-        cc: ["jane.doe@example.com"],
-        bcc: ["manager@example.com"],
-        filenames: ["agenda.pdf"]
-    }) {
-        success
-    }
-}
-```
-
-Example Response:
-```json
-{
-    "data": {
-        "sendEmailExternal": {
-            "success": true
-        }
-    }
-}
-```
-
 **access**
 Example Query:
 ```graphql

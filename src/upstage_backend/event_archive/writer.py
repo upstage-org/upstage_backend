@@ -26,18 +26,12 @@ class _PayloadDecodeError(Exception):
 
 def _decode_payload(raw):
     """
-    Reproduce the exact shape the deleted Mongo-queue worker produced for
-    EventModel.payload (postgresql.JSON): json.loads(bytes_from_wire).
+    Decode MQTT payload bytes/str to a Python value for EventModel.payload
+    (postgresql.JSON), matching the legacy pipeline: raw bytes on the wire,
+    ``json.loads`` before insert.
 
-    The legacy pipeline was:
-        on_message : Mongo.insert_one({"payload": msg.payload})   # raw bytes
-        worker     : payload = json.loads(event["payload"])        # raises on bad data
-        record_event(payload=payload)                              # Python value saved as JSON
-
-    Any payload that could not be json.loads'd never reached Postgres in the
-    old code. We preserve that invariant here: if decoding fails we raise
-    _PayloadDecodeError and the caller drops the event with a log entry,
-    identical to the legacy worker's outer try/except behavior.
+    Any payload that could not be decoded is dropped by the caller with a log
+    line, same as the old archive worker.
     """
     if isinstance(raw, (bytes, bytearray)):
         try:

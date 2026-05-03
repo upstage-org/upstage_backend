@@ -36,10 +36,10 @@ This is used for captcha handling. Turning this off is not recommended, since bo
 # Dependencies that are configured on your behalf, and should remain "hands-free": This is provided for your information only, and requires no action from you other than following the interactive installation instructions:
 
 1. MQTT: mosquitto: Uses SSL for websocket connections only. TCP backend connections do not use SSL.
-1. MQTT, MongoDB, Postgresql are all password protected. Passwords are auto-generated, and UFW rules ensure that remote access is only granted to the app server.
+1. MQTT, Postgresql are password protected. Passwords are auto-generated, and UFW rules ensure that remote access is only granted to the app server.
 1. All code, data and configuration exists on the physical/virtual machines in the '/' directory, and these corresponding directories are mounted into the individual instances as needed. This means that if a docker instance inside the physical/virtual fails for some reason, data will not be lost.
 1. Rerunning certain scripts will cause auto-generated passwords for DBs and such to be reset, and may cause data loss. See the [Restarting](#restarting-instances-in-case-of-problems) section for details on scripts which can be re-executed without harm.
-1. You may want to take snapshots of the above mentioned directories in each virtual/physical machine, or have them mounted from one shared, backed-up drive. See the [Restarting](#restarting-instances-in-case-of-problem) scripts to see how to stop and restart MongoDB and Postgresql for backups.
+1. You may want to take snapshots of the above mentioned directories in each virtual/physical machine, or have them mounted from one shared, backed-up drive. See the [Restarting](#restarting-instances-in-case-of-problem) scripts to see how to stop and restart Postgresql for backups.
 
 # Directories which contain all configuration and data (you may want to take snapshots of these):
 
@@ -57,7 +57,6 @@ build  dist
 
 ```
 In / :
-/mongodb_data_volume
 /postgresql_data
 /mosquitto_files
 ```
@@ -98,7 +97,7 @@ cd /root/upstage_backend/service_containers
 ```
 
 This shell script can harmlessly be restarted at any time.
-It sets the Postgresql and MongoDB passwords used by docker-compose.
+It sets the Postgresql password used by docker-compose.
 Inside the docker-compose file, you'll see how the Mosquitto password is reset upon restart, from a password backup file:
 
 ```
@@ -165,7 +164,7 @@ Choose option 1 to set up the Service Back End.
 
 This will auto-generate passwords for various applications, and will store them in a local config file. It will also configure nginx for the specific type of machine you are setting up. Note that nginx, LetsEncrypt and ufw all run on the machine itself, not in the instances.
 
-It will start three docker containers: MongoDB, Postgresql, Mosquitto.
+It will start docker containers for Postgresql and Mosquitto.
 
 ### Important: Same Machine Setup Configuration
 

@@ -14,7 +14,7 @@ Technically, UpStage is three cooperating runtimes:
 | HTTP / GraphQL backend | FastAPI + Ariadne schema, JWT auth, media storage, stage CRUD, recording | [`prod_copy/upstage_backend/src/upstage_backend/`](upstage_backend/src/upstage_backend/) |
 | Event archive worker | Async MQTT subscriber that persists live events into Postgres | [`prod_copy/upstage_backend/src/upstage_backend/event_archive/`](upstage_backend/src/upstage_backend/event_archive/) |
 
-Infrastructure: Mosquitto (MQTT broker), Postgres (primary data store, including the live event log), MongoDB (email-token collection only), and an object/file store for uploaded media.
+Infrastructure: Mosquitto (MQTT broker), Postgres (primary data store, including the live event log), and an object/file store for uploaded media.
 
 ## 2. System architecture
 
@@ -37,14 +37,12 @@ flowchart LR
   end
 
   PG[("PostgreSQL<br/>users, stages, events,<br/>performances, assets, scenes")]
-  Mongo[("MongoDB<br/>email tokens only")]
   Files[("Uploaded media<br/>(local volume)")]
 
   Browser -->|"HTTPS + GraphQL"| HTTP
   Browser <-->|"MQTT over WSS<br/>topic: <namespace>/<stageUrl>/<topic>"| MQTT
   MQTT --> Sub --> Q --> Wr --> PG
   GQL -->|"SQLAlchemy"| PG
-  GQL --> Mongo
   GQL --> Files
   Browser -->|"media reads"| Files
 ```
@@ -139,7 +137,7 @@ Every folder under `upstage_backend/src/` is a bounded context. They all expose 
 | [`stages/`](upstage_backend/src/upstage_backend/stages/) | Stage CRUD, join/load, event replay, sweep, duplicate, scenes |
 | [`assets/`](upstage_backend/src/upstage_backend/assets/) | Media catalogue, asset usage, copyright levels |
 | [`files/`](upstage_backend/src/upstage_backend/files/) | Upload handling, thumbnails |
-| [`mails/`](upstage_backend/src/upstage_backend/mails/) | System email, email-token Mongo collection |
+| [`mails/`](upstage_backend/src/upstage_backend/mails/) | SMTP helpers for system email |
 | [`licenses/`](upstage_backend/src/upstage_backend/licenses/) | Licence keys, access checks |
 | [`payments/`](upstage_backend/src/upstage_backend/payments/) | Stripe integration |
 | [`performance_config/`](upstage_backend/src/upstage_backend/performance_config/) | Performances (archived stage snapshots) and recordings |
@@ -533,8 +531,6 @@ class EventModel(BaseModel):
     created = Column(DateTime, default=datetime.datetime.now, index=True)
 ```
 
-MongoDB is used only for time-expiring email verification tokens; see [`upstage_backend/src/upstage_backend/event_archive/config/mongodb.py`](upstage_backend/src/upstage_backend/event_archive/config/mongodb.py) `build_mongo_email_client` / `get_mongo_token_collection` (used by [`upstage_backend/src/upstage_backend/mails/helpers/mail.py`](upstage_backend/src/upstage_backend/mails/helpers/mail.py) line 49).
-
 ## 7. Database session management (hybrid contextvar model)
 
 UpStage uses a two-track session strategy so that every DB touch has exactly one owner of its commit/rollback/close, regardless of whether it happens inside an HTTP request or in a long-running worker/script.
@@ -755,7 +751,7 @@ Prereqs: Docker + docker compose, a `.env` file with the database and MQTT crede
 # From the repo root:
 cd prod_copy/upstage_backend/app_containers
 docker compose -f docker-compose-dev.yaml up -d
-# Three app containers plus whatever you run for Postgres, Mongo, MQTT
+# Three app containers plus whatever you run for Postgres and MQTT
 cd ../../upstage_frontend
 npm ci && npm run dev     # Vite dev server against the backend
 ```

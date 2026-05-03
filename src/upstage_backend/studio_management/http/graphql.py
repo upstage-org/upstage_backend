@@ -108,16 +108,7 @@ type_defs = gql("""
         level: Int!
         permissions: String!
     }
-    
-    input EmailInput {
-        subject: String!
-        body: String!
-        recipients: [String!]
-        cc: [String!]
-        bcc: [String!]
-        filenames: [String!]
-    }
-                
+            
     input PaymentIntentInput {
         amount: Int!
         currency: String
@@ -510,10 +501,6 @@ type_defs = gql("""
         message: String!
     }
         
-    type EmailResponse {
-        success: Boolean!
-    }
-                
     type UpdateStageResponse {
         result: String
     }
@@ -655,8 +642,6 @@ type_defs = gql("""
                 
         createLicense(input: LicenseInput!): License!
         revokeLicense(id: ID!): String!
-                
-        sendEmailExternal(emailInfo: EmailInput!): EmailResponse!
                 
         paymentSecret(input: PaymentIntentInput!): String!
         oneTimePurchase(input: OneTimePurchaseInput!): CommonResponse

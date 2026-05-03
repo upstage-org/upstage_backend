@@ -30,7 +30,7 @@ Scripts in this directory orchestrate a **clean Debian install** of UpStage when
 1. `initial_scripts/environments/generate_environments_script.sh` generates secrets and fills:
    - `src/global_config/load_env.py`
    - `container_scripts/mqtt_server/pw.txt`
-   - `service_containers/run_docker_compose.sh` (exports for Postgres and Mongo)
+   - `service_containers/run_docker_compose.sh` (exports for Postgres)
 2. `scripts/generate_cipher_key.sh` updates the cipher entry in `load_env.py`.
 3. Service Docker is started with **`installation/lib/run_service_compose.sh`**, which reads those `export` lines from the generated `run_docker_compose.sh` and runs `docker compose` with **`docker-compose-services-prod.yaml`** (or `-dev`) so prod-style compose filenames work without hand-editing passwords.
 
@@ -60,7 +60,7 @@ Run a single step (after preparing earlier steps), for example:
 
 1. `10_os` — `initial_scripts/setup-os.sh` (Docker, UFW base, logrotate).
 2. `20_collect_domains` — writes `state.env` (app / svc / streaming hostnames, LE email, `prod` or `dev`).
-3. `30_prepare_svc_app_layout` — creates `/postgresql_data`, `/mongodb_data_volume`, `/mosquitto_files`, `/app_code` dirs.
+3. `30_prepare_svc_app_layout` — creates `/postgresql_data`, `/mosquitto_files`, `/app_code` dirs.
 4. `50_certificates` — nginx + certbot; obtains **separate** certificates per hostname (paths match the nginx templates).
 5. `40_generate_secrets` — `generate_environments_script.sh` + `generate_cipher_key.sh` (interactive).
 6. `45_sync_load_env` — mosquitto files, copy app tree to `/app_code`, `sed` on `load_env.py` for `{APP_HOST}` (no SCP).

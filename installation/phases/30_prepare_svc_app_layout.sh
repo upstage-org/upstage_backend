@@ -11,7 +11,6 @@ BACKEND="$(resolve_backend_dir)"
 [[ -n "$BACKEND" ]] || { echo "Backend dir not found"; exit 1; }
 
 mkdir -p /postgresql_data/var /postgresql_data/data
-mkdir -p /mongodb_data_volume
 mkdir -p /mosquitto_files/etc/mosquitto/conf.d
 mkdir -p /mosquitto_files/etc/mosquitto/cron
 mkdir -p /mosquitto_files/var/lib/mosquitto

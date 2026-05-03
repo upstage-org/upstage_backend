@@ -2,26 +2,16 @@
 import os
 import sys
 
-
-from asyncio import sleep
-from datetime import datetime
 from email.mime.application import MIMEApplication
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 from email.utils import formatdate, make_msgid
-import json
-import os
 import re
-import uuid
-import requests
 import ssl
-import pymongo
 import aiosmtplib
 
 from upstage_backend.global_config import ScopedSession
 from upstage_backend.global_config.env import (
-    ACCEPT_EMAIL_HOST,
-    ACCEPT_SERVER_SEND_EMAIL_EXTERNAL,
     DOMAIN,
     EMAIL_HOST,
     EMAIL_HOST_DISPLAY_NAME,
@@ -29,131 +19,41 @@ from upstage_backend.global_config.env import (
     EMAIL_HOST_FROM,
     EMAIL_HOST_LOGIN,
     EMAIL_PORT,
-    EMAIL_TIME_EXPIRED_TOKEN,
     EMAIL_USE_TLS,
-    FULL_DOMAIN,
-    HOSTNAME,
-    SEND_EMAIL_SERVER,
     SUPPORT_EMAILS,
 )
-
-
-from upstage_backend.event_archive.config.mongodb import get_mongo_token_collection
 from upstage_backend.upstage_options.db_models.config import ConfigModel
 
 
 async def send(to, subject, content, bcc=[], cc=[], filenames=[]):
-    if HOSTNAME not in ACCEPT_EMAIL_HOST:
-        call_send_email_external_api(subject, content, to, cc, bcc, filenames)
-    else:
-        msg = create_email(
-            to=to, subject=subject, html=content, cc=cc, bcc=bcc, filenames=filenames
-        )
+    msg = create_email(
+        to=to, subject=subject, html=content, cc=cc, bcc=bcc, filenames=filenames
+    )
     await send_async(msg=msg)
-
-
-def call_send_email_external_api(subject, body, recipients, cc, bcc, filenames):
-    with ScopedSession() as local_db_session:
-        subject_prefix = (
-            local_db_session.query(ConfigModel)
-            .filter(ConfigModel.name == "EMAIL_SUBJECT_PREFIX")
-            .first()
-        )
-        if subject_prefix:
-            subject = f"{subject_prefix.value}: {subject}"
-
-    url = f"{SEND_EMAIL_SERVER}/api/email_graphql"
-    client = get_mongo_token_collection()
-    token = client.find_one(
-        {"from_server": FULL_DOMAIN}, sort=[("_id", pymongo.DESCENDING)]
-    )
-    headers = {}
-    if token and "token" in token:
-        headers["X-Email-Token"] = token["token"]
-    data = """
-        mutation
-            sendEmailExternal($subject: String!, $body: String!, $recipients: [String!], $cc: [String!],$bcc: [String!], $filenames: [String!])
-            {
-                sendEmailExternal(
-                    emailInfo: {
-                        subject: $subject,
-                        body: $body,
-                        recipients: $recipients,
-                        cc: $cc,
-                        bcc: $bcc,
-                        filenames:$filenames
-                    }
-                ){
-                    success
-                }
-            }
-    """
-    variables = {
-        "subject": subject,
-        "body": body,
-        "recipients": recipients,
-        "cc": cc,
-        "bcc": bcc,
-        "filenames": filenames,
-    }
-    result = requests.post(
-        url=url,
-        data={"query": data, "variables": json.dumps(variables)},
-        headers=headers,
-    )
-    if result.ok and "errors" not in json.loads(result.text):
-        return headers["X-Email-Token"]
-    else:
-        raise Exception(json.loads(result.text))
-
-
-def save_email_token_client(token, _):
-    client = get_mongo_token_collection()
-    # client.delete_many({})
-    client.insert_one({"token": token, "expired_date": datetime.now()})
-
-
-def valid_token(token):
-    client = get_mongo_token_collection()
-    # if client.find_one({"token": decrypt(token)}):
-    if client.find_one({"token": token}):
-        return True
-
-
-async def generate_email_token_clients():
-    while True:
-        client = get_mongo_token_collection()
-        """
-        Only generate and insert new tokens locally.
-        The remote site will have access to this mongodb server, and will be able
-        to look them up directly.
-        """
-        for client_server in ACCEPT_SERVER_SEND_EMAIL_EXTERNAL:
-            live_token = uuid.uuid4().hex
-            client.insert_one(
-                {
-                    "token": live_token,
-                    "from_server": client_server,
-                    "expired_date": datetime.now(),
-                }
-            )
-        await sleep(EMAIL_TIME_EXPIRED_TOKEN)
 
 
 async def send_async(msg, user=EMAIL_HOST_LOGIN, password=EMAIL_HOST_PASSWORD):
     """
-    Contact SMTP server and send Message
-    We use this from a local server. 
-    TLS happens by default, no need to set it here.
+    Send via SMTP. Port 465 uses implicit TLS; other ports use STARTTLS when
+    EMAIL_USE_TLS is true (typical for 587 + external providers).
     """
+    if not EMAIL_HOST:
+        raise RuntimeError("EMAIL_HOST is not configured")
+
     host = EMAIL_HOST
-    port = EMAIL_PORT
-    smtp = aiosmtplib.SMTP(hostname=host, port=int(port), use_tls=False)
+    port = int(EMAIL_PORT)
+    tls_context = ssl.create_default_context()
+    implicit_tls = port == 465
+
+    smtp = aiosmtplib.SMTP(
+        hostname=host,
+        port=port,
+        use_tls=implicit_tls,
+        tls_context=tls_context if implicit_tls else None,
+    )
     await smtp.connect()
-    '''
-    if EMAIL_USE_TLS:
-        await smtp.starttls(context=ssl.create_default_context())
-    '''
+    if not implicit_tls and EMAIL_USE_TLS:
+        await smtp.starttls(tls_context)
     if user:
         await smtp.login(user, password)
     await smtp.send_message(msg)
@@ -168,22 +68,19 @@ def create_email(
     cc=[],
     bcc=[],
     sender=EMAIL_HOST_FROM,
-    external=False,
 ):
     """
     Create an email
     """
     msg = MIMEMultipart("fixed")
-    # Get Subject prefix in Upstage server
-    if not external:
-        with ScopedSession() as local_db_session:
-            subject_prefix = (
-                local_db_session.query(ConfigModel)
-                .filter(ConfigModel.name == "EMAIL_SUBJECT_PREFIX")
-                .first()
-            )
-            if subject_prefix:
-                subject = f"{subject_prefix.value}: {subject}"
+    with ScopedSession() as local_db_session:
+        subject_prefix = (
+            local_db_session.query(ConfigModel)
+            .filter(ConfigModel.name == "EMAIL_SUBJECT_PREFIX")
+            .first()
+        )
+        if subject_prefix:
+            subject = f"{subject_prefix.value}: {subject}"
     msg.preamble = subject
 
     # Remove empty strings. Not sure how they get here.
@@ -200,19 +97,19 @@ def create_email(
         bcc = [bcc]
 
     if len(to) == 1:
-        if to[0] in ("",None):
+        if to[0] in ("", None):
             to = []
     else:
         to = [x for x in to if x not in ("", None) and len(to) > 1]
 
     if len(cc) == 1:
-        if cc[0] in ("",None):
+        if cc[0] in ("", None):
             cc = []
     else:
         cc = [x for x in cc if x not in ("", None) and len(cc) > 1]
 
     if len(bcc) == 1:
-        if bcc[0] in ("",None):
+        if bcc[0] in ("", None):
             bcc = []
     else:
         bcc = [x for x in bcc if x not in ("", None) and len(bcc) > 1]
