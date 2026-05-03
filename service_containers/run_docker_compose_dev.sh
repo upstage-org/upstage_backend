@@ -71,9 +71,9 @@ docker compose -f ${DOCKERFILE} -p ${SERVICES} down --remove-orphans
 docker compose -f ${DOCKERFILE} -p ${SERVICES} up -d
 docker compose -f ${DOCKERFILE} -p ${SERVICES} ps
 
-firstrun_fail=`docker logs postgres-container-${SITE} 2>&1 | grep -i "permission\|initdb\|could not change permissions"`
+firstrun_fail=`docker logs postgres_container_${SITE} 2>&1 | grep -i "permission\|initdb\|could not change permissions\|No such container"`
 if [[ ! -z $firstrun_fail ]]; then
-    docker compose -f ${DOCKERFILE} -p ${SERVICES} down --remove-orphans postgres-container-${SITE}
-    docker compose -f ${DOCKERFILE} -p ${SERVICES} up -d postgres-container-${SITE}
+    docker compose -f ${DOCKERFILE} -p ${SERVICES} down --remove-orphans postgres_container_${SITE}
+    docker compose -f ${DOCKERFILE} -p ${SERVICES} up -d postgres_container_${SITE}
     docker compose -f ${DOCKERFILE} -p ${SERVICES} ps
 fi

@@ -38,7 +38,7 @@ services:
       mosquitto_passwd -U /etc/mosquitto/pw.txt &&
       chown mosquitto:mosquitto /etc/mosquitto/pw.txt &&
       chown mosquitto:mosquitto /var/lib/mosquitto &&
-      HARDCODED_HOSTNAME=${HARDCODED_HOSTNAME} /etc/mosquitto/add_certs_ontime.sh &&
+      HARDCODED_HOSTNAME=${HARDCODED_HOSTNAME} /etc/mosquitto/add_certs_onetime.sh &&
       mkdir -p /etc/http &&
       mosquitto -c /etc/mosquitto/mosquitto.conf"
     restart: no
