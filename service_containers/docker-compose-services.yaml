@@ -24,7 +24,7 @@ services:
     user: "1883:1883"
     ports:
       #- "2096:1883" docker containers use the internal port when on the same machine and network.
-      - "${MOSQUITTO_EXPOSED_WS_PORT}:9001"
+      - "${MOSQUITTO_EXPOSED_NON_SSL_WS_PORT}:9001"
     volumes:
       - ${MQ_DATA_DIR}/etc/mosquitto:/etc/mosquitto
       - ${MQ_DATA_DIR}/var/lib/mosquitto:/var/lib/mosquitto
