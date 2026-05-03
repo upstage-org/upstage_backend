@@ -1,8 +1,8 @@
-name: upstage-services-${SUFFIX}
+name: upstage-services-${SITE}
 services:
   postgres:
     image: postgres:latest
-    container_name: postgres_container_${SUFFIX}
+    container_name: postgres_container_${SITE}
     user: "999:999"
     volumes:
       - ${PG_DATA_DIR}/var:/var/lib/postgresql
@@ -20,7 +20,7 @@ services:
 
   mosquitto:
     image: eclipse-mosquitto:latest
-    container_name: mosquitto_container_${SUFFIX}
+    container_name: mosquitto_container_${SITE}
     user: "1883:1883"
     ports:
       #- "2096:1883" docker containers use the internal port when on the same machine and network.
@@ -45,7 +45,7 @@ services:
 
 networks:
   upstage-network:
-    name: upstage-network-${SUFFIX}
+    name: upstage-network-${SITE}
     driver: bridge
     external: true
 volumes:
