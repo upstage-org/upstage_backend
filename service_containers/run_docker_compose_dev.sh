@@ -14,6 +14,7 @@ HOSTNAMES=("dev.upstage.live","upstage.live")
 SITE=dev
 DOCKERFILE=docker-compose-services.yaml
 SERVICES=upstage-services-${SITE}
+MOSQUITTO_EXPOSED_WS_PORT=2087    # CloudFlare-friendly port
 
 HARDCODED_HOSTNAME=${SITE}.upstage.live
 PG_DATA_DIR=/postgres_data_${SITE}
