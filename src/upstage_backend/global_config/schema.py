@@ -11,6 +11,7 @@ from upstage_backend.global_config.db_context import (
     current_session_or_none,
     set_session,
 )
+from upstage_backend.global_config.env import ENV_TYPE
 
 
 def _make_graphql_context(request, data=None):
@@ -221,7 +222,9 @@ def config_graphql_endpoints(app: FastAPI,endpoint = '/api/studio_graphql'):
     )
 
     combined_graphql_app = GraphQL(
-        combined_schema, debug=True, context_value=_make_graphql_context
+        combined_schema,
+        debug=ENV_TYPE != "Production",
+        context_value=_make_graphql_context,
     )
 
     print(endpoint)

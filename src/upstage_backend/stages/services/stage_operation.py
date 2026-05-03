@@ -32,7 +32,15 @@ class StageOperationService:
             StageAttributeModel.name == "playerAccess"
         ).first()
 
-        desc = json.loads(playerAccess.description)
+        if not playerAccess or not playerAccess.description:
+            return
+
+        try:
+            desc = json.loads(playerAccess.description)
+        except (json.JSONDecodeError, TypeError):
+            return
+        if not isinstance(desc, list) or len(desc) < 1 or not isinstance(desc[0], list):
+            return
 
         for uid in user_ids:
             if uid not in desc[0]:
@@ -71,8 +79,11 @@ class StageOperationService:
         ).first()
 
         if player_access:
-            accesses = json.loads(player_access.description)
-            if len(accesses) == 2:
+            try:
+                accesses = json.loads(player_access.description)
+            except (json.JSONDecodeError, TypeError):
+                return "audience"
+            if isinstance(accesses, list) and len(accesses) == 2:
                 if user_id in accesses[0]:
                     return "player"
                 elif user_id in accesses[1]:
