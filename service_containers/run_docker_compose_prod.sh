@@ -1,19 +1,118 @@
 #!/bin/bash
 
-# This file is generated. Do not change the generated copy. It will be
-# overwritten.
+echo "This script may require root privileges."
 
 set -a
 
-export POSTGRES_PASSWORD=changeme
-export MONGO_INITDB_ROOT_PASSWORD=changeme
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+# These have to be set in both dev and prod scripts for SSL support and cert update deploy hook.
+#
+# Check/change the values of these variables before running.
+# 
 
-echo "
-If you need to run this installation more than once, and generated passwords have changed,
-be sure to remove and recreate the /postgresql_data/* dirs.
-"
+BASE_SITE=upstage.live
+SITES=("dev","prod")
+HOSTNAMES=("dev.${BASE_SITE}","${BASE_SITE}")
 
-docker compose -f ./docker-compose-services-prod.yaml -p upstage-services-prod down
+# Set this empty to turn SSL off for Mosquitto.
+#SSL=mqtt.${BASE_SITE}
+SSL=
+
+SITE=prod
+DOCKERFILE=docker-compose-services.yaml
+SERVICES=upstage-services-${SITE}
+MOSQUITTO_EXPOSED_NON_SSL_WS_PORT=2052    # CloudFlare-proxy-friendly non-SSL port
+
+HARDCODED_HOSTNAME=upstage.live
+PG_DATA_DIR=/postgres_data_${SITE}
+MQ_DATA_DIR=/mosquitto_files_${SITE}
+
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+# Set this in your environment: export POSTGRES_PASSWORD_DEV=NNNNN for example.
+var="POSTGRES_PASSWORD_${SITE^^}"
+POSTGRES_PASSWORD="${!var^^}"
+: "${POSTGRES_PASSWORD:?$var is not set or is empty}" || exit 1
+
+if [ ! -d "${MQ_DATA_DIR}" ]; then
+    echo "First time MQTT setup..."
+    sudo mkdir -p ${MQ_DATA_DIR}/etc/mosquitto/ca_certificates && \
+        sudo mkdir -p ${MQ_DATA_DIR}/etc/mosquitto/http && \
+        sudo mkdir -p ${MQ_DATA_DIR}/var/lib/mosquitto && \
+        sudo cp -r ./deployment_config/etc_mosquitto/* ${MQ_DATA_DIR}/etc/mosquitto && \
+        sudo chmod 700  ${MQ_DATA_DIR}/etc/mosquitto/ca_certificates &&
+        sudo chown -R 1883:1883 ${MQ_DATA_DIR}
+    echo "Change the performance and admin passwords in this file: ${MQ_DATA_DIR}/etc/mosquitto/pw.backup"
+
+    if [[ ! -z $SSL ]]; then
+        # We update mosquitto certs in a Let's Encrypt renenwal hook
+        # script on the host server itself.
+        sudo rm -f ${MQ_DATA_DIR}/etc/mosquitto/conf.d/local_mosquitto_nossl.conf
+	sudo cat << EOF > /root/letsencrypt_deploy_hook.sh
+$(cat deployment_config/on_server/letsencrypt_deploy_hook.sh.template)
+EOF
+        sudo certbot certonly \
+         --webroot \
+         --webroot-path /var/www/html \
+         -d ${HARDCODED_HOSTNAME} \
+         --deploy-hook /root/letsencrypt_deploy_hook.sh
+    else
+        sudo rm -f ${MQ_DATA_DIR}/etc/mosquitto/conf.d/local_mosquitto_ssl.conf
+    fi
+
+    exit 0
+else
+    check_mqtt_pw=`grep performance ${MQ_DATA_DIR}/etc/mosquitto/pw.backup | grep performance | awk -F: '{print $2}'`
+    if [ ${check_mqtt_pw} == 'changeme' ]; then
+        echo "Change the performance and admin passwords in this file: ${MQ_DATA_DIR}/etc/mosquitto/pw.backup"
+        exit 1
+    fi
+    check_mqtt_pw=`grep admin ${MQ_DATA_DIR}/etc/mosquitto/pw.backup | grep admin | awk -F: '{print $2}'`
+    if [ ${check_mqtt_pw} == 'changeme' ]; then
+        echo "Change the performance and admin passwords in this file: ${MQ_DATA_DIR}/etc/mosquitto/pw.backup"
+        exit 1
+    fi
+fi
+
+sudo chown -R 1883:1883 ${MQ_DATA_DIR}
+
+if [ ! -d "${PG_DATA_DIR}" ]; then
+    echo "First time Postgres setup..."
+    sudo mkdir -p ${PG_DATA_DIR}
+fi
+sudo chown -R 999:999 ${PG_DATA_DIR}
+
+docker network create upstage-network-${SITE}
+
+docker compose -f ${DOCKERFILE} -p ${SERVICES} down --remove-orphans
 #docker compose rm -f
-docker compose -f ./docker-compose-services-prod.yaml -p upstage-services-prod up -d
-docker compose -f ./docker-compose-services-prod.yaml -p upstage-services-prod ps
+docker compose -f ${DOCKERFILE} -p ${SERVICES} up -d
+docker compose -f ${DOCKERFILE} -p ${SERVICES} ps
+
+counter=0
+firstrun_fail=`docker logs postgres_container_${SITE} 2>&1 | grep -i "initdb\|could not change permissions\|No such container"`
+while [[ -n $firstrun_fail ]] && [ "$counter" -lt 3 ]
+do
+    echo "Restarting Postgres...${firstrun_fail}"
+    sleep 3
+    docker compose -f ${DOCKERFILE} -p ${SERVICES} down --remove-orphans postgres
+    sudo chown -R 999:999 ${PG_DATA_DIR}
+    docker compose -f ${DOCKERFILE} -p ${SERVICES} up -d postgres
+    docker compose -f ${DOCKERFILE} -p ${SERVICES} ps
+    counter=$((counter + 1))
+    firstrun_fail=`docker logs postgres_container_${SITE} 2>&1 | grep -i "initdb\|could not change permissions\|No such container"`
+done
+
+counter=0
+firstrun_fail=`docker logs mosquitto_container_${SITE} 2>&1 | grep -i "Permission denied\|could not change permissions\|No such container"`
+while [[ -n $firstrun_fail ]] && [ "$counter" -lt 3 ]
+do
+    echo "Restarting Mosquitto...${firstrun_fail}"
+    sleep 3
+    docker compose -f ${DOCKERFILE} -p ${SERVICES} down --remove-orphans mosquitto
+    sudo chown -R 1883:1883 ${MQ_DATA_DIR}
+    docker compose -f ${DOCKERFILE} -p ${SERVICES} up -d mosquitto
+    docker compose -f ${DOCKERFILE} -p ${SERVICES} ps
+    counter=$((counter + 1))
+    firstrun_fail=`docker logs mosquitto_container_${SITE} 2>&1 | grep -i "Permission denied\|could not change permissions\|No such container"`
+done

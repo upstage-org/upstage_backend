@@ -2,6 +2,8 @@
 import os
 import sys
 
+import loguru  # noqa: F401  # entrypoint: load loguru before upstage (see app_containers compose)
+
 from fastapi import FastAPI
 from fastapi_exception import FastApiException
 from fastapi_global_variable import GlobalVariable

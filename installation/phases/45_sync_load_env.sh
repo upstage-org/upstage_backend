@@ -28,8 +28,8 @@ cp -r ./dashboard/demo /app_code
 cp -r ./requirements.txt /app_code
 [[ -f ./pyproject.toml ]] && cp -r ./pyproject.toml /app_code
 [[ -d ./migration_scripts ]] && cp -r ./migration_scripts /app_code
-chmod -R 777 /app_code/alembic
-chmod -R 777 /app_code/uploads
+chmod -R u+rwX,g+rX,o+rX /app_code/alembic
+chmod -R u+rwX,g+rX,o+rX /app_code/uploads
 
 output_file="/app_code/src/global_config/load_env.py"
 chmod 755 "$output_file"

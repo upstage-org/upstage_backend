@@ -1,0 +1,9 @@
+# Never copy local venv into the image (would override image-built .venv paths)
+.venv/
+.git/
+**/__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+*.egg-info/
+dist/

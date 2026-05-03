@@ -1,13 +1,16 @@
 import os
 import sys
 
+import loguru  # noqa: F401  # entrypoint: load loguru before upstage (see app_containers compose)
+
 from sqlalchemy import text
+
+from upstage_backend.global_config.logger import logger
 from upstage_backend.global_config.helpers.fernet_crypto import encrypt
 from upstage_backend.global_config.env import DATABASE_HOST, DATABASE_NAME, DATABASE_PASSWORD, DATABASE_PORT, DATABASE_USER
 
 import arrow
 import glob
-from loguru import logger
 import shutil
 from sqlalchemy import create_engine, text
 from sqlalchemy.exc import SQLAlchemyError
