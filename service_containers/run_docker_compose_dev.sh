@@ -4,21 +4,30 @@ echo "This script may require root privileges."
 
 set -a
 
-# Set this to any value to turn ON SSL installation features.
-SSL=
-
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 # These have to be set in both dev and prod scripts for SSL support and cert update deploy hook.
+#
+# Check/change the values of these variables before running.
+# 
+
+BASE_SITE=upstage.live
 SITES=("dev","prod")
-HOSTNAMES=("dev.upstage.live","upstage.live")
+HOSTNAMES=("dev.${BASE_SITE}","${BASE_SITE}")
+
+# Set this empty to turn SSL off for Mosquitto.
+#SSL=mqtt.${BASE_SITE}
+SSL=
 
 SITE=dev
 DOCKERFILE=docker-compose-services.yaml
 SERVICES=upstage-services-${SITE}
-MOSQUITTO_EXPOSED_WS_PORT=2087    # CloudFlare-friendly port
+MOSQUITTO_EXPOSED_NON_SSL_WS_PORT=2052    # CloudFlare-proxy-friendly non-SSL port
 
 HARDCODED_HOSTNAME=${SITE}.upstage.live
 PG_DATA_DIR=/postgres_data_${SITE}
 MQ_DATA_DIR=/mosquitto_files_${SITE}
+
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 # Set this in your environment: export POSTGRES_PASSWORD_DEV=NNNNN for example.
 var="POSTGRES_PASSWORD_${SITE^^}"
@@ -39,11 +48,14 @@ if [ ! -d "${MQ_DATA_DIR}" ]; then
         # We update mosquitto certs in a Let's Encrypt renenwal hook
         # script on the host server itself.
         sudo rm -f ${MQ_DATA_DIR}/etc/mosquitto/conf.d/local_mosquitto_nossl.conf
+	sudo cat << EOF > /root/letsencrypt_deploy_hook.sh
+$(cat deployment_config/on_server/letsencrypt_deploy_hook.sh.template)
+EOF
         sudo certbot certonly \
          --webroot \
          --webroot-path /var/www/html \
          -d ${HARDCODED_HOSTNAME} \
-         --deploy-hook "./deployment_config/on_server/letsencrypt_deploy_hook.sh"
+         --deploy-hook /root/letsencrypt_deploy_hook.sh
     else
         sudo rm -f ${MQ_DATA_DIR}/etc/mosquitto/conf.d/local_mosquitto_ssl.conf
     fi
