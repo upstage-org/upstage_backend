@@ -28,11 +28,11 @@ if [ ! -d "${MQ_DATA_DIR}" ]; then
     sudo mkdir -p ${MQ_DATA_DIR}/etc/mosquitto/ca_certificates && \
         sudo mkdir -p ${MQ_DATA_DIR}/var/lib/mosquitto && \
         sudo cp -r ./deployment_config/etc_mosquitto/* ${MQ_DATA_DIR}/etc/mosquitto && \
-        sudo chmod 700  ${MQ_DATA_DIR}/ca_certificates &&
+        sudo chmod 700  ${MQ_DATA_DIR}/etc/mosquitto/ca_certificates &&
         sudo chown -R 1883:1883 ${MQ_DATA_DIR}
     echo "Change the performance and admin passwords in this file: ${MQ_DATA_DIR}/etc/mosquitto/pw.backup"
 
-    if [[ ! -z $SSL ]]; then:
+    if [[ ! -z $SSL ]]; then
       # We update mosquitto certs in a Let's Encrypt renenwal hook
       # script on the host server itself.
       sudo certbot certonly \
@@ -40,6 +40,7 @@ if [ ! -d "${MQ_DATA_DIR}" ]; then
        --webroot-path /var/www/html \
        -d ${HARDCODED_HOSTNAME} \
        --deploy-hook "./deployment_config/on_server/letsencrypt_deploy_hook.sh"
+    fi
 
     exit 0
 else
@@ -70,7 +71,9 @@ docker compose -f ${DOCKERFILE} -p ${SERVICES} down --remove-orphans
 docker compose -f ${DOCKERFILE} -p ${SERVICES} up -d
 docker compose -f ${DOCKERFILE} -p ${SERVICES} ps
 
-firstrun_fail=`docker logs postgres 2>&1 | grep -i "permission\|initdb\|could not change permissions"`
-if [[ ! -z $firstrun_fail ]]; then:
-    docker restart postgres-container-${SITE}
+firstrun_fail=`docker logs postgres-container-${SITE} 2>&1 | grep -i "permission\|initdb\|could not change permissions"`
+if [[ ! -z $firstrun_fail ]]; then
+    docker compose -f ${DOCKERFILE} -p ${SERVICES} down --remove-orphans postgres-container-${SITE}
+    docker compose -f ${DOCKERFILE} -p ${SERVICES} up -d postgres-container-${SITE}
+    docker compose -f ${DOCKERFILE} -p ${SERVICES} ps
 fi
