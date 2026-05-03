@@ -22,7 +22,7 @@ if [[ ! -f "$GEN" ]]; then
   echo "Expected generated file missing: $GEN" >&2
   exit 1
 fi
-if ! grep -q '^export POSTGRES_PASSWORD=' "$GEN" || ! grep -q '^export MONGO_INITDB_ROOT_PASSWORD=' "$GEN"; then
+if ! grep -q '^export POSTGRES_PASSWORD=' "$GEN"; then
   echo "Generated $GEN does not contain expected export lines." >&2
   exit 1
 fi

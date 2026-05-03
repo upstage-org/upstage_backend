@@ -7,18 +7,7 @@ DATABASE_USER = "postgres"
 DATABASE_PASSWORD = "{REPLACE_POSTGRES_PASSWORD}"
 DATABASE_NAME = "upstage"
 
-MONGO_DB = "upstage"
-MONGO_HOST = "{SVC_HOST}"
-MONGO_PORT = 27018
-MONGO_USER = "admin"
-MONGO_PASSWORD = "{REPLACE_MONGO_PASSWORD}"
 EVENT_COLLECTION = "events"
-MONGODB_COLLECTION_TOKEN = "token"
-MONGO_EMAIL_DB = "email"
-MONGO_EMAIL_HOST = "{SVC_HOST}"
-MONGO_EMAIL_PORT = 27018
-MONGO_EMAIL_PASSWORD = "{REPLACE_MONGO_PASSWORD}"
-MONGO_USER = "admin"
 
 EMAIL_USE_TLS = True
 EMAIL_HOST = "{EMAIL_HOST}"
@@ -47,19 +36,9 @@ CLIENT_MAX_BODY_SIZE=500 * 1024 * 1024
 UPLOAD_USER_CONTENT_FOLDER="/usr/app/uploads" # Mounted this way in docker-compose
 DEMO_MEDIA_FOLDER="/usr/app/dashboard/demo"
 
-# These settings are only for the upstage.live server. 
 # payment
 STRIPE_KEY = ""
 STRIPE_PRODUCT_ID = ""
-
-# This is the upstage.live host/hosts that will act as an email proxy 
-# for servers specified below. 
-ACCEPT_EMAIL_HOST = ["upstage.live"]
-# These are the domain names of machines from which upstage.live will accept
-# and send external email. We act as a mail proxy for approved clients.
-ACCEPT_SERVER_SEND_EMAIL_EXTERNAL = []
-
-SEND_EMAIL_SERVER = "https://upstage.live"
 
 # Change to "Production" for official releases.
 ENV_TYPE="Dev/Testing"

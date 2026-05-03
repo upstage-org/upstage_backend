@@ -71,7 +71,6 @@ case $machinetype in
            sed "s/YOUR_DOMAIN_NAME/$dname/g" ./initial_scripts/nginx_templates/nginx_template_for_svc_machines.conf >/etc/nginx/sites-available/$dname.conf
            mkdir -p /postgresql_data/var
            mkdir -p /postgresql_data/data
-           mkdir -p /mongodb_data_volume
            mkdir -p /mosquitto_files/etc/mosquitto/conf.d
            mkdir -p /mosquitto_files/etc/mosquitto/cron
            mkdir -p /mosquitto_files/var/lib/mosquitto
@@ -120,11 +119,10 @@ Completed service container setup."
            a=`hostname -I`
            read -a arr <<< "$a"
            echo "
-Note that on Digital Ocean, the third IP in the 'hostname -I' command: ${arr[2]} is the local network IP, used for faster connection without going out to the internet. That is the IP we're using. If this is incorrect in your environment, please change this IP address in this generated script: $run_this_on_svc_machine . Note that the mongo port 27018 is open in case you're using the shared email feature. if you're not allowing clients to send emails through your server, remove this UFW rule."
+Note that on Digital Ocean, the third IP in the 'hostname -I' command: ${arr[2]} is the local network IP, used for faster connection without going out to the internet. That is the IP we're using. If this is incorrect in your environment, please change this IP address in this generated script: $run_this_on_svc_machine ."
            APP_HOST="${arr[2]}"
            echo '#!/bin/bash' > $run_these_ufw_commands
            echo "ufw allow from $APP_HOST proto tcp to any port 5433 " >> $run_these_ufw_commands
-           echo "ufw allow from $APP_HOST proto tcp to any port 27018 " >> $run_these_ufw_commands
            echo "ufw allow from $APP_HOST proto any to any port 1884 " >> $run_these_ufw_commands
 
            read -p "

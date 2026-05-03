@@ -15,7 +15,7 @@ if [[ -f "$STATE" ]] && [[ "${UPSTAGE_OVERWRITE_STATE:-}" != "1" ]]; then
   set +a
 else
   read -r -p "App (public) hostname, e.g. app.example.org: " APP_DOMAIN
-  read -r -p "Service hostname (Postgres/Mongo/MQTT), e.g. svc.example.org: " SVC_DOMAIN
+  read -r -p "Service hostname (Postgres/MQTT), e.g. svc.example.org: " SVC_DOMAIN
   read -r -p "Streaming/Jitsi hostname, e.g. streaming.example.org: " STREAMING_DOMAIN
   read -r -p "Let's Encrypt email (agreement + expiry notices): " CERTBOT_EMAIL
   read -r -p "Compose profile prod or dev [prod]: " UPSTAGE_COMPOSE_PROFILE

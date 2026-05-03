@@ -7,6 +7,7 @@ from fastapi import Request
 import jwt
 from graphql import GraphQLError
 from upstage_backend.global_config.env import ALGORITHM, SECRET_KEY
+from upstage_backend.global_config.helpers.bearer import parse_bearer_token
 from upstage_backend.users.services.user import UserService
 
 
@@ -22,10 +23,10 @@ def authenticated(allowed_roles=None):
             info = args[1]
             request: Request = info.context["request"]
             authorization: str = request.headers.get("Authorization")
-            if not authorization:
+            token = parse_bearer_token(authorization)
+            if not token:
                 raise GraphQLError("Authenticated Failed")
 
-            token = authorization.split(" ")[1]
             try:
                 payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
                 user_id = payload.get("user_id")

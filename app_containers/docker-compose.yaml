@@ -1,4 +1,4 @@
-name: upstage-backend-dev
+name: upstage-backend-${SITE}
 
 # Application code is baked in at docker build (see x_common_build). No bind mounts for sources or .venv.
 
@@ -52,14 +52,12 @@ x-common-build: &common_build |
       PYTHONUNBUFFERED=1
 
   # bookworm: shadow-utils; binaries live in /usr/sbin (PATH in RUN can omit it → 127)
-  ARG HOST_UID=1000
-  ARG HOST_GID=1000
-  RUN /usr/sbin/groupadd --gid ${HOST_GID} appuser && \
-      /usr/sbin/useradd --uid ${HOST_UID} --gid ${HOST_GID} \
+      RUN /usr/sbin/groupadd --gid ${APP_GROUP:?APP_GROUP is not set} appuser && \
+      /usr/sbin/useradd --uid ${APP_USER:?APP_USER is not set} --gid ${APP_GROUP:?APP_GROUP is not set} \
               --create-home --shell /bin/bash appuser && \
       mkdir -p uploads
 
-  # Bake in sources (replaces former /app_code_dev bind mounts).
+  # Bake in sources (replaces former /app_code_${SITE} bind mounts).
   COPY --chown=appuser:appuser pyproject.toml uv.lock* ./
   COPY --chown=appuser:appuser src ./src
   COPY --chown=appuser:appuser scripts ./scripts
@@ -72,57 +70,60 @@ x-common-build: &common_build |
 
 # ====================== Services ======================
 services:
-  upstage_backend_dev:
+  upstage_backend:
     build:
       context: ../
       dockerfile_inline: *common_build
     image: upstage/backend:local
-    container_name: upstage_backend_dev
-    user: "${HOST_UID:-1000}:${HOST_GID:-1000}"
+    container_name: upstage_backend_${SITE}
+    user: "${APP_USER}:${APP_GROUP}"
     ports:
       - "3001:3000"
     volumes:
-      - /app_code_dev/uploads:/usr/app/uploads
+      - /app_code_${SITE}/uploads:/usr/app/uploads
     command: >
       /bin/bash -c "
       cd /usr/app &&
       export HARDCODED_HOSTNAME=${HARDCODED_HOSTNAME} &&
       ./scripts/start_upstage.sh"
+    restart: unless-stopped
     networks:
-      - upstage-network-dev
+      - upstage-network
 
-  upstage_event_archive_dev:
+  upstage_event_archive:
     build:
       context: ../
       dockerfile_inline: *common_build
     image: upstage/event-archive:local
-    container_name: upstage_event_archive_dev
-    user: "${HOST_UID:-1000}:${HOST_GID:-1000}"
+    container_name: upstage_event_archive_${SITE}
+    user: "${APP_USER}:${APP_GROUP}"
     command: >
       /bin/bash -c "
       cd /usr/app &&
       export HARDCODED_HOSTNAME=${HARDCODED_HOSTNAME} &&
       ./scripts/run_event_archive.sh"
+    restart: unless-stopped
     networks:
-      - upstage-network-dev
+      - upstage-network
 
-  upstage_stats_dev:
+  upstage_stats:
     build:
       context: ../
       dockerfile_inline: *common_build
     image: upstage/stats:local
-    container_name: upstage_stats_dev
-    user: "${HOST_UID:-1000}:${HOST_GID:-1000}"
+    container_name: upstage_stats_${SITE}
+    user: "${APP_USER}:${APP_GROUP}"
     command: >
       /bin/bash -c "
       cd /usr/app &&
       export HARDCODED_HOSTNAME=${HARDCODED_HOSTNAME} &&
       ./scripts/run_upstage_stats.sh"
+    restart: unless-stopped
     networks:
-      - upstage-network-dev
+      - upstage-network
 
 networks:
-  upstage-network-dev:
-    name: upstage-network-dev
+  upstage-network:
+    name: upstage-network-${SITE}
     driver: bridge
     external: true

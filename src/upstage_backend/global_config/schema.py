@@ -11,6 +11,7 @@ from upstage_backend.global_config.db_context import (
     current_session_or_none,
     set_session,
 )
+from upstage_backend.global_config.env import ENV_TYPE
 
 
 def _make_graphql_context(request, data=None):
@@ -43,7 +44,6 @@ def config_graphql_endpoints(app: FastAPI,endpoint = '/api/studio_graphql'):
     )
     from upstage_backend.authentication.http.schema import mutation as auth_mutation
     from upstage_backend.licenses.http.schema import mutation as license_mutation
-    from upstage_backend.mails.http.schema import mutation as mail_mutation
     from upstage_backend.payments.http.schema import mutation as payment_mutation
     from upstage_backend.studio_management.http.graphql import type_defs as studio_type_defs
     from upstage_backend.performance_config.http.schema import query as performance_query
@@ -68,10 +68,6 @@ def config_graphql_endpoints(app: FastAPI,endpoint = '/api/studio_graphql'):
     )
     combined_mutation.set_field(
         "revokeLicense", license_mutation._resolvers["revokeLicense"]
-    )
-
-    combined_mutation.set_field(
-        "sendEmailExternal", mail_mutation._resolvers["sendEmailExternal"]
     )
 
     combined_mutation.set_field(
@@ -221,7 +217,9 @@ def config_graphql_endpoints(app: FastAPI,endpoint = '/api/studio_graphql'):
     )
 
     combined_graphql_app = GraphQL(
-        combined_schema, debug=True, context_value=_make_graphql_context
+        combined_schema,
+        debug=ENV_TYPE != "Production",
+        context_value=_make_graphql_context,
     )
 
     print(endpoint)

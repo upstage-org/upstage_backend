@@ -31,7 +31,7 @@ MQ_DATA_DIR=/mosquitto_files_${SITE}
 
 # Set this in your environment: export POSTGRES_PASSWORD_DEV=NNNNN for example.
 var="POSTGRES_PASSWORD_${SITE^^}"
-POSTGRES_PASSWORD="${!var^^}"
+POSTGRES_PASSWORD="${!var}"
 : "${POSTGRES_PASSWORD:?$var is not set or is empty}" || exit 1
 
 if [ ! -d "${MQ_DATA_DIR}" ]; then

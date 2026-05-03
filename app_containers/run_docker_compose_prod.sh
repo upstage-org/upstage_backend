@@ -2,27 +2,28 @@
 
 set -a
 
-# Containers run as the host user (see docker-compose.yaml). Exporting these
-# here makes the compose ${HOST_UID}/${HOST_GID} interpolation deterministic
-# without anyone having to hand-edit .env.
-export HOST_UID="$(id -u)"
-export HOST_GID="$(id -g)"
+SITE=prod
+DOCKER_CLIENT_DEBUG=1
+HARDCODED_HOSTNAME=upstage.live
+APP_ROOT=/app_code_${SITE}
+APP_USER=1000
+APP_GROUP=1000
 
-export DOCKER_CLIENT_DEBUG=1
-export HARDCODED_HOSTNAME=upstage.live
+sudo cp -r ../pyproject.toml $APP_ROOT
+sudo cp -r ../uv.lock $APP_ROOT
+sudo cp -r ../src $APP_ROOT
+sudo cp -r ../alembic $APP_ROOT
+sudo cp -r ../scripts $APP_ROOT
+sudo cp -r ../dashboard/demo $APP_ROOT
+sudo cp -r ../migration_scripts $APP_ROOT
 
-cp -r ../pyproject.toml /app_code
-cp -r ../uv.lock /app_code
-cp -r ../src /app_code
-cp -r ../alembic /app_code
-cp -r ../scripts /app_code
-cp -r ../dashboard/demo /app_code
-cp -r ../migration_scripts /app_code
+currwd=`pwd`
+cd $APP_ROOT
+sudo ${HOME}/.local/bin/uv sync --no-dev 
+sudo chown -R $APP_USER:$APP_GROUP $APP_ROOT
+cd $currwd
 
-cd /app_code
-uv sync --no-dev 
-
-docker compose -f docker-compose.yaml -p docker-backend down --remove-orphans
+docker compose -f docker-compose.yaml -p docker-backend-${SITE} down --remove-orphans
 docker compose rm -f
-docker compose -f docker-compose.yaml -p docker-backend up --build -d
-docker compose -f docker-compose.yaml -p docker-backend ps
+docker compose -f docker-compose.yaml -p docker-backend-${SITE} up --build -d
+docker compose -f docker-compose.yaml -p docker-backend-${SITE} ps

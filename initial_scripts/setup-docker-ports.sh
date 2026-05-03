@@ -17,12 +17,6 @@ ufw allow from $UPSTAGE_NETWORK to any port 5433
 ufw allow from $DOCKER_BRIDGE to $INTERNAL_IP port 5433
 ufw allow from $UPSTAGE_NETWORK to $INTERNAL_IP port 5433
 
-# MongoDB - Port 27018  
-ufw allow from $DOCKER_BRIDGE to 127.0.0.1 port 27018
-ufw allow from $UPSTAGE_NETWORK to any port 27018
-ufw allow from $DOCKER_BRIDGE to $INTERNAL_IP port 27018
-ufw allow from $UPSTAGE_NETWORK to $INTERNAL_IP port 27018
-
 # MQTT - Port 1884
 ufw allow from $DOCKER_BRIDGE to 127.0.0.1 port 1884
 ufw allow from $UPSTAGE_NETWORK to any port 1884

@@ -10,6 +10,7 @@ from requests import Request
 from sqlalchemy import and_, nulls_last, exists
 from upstage_backend.global_config import get_session
 from upstage_backend.global_config.env import ALGORITHM, SECRET_KEY
+from upstage_backend.global_config.helpers.bearer import parse_bearer_token
 from upstage_backend.global_config.helpers.object import convert_keys_to_camel_case
 
 from upstage_backend.assets.db_models.asset_usage import AssetUsageModel, NotificationType
@@ -137,11 +138,16 @@ class StageService:
         request: Request = info.context["request"]
         authorization: str = request.headers.get("Authorization")
         current_user_id = None
-        token = authorization.split(" ")[1] if authorization else None
+        token = parse_bearer_token(authorization)
 
         if token:
-            payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
-            current_user_id = payload.get("user_id")
+            try:
+                payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+                current_user_id = payload.get("user_id")
+            except jwt.ExpiredSignatureError:
+                current_user_id = None
+            except jwt.InvalidTokenError:
+                current_user_id = None
 
         query = (
             session.query(StageModel)

@@ -3,8 +3,13 @@ import os
 import sys
 
 from typing import List, Optional
+
 from ariadne import MutationType, QueryType, make_executable_schema
+from graphql import GraphQLError
+
+from upstage_backend.global_config import logger
 from upstage_backend.global_config.decorators.authenticated import authenticated
+from upstage_backend.global_config.env import EMAIL_HOST
 from upstage_backend.global_config.helpers.object import convert_keys_to_camel_case
 from ariadne.asgi import GraphQL
 from upstage_backend.mails.helpers.mail import send
@@ -67,15 +72,48 @@ def delete_user(_, info, id: int):
     )
 
 
+def _split_email_list(raw: Optional[str]) -> list[str]:
+    if not raw or not str(raw).strip():
+        return []
+    return [p.strip() for p in str(raw).split(",") if p.strip()]
+
+
 @mutation.field("sendEmail")
 @authenticated()
-async def send_email(_, __, input):
-    await send(
-        input["recipients"].split(","),
-        input["subject"],
-        input["body"],
-        input["bcc"].split(",") if input["bcc"] else [],
-    )
+async def send_email(_, info, input):
+    """
+    Send email to arbitrary recipients using this server's SMTP (studio UI).
+    Not related to the removed cross-server mail relay.
+    """
+    if not EMAIL_HOST:
+        raise GraphQLError(
+            "Email is not configured on this server (set EMAIL_HOST and related vars)."
+        )
+
+    user = info.context["request"].state.current_user
+    role = int(user["role"])
+
+    if role not in (SUPER_ADMIN, ADMIN) and not user.get("can_send_email"):
+        raise GraphQLError(
+            "You do not have permission to send email from the studio."
+        )
+
+    to_list = _split_email_list(input.get("recipients"))
+    if not to_list:
+        raise GraphQLError("At least one recipient is required.")
+
+    try:
+        await send(
+            to_list,
+            input["subject"],
+            input["body"],
+            _split_email_list(input.get("bcc")),
+        )
+    except Exception:
+        logger.exception("Studio sendEmail: SMTP send failed")
+        raise GraphQLError(
+            "Failed to send email. Check SMTP configuration (EMAIL_HOST, EMAIL_PORT, TLS, credentials)."
+        ) from None
     return {"success": True}
 
 
