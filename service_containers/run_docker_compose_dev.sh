@@ -19,7 +19,7 @@ HARDCODED_HOSTNAME=${SITE}.upstage.live
 PG_DATA_DIR=/postgres_data_${SITE}
 MQ_DATA_DIR=/mosquitto_files_${SITE}
 
-# Set this in your environment.
+# Set this in your environment: export POSTGRES_PASSWORD_DEV=NNNNN for example.
 var="POSTGRES_PASSWORD_${SITE^^}"
 POSTGRES_PASSWORD="${!var^^}"
 : "${POSTGRES_PASSWORD:?$var is not set or is empty}" || exit 1
@@ -73,7 +73,7 @@ docker compose -f ${DOCKERFILE} -p ${SERVICES} ps
 
 firstrun_fail=`docker logs postgres_container_${SITE} 2>&1 | grep -i "permission\|initdb\|could not change permissions\|No such container"`
 if [[ ! -z $firstrun_fail ]]; then
-    docker compose -f ${DOCKERFILE} -p ${SERVICES} down --remove-orphans postgres_container_${SITE}
-    docker compose -f ${DOCKERFILE} -p ${SERVICES} up -d postgres_container_${SITE}
+    docker compose -f ${DOCKERFILE} -p ${SERVICES} down --remove-orphans postgres
+    docker compose -f ${DOCKERFILE} -p ${SERVICES} up -d postgres
     docker compose -f ${DOCKERFILE} -p ${SERVICES} ps
 fi
