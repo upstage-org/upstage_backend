@@ -21,7 +21,12 @@ SSL=
 SITE=prod
 DOCKERFILE=docker-compose-services.yaml
 SERVICES=upstage-services-${SITE}
-MOSQUITTO_EXPOSED_NON_SSL_WS_PORT=2052    # CloudFlare-proxy-friendly non-SSL port
+
+if [[ -z $SSL ]]; then
+    MOSQUITTO_EXPOSED_WS_PORT=2053 # for running locally
+else
+    MOSQUITTO_EXPOSED_WS_PORT=443 # scoped by domain name in nginx
+fi
 
 HARDCODED_HOSTNAME=upstage.live
 PG_DATA_DIR=/postgres_data_${SITE}
@@ -36,29 +41,22 @@ POSTGRES_PASSWORD="${!var}"
 
 if [ ! -d "${MQ_DATA_DIR}" ]; then
     echo "First time MQTT setup..."
-    sudo mkdir -p ${MQ_DATA_DIR}/etc/mosquitto/ca_certificates && \
-        sudo mkdir -p ${MQ_DATA_DIR}/etc/mosquitto/http && \
+    sudo mkdir -p ${MQ_DATA_DIR}/etc/mosquitto/http && \
         sudo mkdir -p ${MQ_DATA_DIR}/var/lib/mosquitto && \
         sudo cp -r ./deployment_config/etc_mosquitto/* ${MQ_DATA_DIR}/etc/mosquitto && \
-        sudo chmod 700  ${MQ_DATA_DIR}/etc/mosquitto/ca_certificates &&
         sudo chown -R 1883:1883 ${MQ_DATA_DIR}
     echo "Change the performance and admin passwords in this file: ${MQ_DATA_DIR}/etc/mosquitto/pw.backup"
 
-    if [[ ! -z $SSL ]]; then
-        # We update mosquitto certs in a Let's Encrypt renenwal hook
-        # script on the host server itself.
-        sudo rm -f ${MQ_DATA_DIR}/etc/mosquitto/conf.d/local_mosquitto_nossl.conf
+    # SSL for mqtt is handled by nginx, and an mqtt.* domain name.
+    # We'll just install the letsencrypt deploy hook to reload nginx when certs are updated.
 	sudo cat << EOF > /root/letsencrypt_deploy_hook.sh
 $(cat deployment_config/on_server/letsencrypt_deploy_hook.sh.template)
 EOF
-        sudo certbot certonly \
-         --webroot \
-         --webroot-path /var/www/html \
-         -d ${HARDCODED_HOSTNAME} \
-         --deploy-hook /root/letsencrypt_deploy_hook.sh
-    else
-        sudo rm -f ${MQ_DATA_DIR}/etc/mosquitto/conf.d/local_mosquitto_ssl.conf
-    fi
+    sudo certbot certonly \
+     --webroot \
+     --webroot-path /var/www/html \
+     -d ${HARDCODED_HOSTNAME} \
+     --deploy-hook /root/letsencrypt_deploy_hook.sh
 
     exit 0
 else
