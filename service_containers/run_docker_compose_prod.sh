@@ -15,6 +15,8 @@ SITES=("dev","prod")
 HOSTNAMES=("dev.${BASE_SITE}","${BASE_SITE}")
 
 # Set this empty to turn SSL off for Mosquitto.
+# NOTE: Uncomment the MQTT port section in the docker-compose-services.yaml file
+# only if you're running locally.
 #SSL=mqtt.${BASE_SITE}
 SSL=
 
@@ -52,6 +54,7 @@ if [ ! -d "${MQ_DATA_DIR}" ]; then
 	sudo cat << EOF > /root/letsencrypt_deploy_hook.sh
 $(cat deployment_config/on_server/letsencrypt_deploy_hook.sh.template)
 EOF
+    sudo chmod 755 /root/letsencrypt_deploy_hook.sh
     sudo certbot certonly \
      --webroot \
      --webroot-path /var/www/html \
