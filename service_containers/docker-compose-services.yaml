@@ -22,10 +22,9 @@ services:
     image: eclipse-mosquitto:latest
     container_name: mosquitto_container_${SITE}
     user: "1883:1883"
-    # Uncomment this only if you're running locally.
-    #ports:
-    #  #- "2096:1883" docker containers use the internal port when on the same machine and network.
-    #  - "${MOSQUITTO_EXPOSED_WS_PORT}:9001"
+    ports:
+      #- "2096:1883" docker containers use the internal port when on the same machine and network.
+      - "127.0.0.1:${MOSQUITTO_EXPOSED_WS_PORT}:9001"
     volumes:
       - ${MQ_DATA_DIR}/etc/mosquitto:/etc/mosquitto
       - ${MQ_DATA_DIR}/var/lib/mosquitto:/var/lib/mosquitto

@@ -24,11 +24,7 @@ SITE=prod
 DOCKERFILE=docker-compose-services.yaml
 SERVICES=upstage-services-${SITE}
 
-if [[ -z $SSL ]]; then
-    MOSQUITTO_EXPOSED_WS_PORT=2053 # for running locally
-else
-    MOSQUITTO_EXPOSED_WS_PORT=443 # scoped by domain name in nginx
-fi
+MOSQUITTO_EXPOSED_WS_PORT=9002
 
 HARDCODED_HOSTNAME=upstage.live
 PG_DATA_DIR=/postgres_data_${SITE}
