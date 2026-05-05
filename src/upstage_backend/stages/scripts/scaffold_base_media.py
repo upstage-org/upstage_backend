@@ -13,6 +13,7 @@ from upstage_backend.assets.db_models.asset import AssetModel
 from upstage_backend.stages.db_models.stage import StageModel
 from upstage_backend.stages.db_models.stage_attribute import StageAttributeModel
 from upstage_backend.stages.db_models.parent_stage import ParentStageModel
+from upstage_backend.stages.services.stage import StageService
 from upstage_backend.users.db_models.user import UserModel, ADMIN, GUEST
 from upstage_backend.upstage_options.db_models.config import ConfigModel
 from upstage_backend.global_config.helpers.fernet_crypto import encrypt
@@ -77,7 +78,59 @@ def down_size(size):
     return w, h
 
 
+def find_existing_demo_asset(session, type, path, owner_id):
+    """
+    If this scaffold was run before, the same on-disk paths and names are reused.
+    Avoid duplicate Asset rows and duplicate file copies.
+    """
+    asset_type = (
+        session.query(AssetTypeModel).filter(AssetTypeModel.name == type).first()
+    )
+    if not asset_type:
+        return None
+
+    if "." in path:
+        dest_path = os.path.join(type, path)
+        return (
+            session.query(AssetModel)
+            .filter(
+                AssetModel.owner_id == owner_id,
+                AssetModel.asset_type_id == asset_type.id,
+                AssetModel.file_location == dest_path,
+            )
+            .first()
+        )
+
+    existing = (
+        session.query(AssetModel)
+        .filter(
+            AssetModel.owner_id == owner_id,
+            AssetModel.asset_type_id == asset_type.id,
+            AssetModel.name == path,
+        )
+        .first()
+    )
+    if not existing or not existing.description:
+        return None
+    try:
+        if json.loads(existing.description).get("multi"):
+            return existing
+    except (TypeError, json.JSONDecodeError):
+        pass
+    return None
+
+
 def create_media(session, type, path, owner_id, created_media_ids):
+    existing = find_existing_demo_asset(session, type, path, owner_id)
+    if existing:
+        created_media_ids.append(existing.id)
+        logger.warning(
+            "⏩ Reusing existing demo {} {} (asset id={})".format(
+                type, path, existing.id
+            )
+        )
+        return
+
     asset_type = (
         session.query(AssetTypeModel).filter(AssetTypeModel.name == type).first()
     )
@@ -130,15 +183,32 @@ def create_demo_media(session, owner_id, created_media_ids):
         create_media(session, type, path, owner_id, created_media_ids)
 
 
+def next_demo_stage_name(session):
+    """Return 'Demo Stage', 'Demo Stage 2', ... not already used as a stage name."""
+    base = "Demo Stage"
+    if session.query(StageModel).filter(StageModel.name == base).first() is None:
+        return base
+    n = 2
+    while True:
+        candidate = f"{base} {n}"
+        if session.query(StageModel).filter(StageModel.name == candidate).first() is None:
+            return candidate
+        n += 1
+
+
 def create_demo_stage(session, owner_id, created_media_ids):
-    if session.query(StageModel).filter(StageModel.name == "Demo").first():
-        logger.warning('⏩ A stage named "Demo" already exists.')
-        return
+    # file_location is the live/MQ topic namespace (see StageService / sweep_stage). Every
+    # stage must have a distinct value or they share one channel and mirror each other.
+    # Historically this script used file_location="demo" always and checked name=="Demo"
+    # (wrong — the display name is "Demo Stage"), so re-runs duplicated the topic key.
+    stage_name = next_demo_stage_name(session)
+    file_location = StageService().get_short_name(stage_name, session)
+
     stage = StageModel(
-        name="Demo Stage",
+        name=stage_name,
         owner_id=owner_id,
         description="This is a demo stage to help you learn how to use and customise UpStage for your own performances.",
-        file_location="demo",
+        file_location=file_location,
     )
     status = StageAttributeModel(name="status", description="live", stage=stage)
     stage.attributes.append(status)
@@ -164,7 +234,11 @@ def create_demo_stage(session, owner_id, created_media_ids):
     for media_id in created_media_ids:
         session.add(ParentStageModel(stage_id=stage.id, child_asset_id=media_id))
     session.flush()
-    logger.warning("✅ Created demo stage")
+    logger.warning(
+        '✅ Created demo stage "{}" (file_location="{}" for live topics)'.format(
+            stage_name, file_location
+        )
+    )
 
 
 def create_demo_users(session):
