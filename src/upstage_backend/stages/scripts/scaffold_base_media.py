@@ -239,10 +239,11 @@ def scaffold_foyer(session):
 
 
 def scaffold_system_configuration(session):
+    # Match Alembic default (e5f8bc8043a5): user-facing T&Cs, not repo LICENSE.
     save_config(
         session,
         "TERMS_OF_SERVICE",
-        "https://raw.githubusercontent.com/upstage-org/upstage/main/LICENSE",
+        "https://upstage.org.nz/?page_id=9622",
     )
     save_config(session, "MANUAL", "https://docs.upstage.live")
     logger.warning("✅ System Configuration Scaffolding Completed")
