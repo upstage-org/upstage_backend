@@ -47,14 +47,20 @@ class SettingService:
             else {"id": 1, "name": "ADDING_EMAIL_SIGNATURE", "value": "true"}
         )
 
+        enable_donate_row = (
+            enable_donate.to_dict()
+            if enable_donate
+            else {"id": 0, "name": ENABLE_DONATE, "value": "false"}
+        )
+
         return convert_keys_to_camel_case(
             {
                 "termsOfService": self.get_config(TERMS_OF_SERVICE),
                 "manual": self.get_config(MANUAL),
                 "esp": self.get_config(EMAIL_SUBJECT_PREFIX),
                 "enableDonate": {
-                    **enable_donate.to_dict(),
-                    "value": enable_donate.value == "true",
+                    **enable_donate_row,
+                    "value": enable_donate_row.get("value") == "true",
                 },
                 "emailSignature": self.get_config(EMAIL_SIGNATURE),
                 "addingEmailSignature": {
@@ -67,14 +73,20 @@ class SettingService:
     def foyer_info(self):
         show_registration = self.get_config(SHOW_REGISTRATION)
 
+        show_registration_row = (
+            show_registration.to_dict()
+            if show_registration
+            else {"id": 0, "name": SHOW_REGISTRATION, "value": "true"}
+        )
+
         return convert_keys_to_camel_case(
             {
                 "title": self.get_config(FOYER_TITLE),
                 "description": self.get_config(FOYER_DESCRIPTION),
                 "menu": self.get_config(FOYER_MENU),
                 "showRegistration": {
-                    **show_registration.to_dict(),
-                    "value": show_registration.value == "true",
+                    **show_registration_row,
+                    "value": show_registration_row.get("value") == "true",
                 },
             }
         )
