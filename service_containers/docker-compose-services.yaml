@@ -24,7 +24,7 @@ services:
     user: "1883:1883"
     ports:
       #- "2096:1883" docker containers use the internal port when on the same machine and network.
-      - "${MOSQUITTO_EXPOSED_NON_SSL_WS_PORT}:9001"
+      - "127.0.0.1:${MOSQUITTO_EXPOSED_WS_PORT}:9001"
     volumes:
       - ${MQ_DATA_DIR}/etc/mosquitto:/etc/mosquitto
       - ${MQ_DATA_DIR}/var/lib/mosquitto:/var/lib/mosquitto
@@ -38,7 +38,6 @@ services:
       mosquitto_passwd -U /etc/mosquitto/pw.txt &&
       chown mosquitto:mosquitto /etc/mosquitto/pw.txt &&
       chown mosquitto:mosquitto /var/lib/mosquitto &&
-      if [[ ! -z ${SSL} ]]; then HARDCODED_HOSTNAME=${HARDCODED_HOSTNAME} /etc/mosquitto/add_certs_onetime.sh; fi &&
       mosquitto -c /etc/mosquitto/mosquitto.conf"
     restart: no
 
