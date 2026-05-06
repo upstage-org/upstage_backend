@@ -236,10 +236,11 @@ class StageService:
         )
 
     def extract_permission(self, user, stage):
-        permission = self.stage_operation_service.resolve_permission(user.id, stage)
-
         if not stage:
             raise GraphQLError("Stage not found")
+
+        permission = self.stage_operation_service.resolve_permission(user.id, stage)
+
         if (
             stage.owner_id != user.id
             and user.role not in [ADMIN, SUPER_ADMIN]
