@@ -66,7 +66,9 @@ class StageOperationService:
             .all()
         )
 
-    def resolve_permission(self, user_id: int, stage: StageModel):
+    def resolve_permission(self, user_id: int, stage: StageModel | None):
+        if stage is None:
+            return "audience"
         if not user_id:
             return "audience"
         if stage.owner_id == user_id:
