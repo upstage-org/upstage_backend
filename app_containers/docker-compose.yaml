@@ -78,7 +78,7 @@ services:
     container_name: upstage_backend_${SITE}
     user: "${APP_USER}:${APP_GROUP}"
     ports:
-      - "3001:3000"
+      - "${APP_PORT}:3000"
     volumes:
       - /app_code_${SITE}/uploads:/usr/app/uploads
     command: >

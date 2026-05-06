@@ -28,7 +28,6 @@ services:
     volumes:
       - ${MQ_DATA_DIR}/etc/mosquitto:/etc/mosquitto
       - ${MQ_DATA_DIR}/var/lib/mosquitto:/var/lib/mosquitto
-      - /etc/letsencrypt:/etc/letsencrypt
     networks:
       - upstage-network
     command:
