@@ -79,6 +79,7 @@ services:
     user: "${APP_USER}:${APP_GROUP}"
     ports:
       - "${APP_PORT}:3000"
+    # Host dir must exist and be writable by APP_USER:APP_GROUP (run_docker_compose_* scripts mkdir+chown).
     volumes:
       - /app_code_${SITE}/uploads:/usr/app/uploads
     command: >
