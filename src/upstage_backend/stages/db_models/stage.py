@@ -55,3 +55,18 @@ class StageModel(BaseModel):
         if attribute:
             return attribute.description
         return None
+
+    @hybrid_property
+    def playerAccess(self):
+        # Mirrors the cover/visibility/status pattern: the value lives in the
+        # stage_attribute table (name="playerAccess", description=<JSON string>).
+        # Without this, the GraphQL Stage.playerAccess field always resolves to
+        # null even when the attribute row exists, because get_stage_by_id only
+        # merges hybrid properties (cover/visibility/status) into the response
+        # dict and stage.to_dict() doesn't see attribute-table rows.
+        attribute = self.attributes.filter(
+            StageAttributeModel.name == "playerAccess"
+        ).first()
+        if attribute:
+            return attribute.description
+        return None
