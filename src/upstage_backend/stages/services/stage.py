@@ -279,7 +279,19 @@ class StageService:
         self.update_stage_attribute(
             stage.id, "playerAccess", input.playerAccess, session
         )
-        return convert_keys_to_camel_case(stage.to_dict())
+        # Hybrid properties (cover/visibility/status/playerAccess) live in the
+        # stage_attribute table and are NOT enumerated by `to_dict()`. Without
+        # explicitly merging them into the return dict the mutation response
+        # comes back with those fields = null even when the writes succeeded —
+        # callers that read-back from the mutation (e.g. e2e setStageStatus)
+        # see a false "did not persist" failure. Mirrors `get_stage_by_id`.
+        return convert_keys_to_camel_case({
+            **stage.to_dict(),
+            "cover": stage.cover,
+            "visibility": stage.visibility,
+            "status": stage.status,
+            "playerAccess": stage.playerAccess,
+        })
 
     def update_stage(self, user: UserModel, input: UpdateStageInput):
         session = get_session()
@@ -323,7 +335,14 @@ class StageService:
         self.update_stage_attribute(
             stage.id, "config", input.config, session
         )
-        return convert_keys_to_camel_case(stage.to_dict())
+        # Same hybrid-property merge as create_stage; see comment there.
+        return convert_keys_to_camel_case({
+            **stage.to_dict(),
+            "cover": stage.cover,
+            "visibility": stage.visibility,
+            "status": stage.status,
+            "playerAccess": stage.playerAccess,
+        })
 
     def update_stage_attribute(
         self, stage_id: int, name: str, value: str, session
