@@ -6,7 +6,6 @@ import jwt
 from graphql import GraphQLError
 from upstage_backend.global_config.env import ALGORITHM, SECRET_KEY
 from upstage_backend.global_config.helpers.bearer import parse_bearer_token
-from upstage_backend.users.services.user import UserService
 
 
 def authenticated(allowed_roles=None):
@@ -16,9 +15,20 @@ def authenticated(allowed_roles=None):
     def decorator(func):
         @wraps(func)
         def wrapper(*args, **kwargs):
+            # Deferred imports: keeping these at function scope (matching the
+            # AuthenticationService pattern) prevents import-time blow-up of the
+            # entire users -> stages -> assets dependency tree in non-HTTP
+            # processes. Concretely, the upstage_stats MQTT worker pulls in
+            # global_config -> decorators.authenticated, but never decorates
+            # anything; importing UserService at module scope dragged in
+            # StageOperationService -> StageModel and left the SQLAlchemy
+            # registry half-populated, which then crashed configure_mappers()
+            # with "expression 'ParentStageModel' failed to locate a name" on
+            # the first session.add() in upstage_stats.mqtt.on_message.
             from upstage_backend.authentication.services.auth import (
                 AuthenticationService,
             )
+            from upstage_backend.users.services.user import UserService
 
             info = args[1]
             request: Request = info.context["request"]
