@@ -2,17 +2,22 @@
 
 from upstage_backend.global_config.logger import logger
 
-from sqlalchemy import create_engine, MetaData
-from databases import Database
-
-from upstage_backend.global_config.env import DATABASE_URL
+from sqlalchemy import create_engine
 from sqlalchemy.pool import NullPool
 
-database = Database(DATABASE_URL)
-metadata = MetaData()
+from upstage_backend.global_config.env import DATABASE_URL
 
+# `engine` here is lazy: SQLAlchemy doesn't open a socket until the first
+# `engine.connect()` / `Session` checkout. The previous module body also
+# carried an unused `database = Database(DATABASE_URL)` (databases lib) and
+# `metadata = MetaData(); metadata.create_all(engine)` pair. The MetaData
+# was empty (every model registers itself against `BaseModel.metadata`,
+# never this one), so create_all was a no-op apart from forcing an eager
+# Postgres connection at import time. That eager connection broke
+# `pytest --collect-only` from the host (whenever `postgres_container_dev`
+# isn't resolvable) and offered no production value — table creation runs
+# through Alembic. Both were removed.
 engine = create_engine(DATABASE_URL, poolclass=NullPool, query_cache_size=0)
-metadata.create_all(engine)
 
 
 class ScopedSession(object):
