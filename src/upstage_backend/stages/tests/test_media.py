@@ -1,15 +1,14 @@
 # -*- coding: iso8859-15 -*-
-import os
-import sys
 
 import pytest
 from upstage_backend.assets.db_models.asset import AssetModel
 from upstage_backend.authentication.tests.auth_test import TestAuthenticationController
 from upstage_backend.global_config import get_session
 from upstage_backend.stages.tests.test_stage import TestStageController
-from upstage_backend.assets.tests.asset_test import TestAssetController, load_base64_from_image
-from upstage_backend.main import app
-from upstage_backend.stages.http.schema import stage_graphql_app
+from upstage_backend.assets.tests.asset_test import (
+    TestAssetController,
+    load_base64_from_image,
+)
 from upstage_backend.users.db_models.user import SUPER_ADMIN
 import random
 
@@ -98,7 +97,7 @@ class TestMediaController:
         headers = test_AuthenticationController.get_headers(client, SUPER_ADMIN)
         await test_AssetController.test_03_save_media_successfully(client)
         asset = get_session().query(AssetModel).first()
-        file_location = f"image/test2.png"
+        file_location = "image/test2.png"
         response = self.update_media(client, headers, asset.id, file_location)
         assert response.status_code == 200
         assert "data" in response.json()
@@ -154,7 +153,7 @@ class TestMediaController:
         )
 
         response = self.delete_media_request(client, headers, asset)
-        assert response.json()["data"]["deleteMediaOnStage"]["success"] == True
+        assert response.json()["data"]["deleteMediaOnStage"]["success"] is True
 
     async def test_06_delete_media_not_found(self, client):
         headers = test_AuthenticationController.get_headers(client, SUPER_ADMIN)

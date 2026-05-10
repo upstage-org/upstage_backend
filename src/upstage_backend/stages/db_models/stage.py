@@ -1,6 +1,4 @@
 # -*- coding: iso8859-15 -*-
-import os
-import sys
 
 from datetime import datetime
 from sqlalchemy import BigInteger, Column, DateTime, ForeignKey, Integer, String, Text
@@ -8,7 +6,6 @@ from sqlalchemy.orm import relationship
 from sqlalchemy.ext.hybrid import hybrid_property
 from upstage_backend.global_config.db_models.base import BaseModel
 from upstage_backend.stages.db_models.stage_attribute import StageAttributeModel
-from upstage_backend.stages.db_models.parent_stage import ParentStageModel
 
 
 class StageModel(BaseModel):

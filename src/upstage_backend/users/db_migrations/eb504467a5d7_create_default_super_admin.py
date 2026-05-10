@@ -10,7 +10,7 @@ from typing import Sequence, Union
 
 from alembic import op
 from sqlalchemy.sql import table, column
-from sqlalchemy import String, Integer, Text, Boolean, TIMESTAMP
+from sqlalchemy import Integer, Text, Boolean, TIMESTAMP
 from datetime import datetime
 
 from upstage_backend.global_config.helpers.fernet_crypto import encrypt
@@ -46,7 +46,7 @@ def upgrade() -> None:
             {
                 "username": "admin",
                 "email": "upstage@gmail.com",
-                "password": encrypt(f"Secret@123"),
+                "password": encrypt("Secret@123"),
                 "role": SUPER_ADMIN,
                 "active": True,
                 "created_on": datetime.now(),

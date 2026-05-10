@@ -1,13 +1,11 @@
 # -*- coding: iso8859-15 -*-
 import asyncio
 import os
-import sys
 
 from datetime import datetime, timedelta
 import hashlib
 import json
 from operator import or_
-import os
 from typing import Optional
 import time
 from graphql import GraphQLError
@@ -20,7 +18,12 @@ from upstage_backend.global_config.env import (
     STREAM_KEY,
 )
 from upstage_backend.global_config.helpers.object import convert_keys_to_camel_case
-from upstage_backend.assets.db_models.asset import AssetModel, AvatarVoice, Voice, Previlege
+from upstage_backend.assets.db_models.asset import (
+    AssetModel,
+    AvatarVoice,
+    Voice,
+    Previlege,
+)
 from upstage_backend.assets.db_models.asset_license import AssetLicenseModel
 from upstage_backend.assets.db_models.asset_type import AssetTypeModel
 from upstage_backend.assets.db_models.asset_usage import AssetUsageModel
@@ -189,15 +192,8 @@ class AssetService:
         asset_type = self.validate_asset_type(input, session)
 
         if input.id:
-            asset = (
-                session.query(AssetModel)
-                .filter(AssetModel.id == input.id)
-                .first()
-            )
-            if (
-                owner.role not in [SUPER_ADMIN, ADMIN]
-                and asset.owner_id != owner.id
-            ):
+            asset = session.query(AssetModel).filter(AssetModel.id == input.id).first()
+            if owner.role not in [SUPER_ADMIN, ADMIN] and asset.owner_id != owner.id:
                 raise GraphQLError("You are not allowed to update this asset")
         else:
             asset = AssetModel(owner_id=owner.id)
@@ -279,10 +275,7 @@ class AssetService:
             granted_permissions = asset.permissions.all()
             for permission in granted_permissions:
                 if isinstance(permission, AssetUsageModel):
-                    if (
-                        permission.user_id not in user_ids
-                        and permission.approved == True
-                    ):
+                    if permission.user_id not in user_ids and permission.approved:
                         asset.permissions.remove(permission)
                         local_db_session.delete(permission)
             for user_id in user_ids:
@@ -315,7 +308,7 @@ class AssetService:
 
             attributes = json.loads(asset.description)
 
-            if not "frames" in attributes or attributes["frames"]:
+            if "frames" not in attributes or attributes["frames"]:
                 attributes["frames"] = []
 
             asset.size = 0
@@ -324,7 +317,7 @@ class AssetService:
                 full_path = os.path.join(storagePath, url)
                 try:
                     size = os.path.getsize(full_path)
-                except:
+                except Exception:
                     size = 0  # file not exist
                 asset.size += size
 
@@ -383,7 +376,7 @@ class AssetService:
                 if new_owner.id != asset.owner_id and new_owner.role in (
                     ADMIN,
                     SUPER_ADMIN,
-                    PLAYER
+                    PLAYER,
                 ):
                     asset.owner_id = new_owner.id
             else:

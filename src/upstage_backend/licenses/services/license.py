@@ -1,6 +1,4 @@
 # -*- coding: iso8859-15 -*-
-import os
-import sys
 
 from secrets import token_urlsafe
 
@@ -26,9 +24,7 @@ class LicenseService:
         )
         session.add(license)
         session.flush()
-        license = (
-            session.query(AssetLicenseModel).filter_by(id=license.id).first()
-        )
+        license = session.query(AssetLicenseModel).filter_by(id=license.id).first()
 
         return {
             **convert_keys_to_camel_case(license.to_dict()),

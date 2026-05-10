@@ -1,6 +1,5 @@
 # -*- coding: iso8859-15 -*-
 import os
-import sys
 
 import socket
 from dotenv import load_dotenv
@@ -35,7 +34,7 @@ APPLE_TEAM_ID = os.getenv("APPLE_TEAM_ID")
 
 JWT_HEADER_NAME = "X-Access-Token"
 
-CIPHER_KEY =  b"DDVf4r4bxTZYJSfYJDNDx2i5_Lhjo1L1uA_Ya20fIWc="
+CIPHER_KEY = b"DDVf4r4bxTZYJSfYJDNDx2i5_Lhjo1L1uA_Ya20fIWc="
 CLOUDFLARE_CAPTCHA_SECRETKEY = os.getenv("CLOUDFLARE_CAPTCHA_SECRETKEY")
 CLOUDFLARE_CAPTCHA_VERIFY_ENDPOINT = os.getenv("CLOUDFLARE_CAPTCHA_VERIFY_ENDPOINT")
 

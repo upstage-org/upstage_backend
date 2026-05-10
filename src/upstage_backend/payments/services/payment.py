@@ -1,13 +1,14 @@
 # -*- coding: iso8859-15 -*-
-import os
-import sys
 
 from upstage_backend.global_config import logger
 
 import stripe
 from upstage_backend.global_config.env import STRIPE_KEY, STRIPE_PRODUCT_ID
 from upstage_backend.global_config.helpers.object import convert_keys_to_camel_case
-from upstage_backend.payments.http.validation import OneTimePurchaseInput, CreateSubscriptionInput
+from upstage_backend.payments.http.validation import (
+    OneTimePurchaseInput,
+    CreateSubscriptionInput,
+)
 
 stripe.api_key = STRIPE_KEY
 
@@ -154,7 +155,7 @@ class PaymentService:
             card_number, card_exp_month, card_exp_year, card_cvc
         )
 
-        payment = self.create_payment_charge(card_token, amount)
+        _ = self.create_payment_charge(card_token, amount)
 
         return {"success": True}
 

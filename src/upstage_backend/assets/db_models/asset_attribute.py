@@ -1,11 +1,8 @@
 # -*- coding: iso8859-15 -*-
-import os
-import sys
 
 from datetime import datetime
 from sqlalchemy import BigInteger, Column, DateTime, ForeignKey, Integer, String, Text
 from sqlalchemy.orm import relationship
-from upstage_backend.assets.db_models.asset import AssetModel
 from upstage_backend.global_config.db_models.base import BaseModel
 
 

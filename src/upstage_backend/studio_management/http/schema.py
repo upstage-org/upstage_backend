@@ -1,6 +1,4 @@
 # -*- coding: iso8859-15 -*-
-import os
-import sys
 
 from typing import List, Optional
 
@@ -20,7 +18,13 @@ from upstage_backend.studio_management.http.validation import (
     UpdateUserInput,
 )
 from upstage_backend.studio_management.services.studio import StudioService
-from upstage_backend.users.db_models.user import ADMIN, ROLES, SUPER_ADMIN, PLAYER, UserModel
+from upstage_backend.users.db_models.user import (
+    ADMIN,
+    ROLES,
+    SUPER_ADMIN,
+    PLAYER,
+    UserModel,
+)
 
 
 query = QueryType()
@@ -43,7 +47,9 @@ def admin_players(_, __, **kwargs):
 @query.field("getAllStages")
 @authenticated()
 def stages(_, info):
-    return StudioService().stages(UserModel(**info.context["request"].state.current_user))
+    return StudioService().stages(
+        UserModel(**info.context["request"].state.current_user)
+    )
 
 
 @query.field("users")
@@ -94,9 +100,7 @@ async def send_email(_, info, input):
     role = int(user["role"])
 
     if role not in (SUPER_ADMIN, ADMIN) and not user.get("can_send_email"):
-        raise GraphQLError(
-            "You do not have permission to send email from the studio."
-        )
+        raise GraphQLError("You do not have permission to send email from the studio.")
 
     to_list = _split_email_list(input.get("recipients"))
     if not to_list:

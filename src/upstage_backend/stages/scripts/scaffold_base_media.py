@@ -1,6 +1,5 @@
 # -*- coding: iso8859-15 -*-
 import os
-import sys
 
 from upstage_backend.global_config import logger
 
@@ -17,7 +16,10 @@ from upstage_backend.stages.services.stage import StageService
 from upstage_backend.users.db_models.user import UserModel, ADMIN, GUEST
 from upstage_backend.upstage_options.db_models.config import ConfigModel
 from upstage_backend.global_config.helpers.fernet_crypto import encrypt
-from upstage_backend.global_config.env import UPLOAD_USER_CONTENT_FOLDER, DEMO_MEDIA_FOLDER
+from upstage_backend.global_config.env import (
+    UPLOAD_USER_CONTENT_FOLDER,
+    DEMO_MEDIA_FOLDER,
+)
 from upstage_backend.global_config.database import ScopedSession
 
 
@@ -191,7 +193,10 @@ def next_demo_stage_name(session):
     n = 2
     while True:
         candidate = f"{base} {n}"
-        if session.query(StageModel).filter(StageModel.name == candidate).first() is None:
+        if (
+            session.query(StageModel).filter(StageModel.name == candidate).first()
+            is None
+        ):
             return candidate
         n += 1
 

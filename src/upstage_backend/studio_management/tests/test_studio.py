@@ -1,6 +1,4 @@
 # -*- coding: iso8859-15 -*-
-import os
-import sys
 
 import random
 from faker import Faker
@@ -10,11 +8,9 @@ from upstage_backend.assets.db_models.asset import AssetModel
 from upstage_backend.assets.db_models.asset_usage import AssetUsageModel
 from upstage_backend.stages.db_models.stage import StageModel
 from upstage_backend.stages.tests.test_stage import TestStageController
-from upstage_backend.studio_management.http.schema import studio_graphql_app
-from upstage_backend.users.db_models.user import GUEST, PLAYER, SUPER_ADMIN, UserModel
+from upstage_backend.users.db_models.user import PLAYER, SUPER_ADMIN, UserModel
 from upstage_backend.global_config import get_session
 from upstage_backend.global_config.database import ScopedSession
-from upstage_backend.main import app
 
 test_AuthenticationController = TestAuthenticationController()
 test_StageController = TestStageController()
@@ -106,7 +102,12 @@ class TestStudioController:
             username = user.username
             session.flush()
 
-        user = get_session().query(UserModel).filter(UserModel.username == username).first()
+        user = (
+            get_session()
+            .query(UserModel)
+            .filter(UserModel.username == username)
+            .first()
+        )
 
         headers = test_AuthenticationController.get_headers(client, SUPER_ADMIN)
         query = """
@@ -171,7 +172,6 @@ class TestStudioController:
                 "active": False,
             }
         }
-        
 
         response = client.post(
             "/api/studio_graphql",
@@ -185,8 +185,6 @@ class TestStudioController:
         assert "email" in response.json()["data"]["updateUser"]
 
         variables = {"input": {**variables["input"], "id": 1000}}
-
-
 
         response = client.post(
             "/api/studio_graphql",
@@ -212,7 +210,6 @@ class TestStudioController:
 
         assert response.status_code == 200
         assert "errors" in response.json()
-
 
         user_2 = get_session().query(UserModel).all()[-1]
 

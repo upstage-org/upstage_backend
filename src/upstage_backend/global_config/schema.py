@@ -1,6 +1,4 @@
 # -*- coding: iso8859-15 -*-
-import os
-import sys
 
 from ariadne import MutationType, QueryType, make_executable_schema
 from fastapi import FastAPI
@@ -36,8 +34,11 @@ def _make_graphql_context(request, data=None):
     return {"request": request, "db": session}
 
 
-def config_graphql_endpoints(app: FastAPI,endpoint = '/api/studio_graphql'):
-    from upstage_backend.assets.http.schema import query as asset_query, mutation as asset_mutation
+def config_graphql_endpoints(app: FastAPI, endpoint="/api/studio_graphql"):
+    from upstage_backend.assets.http.schema import (
+        query as asset_query,
+        mutation as asset_mutation,
+    )
     from upstage_backend.studio_management.http.schema import (
         query as studio_query,
         mutation as studio_mutation,
@@ -45,14 +46,24 @@ def config_graphql_endpoints(app: FastAPI,endpoint = '/api/studio_graphql'):
     from upstage_backend.authentication.http.schema import mutation as auth_mutation
     from upstage_backend.licenses.http.schema import mutation as license_mutation
     from upstage_backend.payments.http.schema import mutation as payment_mutation
-    from upstage_backend.studio_management.http.graphql import type_defs as studio_type_defs
-    from upstage_backend.performance_config.http.schema import query as performance_query
-    from upstage_backend.stages.http.schema import query as stage_query, mutation as stage_mutation
+    from upstage_backend.studio_management.http.graphql import (
+        type_defs as studio_type_defs,
+    )
+    from upstage_backend.performance_config.http.schema import (
+        query as performance_query,
+    )
+    from upstage_backend.stages.http.schema import (
+        query as stage_query,
+        mutation as stage_mutation,
+    )
     from upstage_backend.upstage_options.http.schema import (
         query as upstage_options_query,
         mutation as upstage_options_mutation,
     )
-    from upstage_backend.users.http.schema import query as user_query, mutation as user_mutation
+    from upstage_backend.users.http.schema import (
+        query as user_query,
+        mutation as user_mutation,
+    )
 
     combined_query = QueryType()
     combined_mutation = MutationType()

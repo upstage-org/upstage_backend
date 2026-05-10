@@ -1,6 +1,4 @@
 # -*- coding: iso8859-15 -*-
-import os
-import sys
 
 
 from operator import or_
@@ -11,11 +9,13 @@ from graphql import GraphQLError
 import pyotp
 import requests
 from upstage_backend.global_config import get_session
-from upstage_backend.global_config.env import (ENV_TYPE,
+from upstage_backend.global_config.env import (
+    ENV_TYPE,
     CLOUDFLARE_CAPTCHA_SECRETKEY,
     CLOUDFLARE_CAPTCHA_VERIFY_ENDPOINT,
     SUPPORT_EMAILS,
-    HOSTNAME)
+    HOSTNAME,
+)
 
 from upstage_backend.mails.helpers.mail import send
 from upstage_backend.mails.templates.templates import (
@@ -79,7 +79,7 @@ class UserService:
         )
 
         asyncio.create_task(
-            send([user.email], f"Welcome to UpStage!", user_registration(user))
+            send([user.email], "Welcome to UpStage!", user_registration(user))
         )
         admin_emails = SUPPORT_EMAILS
         approval_url = f"https://{HOSTNAME}/admin/player?sortByCreated=true"
@@ -104,7 +104,7 @@ class UserService:
 
         cf_ip = request.headers.get("CF-Connecting-IP")
         ip = request.headers.get("X-Forwarded-For", request.client.host)
-        if type(ip) == list:
+        if isinstance(ip, list):
             ip = ip[0]
 
         """
@@ -177,11 +177,7 @@ class UserService:
         if not otp:
             raise GraphQLError("Invalid token")
 
-        user = (
-            session.query(UserModel)
-            .filter(UserModel.id == otp.user_id)
-            .first()
-        )
+        user = session.query(UserModel).filter(UserModel.id == otp.user_id).first()
 
         if not user:
             raise GraphQLError("Invalid token")
@@ -202,11 +198,7 @@ class UserService:
         if not otp:
             raise GraphQLError("Invalid token")
 
-        user = (
-            session.query(UserModel)
-            .filter(UserModel.id == otp.user_id)
-            .first()
-        )
+        user = session.query(UserModel).filter(UserModel.id == otp.user_id).first()
 
         if not user:
             raise GraphQLError("Invalid token")

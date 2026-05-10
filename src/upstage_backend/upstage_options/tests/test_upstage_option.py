@@ -1,13 +1,10 @@
 # -*- coding: iso8859-15 -*-
-import os
-import sys
 
 from faker import Faker
 import pytest
 from upstage_backend.authentication.tests.auth_test import TestAuthenticationController
-from upstage_backend.main import app
 from upstage_backend.users.db_models.user import SUPER_ADMIN
-from upstage_backend.upstage_options.http.schema import config_graphql_app
+
 test_AuthenticationController = TestAuthenticationController()
 
 

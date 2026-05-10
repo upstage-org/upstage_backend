@@ -1,6 +1,4 @@
 # -*- coding: iso8859-15 -*-
-import os
-import sys
 
 from upstage_backend.global_config.database import ScopedSession
 from upstage_backend.global_config.helpers.fernet_crypto import encrypt

@@ -7,8 +7,8 @@ inside an asyncio.TaskGroup. Any unhandled exception in any child task
 cancels its siblings, an ExceptionGroup bubbles up to the process exit code,
 and the container is restarted by Docker.
 """
+
 import os
-import sys
 
 import asyncio
 import signal
@@ -30,8 +30,7 @@ async def _supervisor(queue: asyncio.Queue, stop: asyncio.Event) -> None:
             await asyncio.wait_for(stop.wait(), timeout=HEARTBEAT_SECONDS)
         except asyncio.TimeoutError:
             logger.info(
-                f"event_archive: heartbeat queue_depth={queue.qsize()}/"
-                f"{QUEUE_CAPACITY}"
+                f"event_archive: heartbeat queue_depth={queue.qsize()}/{QUEUE_CAPACITY}"
             )
 
 

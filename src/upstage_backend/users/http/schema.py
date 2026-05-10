@@ -1,6 +1,4 @@
 # -*- coding: iso8859-15 -*-
-import os
-import sys
 
 from ariadne import MutationType, QueryType, make_executable_schema
 from upstage_backend.global_config.helpers.object import convert_keys_to_camel_case

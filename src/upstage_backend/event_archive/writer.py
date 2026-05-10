@@ -6,8 +6,6 @@ Drains items produced by the MQTT subscriber and persists each as an
 EventModel row. Each event is written in its own transaction so a single
 bad payload cannot poison the rest.
 """
-import os
-import sys
 
 import asyncio
 import json
@@ -53,9 +51,7 @@ async def writer_loop(
     try:
         while not (stop.is_set() and queue.empty()):
             try:
-                item = await asyncio.wait_for(
-                    queue.get(), timeout=POLL_TIMEOUT_SECONDS
-                )
+                item = await asyncio.wait_for(queue.get(), timeout=POLL_TIMEOUT_SECONDS)
             except asyncio.TimeoutError:
                 continue
 

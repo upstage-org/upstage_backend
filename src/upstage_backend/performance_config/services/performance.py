@@ -1,6 +1,4 @@
 # -*- coding: iso8859-15 -*-
-import os
-import sys
 
 from datetime import datetime
 from graphql import GraphQLError
@@ -11,7 +9,9 @@ from upstage_backend.performance_config.db_models.performance import Performance
 from upstage_backend.performance_config.db_models.performance_mqtt_config import (
     PerformanceMQTTConfigModel,
 )
-from upstage_backend.performance_config.db_models.performance_config import PerformanceConfigModel
+from upstage_backend.performance_config.db_models.performance_config import (
+    PerformanceConfigModel,
+)
 from upstage_backend.stages.db_models.stage import StageModel
 from upstage_backend.stages.http.validation import PerformanceInput, RecordInput
 from upstage_backend.users.db_models.user import ADMIN, SUPER_ADMIN, UserModel
@@ -38,9 +38,7 @@ class PerformanceService:
 
     def create_performance(self, user: UserModel, input: RecordInput):
         session = get_session()
-        stage = (
-            session.query(StageModel).filter_by(id=input.stageId).first()
-        )
+        stage = session.query(StageModel).filter_by(id=input.stageId).first()
         if not stage:
             raise GraphQLError("Stage not found")
 
@@ -63,9 +61,7 @@ class PerformanceService:
 
     def update_performance(self, user: UserModel, input: PerformanceInput):
         session = get_session()
-        performance = (
-            session.query(PerformanceModel).filter_by(id=input.id).first()
-        )
+        performance = session.query(PerformanceModel).filter_by(id=input.id).first()
 
         if not performance:
             raise GraphQLError("Performance not found")
@@ -84,9 +80,7 @@ class PerformanceService:
 
     def delete_performance(self, user: UserModel, id: int):
         session = get_session()
-        performance = (
-            session.query(PerformanceModel).filter_by(id=id).first()
-        )
+        performance = session.query(PerformanceModel).filter_by(id=id).first()
         if not performance:
             raise GraphQLError("Performance not found")
 
@@ -96,17 +90,15 @@ class PerformanceService:
         ):
             raise GraphQLError("You are not allowed to delete this performance")
 
-        session.query(EventModel).filter(
-            EventModel.performance_id == id
-        ).delete(synchronize_session=False)
+        session.query(EventModel).filter(EventModel.performance_id == id).delete(
+            synchronize_session=False
+        )
         session.delete(performance)
         return {"success": True}
 
     def save_recording(self, user: UserModel, id: int):
         session = get_session()
-        performance = (
-            session.query(PerformanceModel).filter_by(id=id).first()
-        )
+        performance = session.query(PerformanceModel).filter_by(id=id).first()
         if not performance:
             raise GraphQLError("Performance not found")
 
@@ -120,9 +112,7 @@ class PerformanceService:
         events = (
             session.query(EventModel)
             .filter(
-                EventModel.topic.ilike(
-                    "%/{}/%".format(performance.stage.file_location)
-                )
+                EventModel.topic.ilike("%/{}/%".format(performance.stage.file_location))
             )
             .filter(EventModel.created > performance.created_on)
             .filter(EventModel.created < saved_on)

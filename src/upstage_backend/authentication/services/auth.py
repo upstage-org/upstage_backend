@@ -1,6 +1,4 @@
 # -*- coding: iso8859-15 -*-
-import os
-import sys
 
 from datetime import datetime, timedelta
 from graphql import GraphQLError
@@ -8,7 +6,13 @@ import jwt
 from fastapi import Request
 from email.utils import parseaddr
 from upstage_backend.authentication.http.validation import LoginInput
-from upstage_backend.users.db_models.user import ADMIN, GUEST, PLAYER, SUPER_ADMIN, UserModel
+from upstage_backend.users.db_models.user import (
+    ADMIN,
+    GUEST,
+    PLAYER,
+    SUPER_ADMIN,
+    UserModel,
+)
 from upstage_backend.users.services.user import UserService
 from upstage_backend.global_config.helpers.fernet_crypto import decrypt
 from upstage_backend.global_config.env import (
@@ -62,9 +66,7 @@ class AuthenticationService:
         user.last_login = datetime.now()
 
         db = get_request_session()
-        db.query(UserSessionModel).filter(
-            UserSessionModel.user_id == user.id
-        ).delete()
+        db.query(UserSessionModel).filter(UserSessionModel.user_id == user.id).delete()
         db.add(user_session)
         db.flush()
 
@@ -111,7 +113,7 @@ class AuthenticationService:
         try:
             if decrypt(user.password) != enter_password:
                 raise GraphQLError("Incorrect username or password. Please try again.")
-        except:
+        except Exception:
             raise GraphQLError("Incorrect username or password. Please try again.")
         if not user.active:
             raise GraphQLError(
@@ -160,9 +162,7 @@ class AuthenticationService:
         if not session:
             raise GraphQLError("Invalid refresh token")
 
-        user = (
-            db.query(UserModel).filter(UserModel.id == session.user_id).first()
-        )
+        user = db.query(UserModel).filter(UserModel.id == session.user_id).first()
 
         access_token = self.create_token(
             {"user_id": session.user_id},

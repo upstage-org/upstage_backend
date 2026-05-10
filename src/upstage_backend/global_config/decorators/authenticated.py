@@ -1,6 +1,4 @@
 # -*- coding: iso8859-15 -*-
-import os
-import sys
 
 from functools import wraps
 from fastapi import Request
@@ -18,7 +16,9 @@ def authenticated(allowed_roles=None):
     def decorator(func):
         @wraps(func)
         def wrapper(*args, **kwargs):
-            from upstage_backend.authentication.services.auth import AuthenticationService
+            from upstage_backend.authentication.services.auth import (
+                AuthenticationService,
+            )
 
             info = args[1]
             request: Request = info.context["request"]

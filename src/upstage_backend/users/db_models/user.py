@@ -1,6 +1,4 @@
 # -*- coding: iso8859-15 -*-
-import os
-import sys
 
 from sqlalchemy import TIMESTAMP, BigInteger, Boolean, Column, Integer, String, Text
 from datetime import datetime

@@ -4,8 +4,7 @@ End-to-end drift-catching test for the event_archive writer's output shape
 against the downstream consumers StageOperationService.get_event_list and
 StageService.sweep_stage.
 """
-import os
-import sys
+
 import json
 import types
 
@@ -28,7 +27,10 @@ def _persist_via_writer_logic(session, topic: str, raw_payload, ts: float):
     async plumbing. If writer.py's decode+construct contract drifts, this
     function will need to change in lockstep with it.
     """
-    from upstage_backend.event_archive.writer import _decode_payload, _PayloadDecodeError
+    from upstage_backend.event_archive.writer import (
+        _decode_payload,
+        _PayloadDecodeError,
+    )
     from upstage_backend.event_archive.db_models.event import EventModel
 
     try:
@@ -81,19 +83,28 @@ class TestWriterDecodeShape:
         assert _decode_payload(b"[1,2,3]") == [1, 2, 3]
 
     def test_rejects_invalid_utf8_bytes(self):
-        from upstage_backend.event_archive.writer import _decode_payload, _PayloadDecodeError
+        from upstage_backend.event_archive.writer import (
+            _decode_payload,
+            _PayloadDecodeError,
+        )
 
         with pytest.raises(_PayloadDecodeError):
             _decode_payload(b"\xff\xfe\x00bad")
 
     def test_rejects_non_json_text(self):
-        from upstage_backend.event_archive.writer import _decode_payload, _PayloadDecodeError
+        from upstage_backend.event_archive.writer import (
+            _decode_payload,
+            _PayloadDecodeError,
+        )
 
         with pytest.raises(_PayloadDecodeError):
             _decode_payload(b"not json at all")
 
     def test_rejects_unsupported_payload_type(self):
-        from upstage_backend.event_archive.writer import _decode_payload, _PayloadDecodeError
+        from upstage_backend.event_archive.writer import (
+            _decode_payload,
+            _PayloadDecodeError,
+        )
 
         with pytest.raises(_PayloadDecodeError):
             _decode_payload(12345)
@@ -161,17 +172,14 @@ class TestWriterPersistAndRead:
         stage_file_location = stage.file_location
         other_stage_id = other_stage.id
 
-        assert dropped == 1, "malformed payload should be dropped, matching legacy worker"
+        assert dropped == 1, (
+            "malformed payload should be dropped, matching legacy worker"
+        )
         assert len(persisted_ids) == 4
 
         from upstage_backend.event_archive.db_models.event import EventModel
 
-        rows = (
-            get_session()
-            .query(EventModel)
-            .order_by(EventModel.mqtt_timestamp)
-            .all()
-        )
+        rows = get_session().query(EventModel).order_by(EventModel.mqtt_timestamp).all()
         assert [r.performance_id for r in rows] == [None, None, None, None]
         for r in rows:
             assert isinstance(r.payload, (dict, list)), (
@@ -179,7 +187,9 @@ class TestWriterPersistAndRead:
                 "so that the GraphQL layer serializes it correctly"
             )
 
-        from upstage_backend.stages.services.stage_operation import StageOperationService
+        from upstage_backend.stages.services.stage_operation import (
+            StageOperationService,
+        )
         from upstage_backend.stages.http.validation import StageStreamInput
 
         op = StageOperationService()
@@ -241,8 +251,7 @@ class TestWriterPersistAndRead:
             StageStreamInput(performanceId=None, cursor=None), other_ref
         )
         assert len(other_live_after_sweep) == 1, (
-            "sweep must only touch events belonging to the swept stage's "
-            "file_location"
+            "sweep must only touch events belonging to the swept stage's file_location"
         )
 
         from graphql import GraphQLError

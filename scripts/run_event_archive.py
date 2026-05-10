@@ -11,7 +11,7 @@ Runs from any CWD, with or without PYTHONPATH set: this script resolves
 its own location via __file__ and puts the project root and src/ on
 sys.path before any project imports.
 """
-import os
+
 import sys
 
 import loguru  # noqa: F401  # entrypoint: load loguru before upstage (see app_containers compose)

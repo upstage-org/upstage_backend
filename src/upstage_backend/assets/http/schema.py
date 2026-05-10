@@ -1,6 +1,4 @@
 # -*- coding: iso8859-15 -*-
-import os
-import sys
 
 from ariadne import MutationType, QueryType, make_executable_schema
 from ariadne.asgi import GraphQL
@@ -20,7 +18,7 @@ mutation = MutationType()
 
 @query.field("mediaList")
 @authenticated(allowed_roles=[SUPER_ADMIN, ADMIN, PLAYER])
-async def search_assets(_, info, **kwargs):
+async def media_list(_, info, **kwargs):
     return AssetService().get_all_medias(
         UserModel(**info.context["request"].state.current_user), kwargs
     )

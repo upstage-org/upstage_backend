@@ -1,9 +1,7 @@
 # -*- coding: iso8859-15 -*-
 import os
-import sys
 
 from base64 import b64decode
-import os
 import uuid
 from graphql import GraphQLError
 

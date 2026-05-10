@@ -1,6 +1,5 @@
 # -*- coding: iso8859-15 -*-
 import os
-import sys
 
 from email.mime.application import MIMEApplication
 from email.mime.multipart import MIMEMultipart
@@ -87,13 +86,13 @@ def create_email(
     # Remove support admins if they've been listed as recipients.
     # They are implicitly added to all emails. No need to add them again.
 
-    if type(to) != list:
+    if not isinstance(to, list):
         to = [to]
 
-    if type(cc) != list:
+    if not isinstance(cc, list):
         cc = [cc]
 
-    if type(bcc) != list:
+    if not isinstance(bcc, list):
         bcc = [bcc]
 
     if len(to) == 1:
@@ -172,8 +171,9 @@ def remove_html(raw_html):
     cleantext = re.sub(cleanr, "", raw_html)
     return cleantext
 
-'''
+
+"""
 if __name__ == '__main__':
     import asyncio
     asyncio.run(send(to='some_email_address', subject='testing smtp', content='test', bcc=[], cc=[], filenames=[]))
-'''
+"""

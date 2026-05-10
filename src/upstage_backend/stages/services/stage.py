@@ -1,6 +1,4 @@
 # -*- coding: iso8859-15 -*-
-import os
-import sys
 
 import re
 from datetime import datetime
@@ -13,7 +11,10 @@ from upstage_backend.global_config.env import ALGORITHM, SECRET_KEY
 from upstage_backend.global_config.helpers.bearer import parse_bearer_token
 from upstage_backend.global_config.helpers.object import convert_keys_to_camel_case
 
-from upstage_backend.assets.db_models.asset_usage import AssetUsageModel, NotificationType
+from upstage_backend.assets.db_models.asset_usage import (
+    AssetUsageModel,
+    NotificationType,
+)
 from upstage_backend.stages.services.stage_operation import StageOperationService
 from upstage_backend.users.db_models.user import ADMIN, SUPER_ADMIN
 from upstage_backend.stages.http.validation import (
@@ -90,7 +91,11 @@ class StageService:
 
         data = query.all()
 
-        access = input.access if input.access and len(input.access) else ['owner', 'editor', 'player']
+        access = (
+            input.access
+            if input.access and len(input.access)
+            else ["owner", "editor", "player"]
+        )
 
         stages = []
         for stage in data:
@@ -264,18 +269,12 @@ class StageService:
         session.add(stage)
         session.flush()
 
-        self.update_stage_attribute(
-            stage.id, "cover", input.cover, session
-        )
+        self.update_stage_attribute(stage.id, "cover", input.cover, session)
         self.update_stage_attribute(
             stage.id, "visibility", str(input.visibility).lower(), session
         )
-        self.update_stage_attribute(
-            stage.id, "description", input.description, session
-        )
-        self.update_stage_attribute(
-            stage.id, "status", input.status, session
-        )
+        self.update_stage_attribute(stage.id, "description", input.description, session)
+        self.update_stage_attribute(stage.id, "status", input.status, session)
         self.update_stage_attribute(
             stage.id, "playerAccess", input.playerAccess, session
         )
@@ -285,13 +284,15 @@ class StageService:
         # comes back with those fields = null even when the writes succeeded —
         # callers that read-back from the mutation (e.g. e2e setStageStatus)
         # see a false "did not persist" failure. Mirrors `get_stage_by_id`.
-        return convert_keys_to_camel_case({
-            **stage.to_dict(),
-            "cover": stage.cover,
-            "visibility": stage.visibility,
-            "status": stage.status,
-            "playerAccess": stage.playerAccess,
-        })
+        return convert_keys_to_camel_case(
+            {
+                **stage.to_dict(),
+                "cover": stage.cover,
+                "visibility": stage.visibility,
+                "status": stage.status,
+                "playerAccess": stage.playerAccess,
+            }
+        )
 
     def update_stage(self, user: UserModel, input: UpdateStageInput):
         session = get_session()
@@ -301,9 +302,7 @@ class StageService:
 
         self.extract_permission(user, stage)
 
-        stage.name = (
-            input.name if hasattr(input, "name") and input.name else stage.name
-        )
+        stage.name = input.name if hasattr(input, "name") and input.name else stage.name
         stage.description = (
             input.description
             if hasattr(input, "description") and input.description
@@ -315,38 +314,32 @@ class StageService:
             else stage.file_location
         )
 
-        stage.owner_id = input.owner if hasattr(input, "owner") and input.owner else stage.owner_id
-
-        self.update_stage_attribute(
-            stage.id, "cover", input.cover, session
+        stage.owner_id = (
+            input.owner if hasattr(input, "owner") and input.owner else stage.owner_id
         )
+
+        self.update_stage_attribute(stage.id, "cover", input.cover, session)
         self.update_stage_attribute(
             stage.id, "visibility", str(input.visibility).lower(), session
         )
-        self.update_stage_attribute(
-            stage.id, "description", input.description, session
-        )
-        self.update_stage_attribute(
-            stage.id, "status", input.status, session
-        )
+        self.update_stage_attribute(stage.id, "description", input.description, session)
+        self.update_stage_attribute(stage.id, "status", input.status, session)
         self.update_stage_attribute(
             stage.id, "playerAccess", input.playerAccess, session
         )
-        self.update_stage_attribute(
-            stage.id, "config", input.config, session
-        )
+        self.update_stage_attribute(stage.id, "config", input.config, session)
         # Same hybrid-property merge as create_stage; see comment there.
-        return convert_keys_to_camel_case({
-            **stage.to_dict(),
-            "cover": stage.cover,
-            "visibility": stage.visibility,
-            "status": stage.status,
-            "playerAccess": stage.playerAccess,
-        })
+        return convert_keys_to_camel_case(
+            {
+                **stage.to_dict(),
+                "cover": stage.cover,
+                "visibility": stage.visibility,
+                "status": stage.status,
+                "playerAccess": stage.playerAccess,
+            }
+        )
 
-    def update_stage_attribute(
-        self, stage_id: int, name: str, value: str, session
-    ):
+    def update_stage_attribute(self, stage_id: int, name: str, value: str, session):
         if not value:
             return
 
@@ -371,9 +364,7 @@ class StageService:
 
     def delete_stage(self, user: UserModel, id: int):
         session = get_session()
-        stage = (
-            session.query(StageModel).filter(StageModel.id == id).first()
-        )
+        stage = session.query(StageModel).filter(StageModel.id == id).first()
         if not stage:
             raise GraphQLError("Stage not found")
 
@@ -382,13 +373,9 @@ class StageService:
         session.query(StageAttributeModel).filter(
             StageAttributeModel.stage_id == id
         ).delete()
-        session.query(ParentStageModel).filter(
-            ParentStageModel.stage_id == id
-        ).delete()
+        session.query(ParentStageModel).filter(ParentStageModel.stage_id == id).delete()
 
-        session.query(SceneModel).filter(
-            SceneModel.stage_id == id
-        ).delete()
+        session.query(SceneModel).filter(SceneModel.stage_id == id).delete()
 
         performances = session.query(PerformanceModel).filter(
             PerformanceModel.stage_id == id
@@ -398,20 +385,14 @@ class StageService:
             EventModel.performance_id.in_([p.id for p in performances])
         ).delete()
 
-        session.query(PerformanceModel).filter(
-            PerformanceModel.stage_id == id
-        ).delete()
+        session.query(PerformanceModel).filter(PerformanceModel.stage_id == id).delete()
 
         session.delete(stage)
         return {"success": True, "message": "Stage deleted"}
 
     def duplicate_stage(self, user: UserModel, input: DuplicateStageInput):
         session = get_session()
-        stage = (
-            session.query(StageModel)
-            .filter(StageModel.id == input.id)
-            .first()
-        )
+        stage = session.query(StageModel).filter(StageModel.id == input.id).first()
         if not stage:
             raise GraphQLError("Stage not found")
 
@@ -432,9 +413,7 @@ class StageService:
         session.flush()
         return convert_keys_to_camel_case(new_stage.to_dict())
 
-    def copy_data(
-        self, input: DuplicateStageInput, session, new_stage: StageModel
-    ):
+    def copy_data(self, input: DuplicateStageInput, session, new_stage: StageModel):
         stage_attributes = (
             session.query(StageAttributeModel)
             .filter(StageAttributeModel.stage_id == input.id)
@@ -480,15 +459,13 @@ class StageService:
 
     def sweep_stage(self, user: UserModel, id: int):
         session = get_session()
-        stage = (
-            session.query(StageModel).filter(StageModel.id == id).first()
-        )
+        stage = session.query(StageModel).filter(StageModel.id == id).first()
         if not stage:
             raise GraphQLError("Stage not found")
 
         events = (
             session.query(EventModel)
-            .filter(EventModel.performance_id == None)
+            .filter(EventModel.performance_id == None)  # noqa: E711  (SQLAlchemy column NULL comparison)
             .filter(EventModel.topic.ilike("%/{}/%".format(stage.file_location)))
         )
 
@@ -511,9 +488,7 @@ class StageService:
 
     def update_status(self, user: UserModel, id: int):
         session = get_session()
-        stage = (
-            session.query(StageModel).filter(StageModel.id == id).first()
-        )
+        stage = session.query(StageModel).filter(StageModel.id == id).first()
         if not stage:
             raise GraphQLError("Stage not found")
 
@@ -551,9 +526,7 @@ class StageService:
 
     def update_visibility(self, user: UserModel, id: int):
         session = get_session()
-        stage = (
-            session.query(StageModel).filter(StageModel.id == id).first()
-        )
+        stage = session.query(StageModel).filter(StageModel.id == id).first()
         if not stage:
             raise GraphQLError("Stage not found")
 
@@ -592,9 +565,7 @@ class StageService:
 
     def update_last_access(self, id: int):
         session = get_session()
-        stage = (
-            session.query(StageModel).filter(StageModel.id == id).first()
-        )
+        stage = session.query(StageModel).filter(StageModel.id == id).first()
         if not stage:
             raise GraphQLError("Stage not found")
 
@@ -616,7 +587,7 @@ class StageService:
             and_(
                 StageAttributeModel.stage_id == StageModel.id,
                 StageAttributeModel.name == "visibility",
-                StageAttributeModel.description == "true"
+                StageAttributeModel.description == "true",
             )
         )
 
@@ -639,7 +610,7 @@ class StageService:
         session = get_session()
         notifications = (
             session.query(AssetUsageModel)
-            .filter(AssetUsageModel.approved == False)
+            .filter(AssetUsageModel.approved == False)  # noqa: E712  (SQLAlchemy column comparison)
             .filter(AssetUsageModel.asset.has(owner_id=user.id))
             .all()
         )

@@ -1,6 +1,4 @@
 # -*- coding: iso8859-15 -*-
-import os
-import sys
 
 from graphql import GraphQLError
 from upstage_backend.global_config import get_session
@@ -43,7 +41,7 @@ class SceneService:
             existed_scene = (
                 session.query(SceneModel)
                 .filter(SceneModel.stage_id == input.stageId)
-                .filter(SceneModel.active == True)
+                .filter(SceneModel.active == True)  # noqa: E712  (SQLAlchemy column comparison)
                 .filter(SceneModel.name == input.name)
                 .first()
             )

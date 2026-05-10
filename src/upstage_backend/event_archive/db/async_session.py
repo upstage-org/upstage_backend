@@ -7,8 +7,8 @@ DATABASE_URL used by the web app, so the existing synchronous engine in
 global_config/database.py is untouched. All writer tasks share a single
 connection pool via AsyncSessionLocal.
 """
+
 import os
-import sys
 
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 
