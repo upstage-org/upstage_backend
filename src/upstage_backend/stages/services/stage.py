@@ -103,6 +103,7 @@ class StageService:
                             "cover": stage.cover,
                             "visibility": stage.visibility,
                             "status": stage.status,
+                            "playerAccess": stage.playerAccess,
                             "permission": permission,
                         }
                     )
@@ -176,6 +177,7 @@ class StageService:
                     "cover": stage.cover,
                     "visibility": stage.visibility,
                     "status": stage.status,
+                    "playerAccess": stage.playerAccess,
                     "permission": self.stage_operation_service.resolve_permission(
                         current_user_id, stage
                     ),
@@ -219,6 +221,7 @@ class StageService:
                 "cover": stage.cover,
                 "visibility": stage.visibility,
                 "status": stage.status,
+                "playerAccess": stage.playerAccess,
                 "permission": permission,
                 "performances": [
                     convert_keys_to_camel_case(pf.to_dict())
