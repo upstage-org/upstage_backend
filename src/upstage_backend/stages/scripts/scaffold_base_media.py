@@ -9,6 +9,21 @@ from PIL import Image
 
 from upstage_backend.assets.db_models.asset_type import AssetTypeModel
 from upstage_backend.assets.db_models.asset import AssetModel
+
+# AssetModel declares string-name relationships to AssetLicenseModel and
+# MediaTagModel. SQLAlchemy resolves those strings the first time the mapper
+# configures (i.e. the first session.query(...) call below), and resolution
+# fails unless both classes have been imported so they are present in
+# Base.registry. The web process picks them up transitively via HTTP/service
+# modules, but this standalone scaffold does not.
+#
+# As of the asset db_models package __init__.py re-exports, simply importing
+# AssetModel above is already enough to register all sibling asset models.
+# The explicit imports here are defensive: they pin the dependency at the call
+# site so a future refactor of the package __init__.py cannot silently
+# resurrect this bug.
+from upstage_backend.assets.db_models.asset_license import AssetLicenseModel  # noqa: F401
+from upstage_backend.assets.db_models.media_tag import MediaTagModel  # noqa: F401
 from upstage_backend.stages.db_models.stage import StageModel
 from upstage_backend.stages.db_models.stage_attribute import StageAttributeModel
 from upstage_backend.stages.db_models.parent_stage import ParentStageModel
