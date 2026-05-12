@@ -80,6 +80,28 @@ x-common-build: &common_build |
 
 # ====================== Services ======================
 services:
+  # One-shot migration runner. Exits 0 once Alembic is at heads. The three
+  # long-running services below `depends_on` this with
+  # `service_completed_successfully`, so on a fresh DB nobody tries to write
+  # to a not-yet-created table (formerly produced
+  # `relation "connection_stats" does not exist` from upstage_stats on first
+  # MQTT message). Single migration runner across the whole compose project.
+  upstage_db_migrate:
+    build:
+      context: ../
+      dockerfile_inline: *common_build
+    image: upstage/backend:local
+    container_name: upstage_db_migrate_${SITE}
+    user: "${APP_USER}:${APP_GROUP}"
+    command: >
+      /bin/bash -c "
+      cd /usr/app &&
+      export HARDCODED_HOSTNAME=${HARDCODED_HOSTNAME} &&
+      python -m alembic -c ./scripts/alembic.ini upgrade heads"
+    restart: "no"
+    networks:
+      - upstage-network
+
   upstage_backend:
     build:
       context: ../
@@ -92,6 +114,9 @@ services:
     # Host dir must exist and be writable by APP_USER:APP_GROUP (run_docker_compose_* scripts mkdir+chown).
     volumes:
       - /app_code_${SITE}/uploads:/usr/app/uploads
+    depends_on:
+      upstage_db_migrate:
+        condition: service_completed_successfully
     command: >
       /bin/bash -c "
       cd /usr/app &&
@@ -108,6 +133,9 @@ services:
     image: upstage/event-archive:local
     container_name: upstage_event_archive_${SITE}
     user: "${APP_USER}:${APP_GROUP}"
+    depends_on:
+      upstage_db_migrate:
+        condition: service_completed_successfully
     command: >
       /bin/bash -c "
       cd /usr/app &&
@@ -124,6 +152,9 @@ services:
     image: upstage/stats:local
     container_name: upstage_stats_${SITE}
     user: "${APP_USER}:${APP_GROUP}"
+    depends_on:
+      upstage_db_migrate:
+        condition: service_completed_successfully
     command: >
       /bin/bash -c "
       cd /usr/app &&
