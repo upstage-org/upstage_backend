@@ -3,13 +3,15 @@
 """
 Entry point for the event_archive service.
 
-Hands control to src.event_archive.main.main(), which runs a single
-asyncio.TaskGroup containing the MQTT subscriber and N Postgres writers.
-Non-zero exit on any task failure so Docker restarts the container.
+Hands control to ``upstage_backend.event_archive.main.main()``, which runs
+a single ``asyncio.TaskGroup`` containing the MQTT subscriber and N
+Postgres writers. Non-zero exit on any task failure so Docker restarts
+the container.
 
-Runs from any CWD, with or without PYTHONPATH set: this script resolves
-its own location via __file__ and puts the project root and src/ on
-sys.path before any project imports.
+Imports work from any CWD because ``upstage_backend`` is editable-
+installed (``pip install -e .``) into the venv at container build time
+(see ``app_containers/docker-compose.yaml`` ``x-common-build`` runtime
+stage). No ``sys.path`` manipulation, no ``PYTHONPATH`` exports.
 """
 
 import sys

@@ -63,42 +63,30 @@ cd prod_copy/upstage_backend
 pip install -e .
 ```
 
-That makes `upstage_backend` importable from any directory, so `uvicorn upstage_backend.main:app`, `pytest`, `alembic`, and ad-hoc `python3 -m scripts.run_event_archive` all work with no `PYTHONPATH` exports, no `sys.path` headers, and no `from src.X` imports. The container images do the same: `requirements.txt` is a one-line `-e .`, which triggers the editable install at container start.
+That makes `upstage_backend` importable from any directory, so `uvicorn upstage_backend.main:app`, `pytest`, `alembic`, and ad-hoc `python3 -m scripts.run_event_archive` all work with no `PYTHONPATH` exports, no `sys.path` headers, and no `from src.X` imports. The container images do the same thing without ever consulting `requirements.txt`: the inline Dockerfile in [`app_containers/docker-compose.yaml`](upstage_backend/app_containers/docker-compose.yaml) (`x-common-build`) runs `uv sync --no-install-project` in the builder stage to populate `/usr/app/.venv`, then in the runtime stage runs `pip install --no-deps --no-cache-dir -e .` so `upstage_backend` itself is editable-installed into that venv. (`requirements.txt` is kept on disk as a one-line `-e .` only so legacy host-side installers that still call `pip install -r requirements.txt` continue to work; nothing inside the container build path consults it.)
 
 ### 3.1. Compose services
 
-The backend compose file declares three app services that share one network:
+The backend compose file ([`app_containers/docker-compose.yaml`](upstage_backend/app_containers/docker-compose.yaml), templated per site via the `${SITE}` env var) declares one one-shot migration service plus three long-running app services on a shared network. The one-shot runs Alembic to heads, then exits; the three app services `depends_on` it with `service_completed_successfully`, so on a fresh DB nobody tries to write to a not-yet-migrated table:
 
-```50:112:upstage_backend/app_containers/docker-compose-dev.yaml
+```upstage_backend/app_containers/docker-compose.yaml
 services:
-  upstage_backend_dev:
-    image: registry.access.redhat.com/ubi9/python-312:latest
-    ...
-    command: >
-      /bin/bash -c "
-      cd /usr/app &&
-      pip install --upgrade pip &&
-      pip install -r ./requirements.txt &&
-      export HARDCODED_HOSTNAME=${HARDCODED_HOSTNAME} &&
-      ./scripts/start_upstage.sh"
-
-  upstage_event_archive_dev:
-    ...
-    command: >
-      /bin/bash -c "
-      cd /usr/app &&
-      ...
-      python3 -m scripts.run_event_archive"
-
-  upstage_stats_dev:
-    ...
-      python3 -m scripts.run_upstage_stats"
+  upstage_db_migrate:        # one-shot: alembic upgrade heads, exit 0
+  upstage_backend:           # FastAPI; runs ./scripts/start_upstage.sh
+  upstage_event_archive:     # MQTT→Postgres; runs ./scripts/run_event_archive.sh
+  upstage_stats:             # connection-stats aggregator; runs ./scripts/run_upstage_stats.sh
 ```
 
-[`upstage_backend/scripts/start_upstage.sh`](upstage_backend/scripts/start_upstage.sh) pins it together:
+Each app service's `command:` is a 3-liner that `cd /usr/app`s, exports `HARDCODED_HOSTNAME`, and execs the corresponding wrapper under `scripts/`. The wrappers are intentionally tiny — they activate the editable-installed venv and `exec python -m scripts.run_<name>` (or `exec uvicorn …` for the FastAPI service). No `PYTHONPATH` exports, no `sys.path` headers.
 
-```1:5:upstage_backend/scripts/start_upstage.sh
-uvicorn upstage_backend.main:app --proxy-headers --forwarded-allow-ips='*' --host 0.0.0.0 --port 3000
+[`upstage_backend/scripts/start_upstage.sh`](upstage_backend/scripts/start_upstage.sh) pins it together (Alembic is intentionally NOT re-run here — `upstage_db_migrate` already did it):
+
+```17:21:upstage_backend/scripts/start_upstage.sh
+exec uvicorn upstage_backend.main:app \
+    --proxy-headers \
+    --forwarded-allow-ips='*' \
+    --host 0.0.0.0 \
+    --port 3000
 ```
 
 The ASGI app is defined in [`upstage_backend/src/upstage_backend/main.py`](upstage_backend/src/upstage_backend/main.py):
