@@ -90,7 +90,10 @@ services:
     build:
       context: ../
       dockerfile_inline: *common_build
-    image: upstage/backend:local
+    # Per-site tag (shared with upstage_backend below — same image, different
+    # commands). dev and prod must never share an image: sources are baked in
+    # at build time and the SITE differs between deployments.
+    image: upstage/backend:${SITE}
     container_name: upstage_db_migrate_${SITE}
     user: "${APP_USER}:${APP_GROUP}"
     command: >
@@ -106,7 +109,7 @@ services:
     build:
       context: ../
       dockerfile_inline: *common_build
-    image: upstage/backend:local
+    image: upstage/backend:${SITE}
     container_name: upstage_backend_${SITE}
     user: "${APP_USER}:${APP_GROUP}"
     ports:
@@ -130,7 +133,7 @@ services:
     build:
       context: ../
       dockerfile_inline: *common_build
-    image: upstage/event-archive:local
+    image: upstage/event-archive:${SITE}
     container_name: upstage_event_archive_${SITE}
     user: "${APP_USER}:${APP_GROUP}"
     depends_on:
@@ -149,7 +152,7 @@ services:
     build:
       context: ../
       dockerfile_inline: *common_build
-    image: upstage/stats:local
+    image: upstage/stats:${SITE}
     container_name: upstage_stats_${SITE}
     user: "${APP_USER}:${APP_GROUP}"
     depends_on:

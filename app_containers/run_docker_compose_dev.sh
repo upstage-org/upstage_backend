@@ -12,7 +12,7 @@ APP_GROUP=1000
 sudo mkdir -p "/app_code_${SITE}/uploads"
 sudo chown -R "${APP_USER}:${APP_GROUP}" "/app_code_${SITE}/uploads"
 
-docker compose -f docker-compose.yaml -p docker-backend-${SITE} down --remove-orphans
+docker compose -f docker-compose.yaml -p upstage-backend-${SITE} down --remove-orphans
 docker compose rm -f
-docker compose -f docker-compose.yaml -p docker-backend-${SITE} up --build -d
-docker compose -f docker-compose.yaml -p docker-backend-${SITE} ps
+docker compose -f docker-compose.yaml -p upstage-backend-${SITE} up --build -d
+docker compose -f docker-compose.yaml -p upstage-backend-${SITE} ps
