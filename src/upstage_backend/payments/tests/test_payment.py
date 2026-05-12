@@ -1,6 +1,4 @@
 # -*- coding: iso8859-15 -*-
-import os
-import sys
 
 import asyncio
 import pytest
@@ -21,7 +19,7 @@ class TestPaymentController:
         )
         ps = PaymentService()
         result = await ps.one_time_purchase(otpi)
-        assert result["success"] == True
+        assert result["success"] is True
 
     '''
     login_query = """

@@ -1,6 +1,4 @@
 # -*- coding: iso8859-15 -*-
-import os
-import sys
 
 import pytest
 from upstage_backend.authentication.tests.auth_test import TestAuthenticationController
@@ -105,7 +103,9 @@ class TestUserController:
             }
         """
 
-        response = client.post("/api/studio_graphql", json={"query": query}, headers=headers)
+        response = client.post(
+            "/api/studio_graphql", json={"query": query}, headers=headers
+        )
         data = response.json()
 
         assert "errors" not in data

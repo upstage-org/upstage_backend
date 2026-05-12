@@ -1,4 +1,5 @@
 """Configures loguru; import ``logger`` from here (or re-exports) for all output — not the stdlib log package."""
+
 from loguru import logger
 import sys
 

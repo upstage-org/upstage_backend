@@ -6,6 +6,7 @@ This module MUST be imported before any `src.*` module so that env vars are
 set and `global_config.database.engine` points at an in-memory SQLite engine
 rather than trying to connect to a real Postgres at import time.
 """
+
 import os
 import sys
 
@@ -57,7 +58,9 @@ def sqlite_engine():
     from upstage_backend.stages.db_models.stage import StageModel
     from upstage_backend.stages.db_models.stage_attribute import StageAttributeModel
     from upstage_backend.stages.db_models.parent_stage import ParentStageModel
-    from upstage_backend.performance_config.db_models.performance import PerformanceModel
+    from upstage_backend.performance_config.db_models.performance import (
+        PerformanceModel,
+    )
     from upstage_backend.performance_config.db_models.scene import SceneModel
 
     EventModel.__table__.c.payload.type = GenericJSON()
@@ -143,7 +146,9 @@ def rebound_db(sqlite_engine, monkeypatch):
     with sqlite_engine.begin() as conn:
         from upstage_backend.event_archive.db_models.event import EventModel
         from upstage_backend.stages.db_models.stage import StageModel
-        from upstage_backend.performance_config.db_models.performance import PerformanceModel
+        from upstage_backend.performance_config.db_models.performance import (
+            PerformanceModel,
+        )
 
         for tbl in (
             EventModel.__table__,

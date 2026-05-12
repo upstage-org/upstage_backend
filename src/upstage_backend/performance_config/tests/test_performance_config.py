@@ -1,14 +1,9 @@
 # -*- coding: iso8859-15 -*-
-import os
-import sys
 
 
 import pytest
-from upstage_backend.global_config import get_session
-from upstage_backend.global_config.database import ScopedSession
-from upstage_backend.global_config.helpers.object import convert_keys_to_camel_case
-from upstage_backend.main import app
-from upstage_backend.performance_config.http.schema import performance_graphql_app
+
+
 @pytest.mark.anyio
 class TestPerformanceConfig:
     async def test_01_get_performance_communication(self, client):

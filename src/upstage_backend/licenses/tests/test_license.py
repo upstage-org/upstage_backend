@@ -1,17 +1,14 @@
 # -*- coding: iso8859-15 -*-
-import os
-import sys
 
 
 import pytest
 from upstage_backend.assets.db_models.asset import AssetModel
 from upstage_backend.assets.tests.asset_test import TestAssetController
 from upstage_backend.assets.db_models.asset_license import AssetLicenseModel
-from upstage_backend.main import app
-from upstage_backend.licenses.http.schema import license_graphql_app
 from upstage_backend.global_config import get_session
 
 test_AssetController = TestAssetController()
+
 
 @pytest.mark.anyio
 class TestLicenseController:
@@ -70,5 +67,7 @@ class TestLicenseController:
         assert response.json()["data"][
             "revokeLicense"
         ] == "Failed to revoke license {}".format(license.id)
-        license = get_session().query(AssetLicenseModel).filter_by(id=license.id).first()
+        license = (
+            get_session().query(AssetLicenseModel).filter_by(id=license.id).first()
+        )
         assert license is None

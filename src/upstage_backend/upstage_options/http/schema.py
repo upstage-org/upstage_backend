@@ -1,11 +1,12 @@
 # -*- coding: iso8859-15 -*-
-import os
-import sys
 
 from ariadne import MutationType, QueryType, make_executable_schema
 
 from upstage_backend.global_config.decorators.authenticated import authenticated
-from upstage_backend.upstage_options.http.validation import ConfigInput, SystemEmailInput
+from upstage_backend.upstage_options.http.validation import (
+    ConfigInput,
+    SystemEmailInput,
+)
 from upstage_backend.upstage_options.services.upstage_option import SettingService
 from upstage_backend.studio_management.http.graphql import type_defs
 from ariadne.asgi import GraphQL

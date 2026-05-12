@@ -5,7 +5,11 @@ import pathlib
 
 from sqlalchemy import not_
 from terminal_colors import bcolors
-from upstage_backend.global_config import UPLOAD_USER_CONTENT_FOLDER, ScopedSession, logger
+from upstage_backend.global_config import (
+    UPLOAD_USER_CONTENT_FOLDER,
+    ScopedSession,
+    logger,
+)
 from upstage_backend.assets.db_models.asset import AssetModel
 from upstage_backend.assets.db_models.asset_license import AssetLicenseModel
 from upstage_backend.assets.db_models.asset_usage import AssetUsageModel
@@ -43,18 +47,18 @@ with ScopedSession() as session:
         if stage.file_location in stages_to_be_kepts:
             keep_ids.append(stage.id)
 
-    session.query(ParentStageModel).filter(ParentStageModel.stage_id.notin_(keep_ids)).delete(
-        synchronize_session=False
-    )
+    session.query(ParentStageModel).filter(
+        ParentStageModel.stage_id.notin_(keep_ids)
+    ).delete(synchronize_session=False)
 
     for asset in session.query(AssetModel).filter(not_(AssetModel.stages.any())).all():
         logger.info("🗑️ Deleting asset: {}".format(asset.name))
-        session.query(AssetLicenseModel).filter(AssetLicenseModel.asset_id == asset.id).delete(
-            synchronize_session=False
-        )
-        session.query(AssetUsageModel).filter(AssetUsageModel.asset_id == asset.id).delete(
-            synchronize_session=False
-        )
+        session.query(AssetLicenseModel).filter(
+            AssetLicenseModel.asset_id == asset.id
+        ).delete(synchronize_session=False)
+        session.query(AssetUsageModel).filter(
+            AssetUsageModel.asset_id == asset.id
+        ).delete(synchronize_session=False)
         session.query(MediaTagModel).filter(MediaTagModel.asset_id == asset.id).delete(
             synchronize_session=False
         )
@@ -75,7 +79,7 @@ with ScopedSession() as session:
                         pathlib.Path(
                             "{}/{}/{}".format(upload_assets_folder, ftype, media)
                         ).unlink()
-                    except:
+                    except Exception:
                         logger.error(
                             "Failed to remove {}/{}/{}".format(
                                 upload_assets_folder, ftype, media
@@ -100,21 +104,21 @@ with ScopedSession() as session:
                 .first()
             )
             if sample_event:
-                session.query(EventModel).filter(EventModel.topic == sample_event.topic).delete(
-                    synchronize_session=False
-                )
-            session.query(PerformanceModel).filter(PerformanceModel.stage_id == stage.id).delete(
-                synchronize_session=False
-            )
+                session.query(EventModel).filter(
+                    EventModel.topic == sample_event.topic
+                ).delete(synchronize_session=False)
+            session.query(PerformanceModel).filter(
+                PerformanceModel.stage_id == stage.id
+            ).delete(synchronize_session=False)
             session.query(SceneModel).filter(SceneModel.stage_id == stage.id).delete(
                 synchronize_session=False
             )
             session.delete(stage)
         else:
             logger.info("🗑️ Clearing replays and scenes of {}".format(stage.name))
-            session.query(PerformanceModel).filter(PerformanceModel.stage_id == stage.id).delete(
-                synchronize_session=False
-            )
+            session.query(PerformanceModel).filter(
+                PerformanceModel.stage_id == stage.id
+            ).delete(synchronize_session=False)
             session.query(SceneModel).filter(SceneModel.stage_id == stage.id).delete(
                 synchronize_session=False
             )

@@ -1,6 +1,4 @@
 # -*- coding: iso8859-15 -*-
-import os
-import sys
 
 from upstage_backend.payments.services.pdf_operator import create_receipt_base64
 

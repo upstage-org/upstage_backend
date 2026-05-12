@@ -3,10 +3,9 @@
 """
 Only run this manually, to load scaffolding and a demo stage.
 """
-import os
+
 import sys
 
-import loguru 
 import asyncio
 
 from upstage_backend.stages.scripts.scaffold_base_media import main

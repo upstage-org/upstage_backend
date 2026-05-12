@@ -1,11 +1,8 @@
 # -*- coding: iso8859-15 -*-
-import os
-import sys
 
 from sqlalchemy import Column, Integer, BigInteger, ForeignKey
 from sqlalchemy.orm import relationship
 from upstage_backend.global_config.db_models.base import BaseModel
-from upstage_backend.assets.db_models.asset import AssetModel
 
 
 class ParentStageModel(BaseModel):

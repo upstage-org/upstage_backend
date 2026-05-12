@@ -6,8 +6,8 @@ Connects to the broker with aiomqtt, subscribes to PERFORMANCE_TOPIC_RULE, and
 pushes every non-retained, non-statistics message onto an asyncio.Queue for the
 writer tasks to drain. On disconnect, logs and reconnects with a backoff.
 """
+
 import os
-import sys
 
 import asyncio
 import secrets

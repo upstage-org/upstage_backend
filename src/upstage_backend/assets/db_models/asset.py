@@ -1,6 +1,4 @@
 # -*- coding: iso8859-15 -*-
-import os
-import sys
 
 from datetime import datetime
 from enum import Enum
@@ -16,10 +14,6 @@ from sqlalchemy import (
 )
 from sqlalchemy.orm import relationship
 from upstage_backend.global_config.db_models.base import BaseModel
-from upstage_backend.assets.db_models.asset_type import AssetTypeModel
-from upstage_backend.assets.db_models.asset_license import AssetLicenseModel
-from upstage_backend.assets.db_models.media_tag import MediaTagModel
-from upstage_backend.assets.db_models.asset_usage import AssetUsageModel
 
 
 class Previlege(Enum):

@@ -1,6 +1,4 @@
 # -*- coding: iso8859-15 -*-
-import os
-import sys
 
 from datetime import datetime
 from sqlalchemy import BigInteger, Column, DateTime, ForeignKey, Integer, String, Text
@@ -8,7 +6,6 @@ from sqlalchemy.orm import relationship
 from sqlalchemy.ext.hybrid import hybrid_property
 from upstage_backend.global_config.db_models.base import BaseModel
 from upstage_backend.stages.db_models.stage_attribute import StageAttributeModel
-from upstage_backend.stages.db_models.parent_stage import ParentStageModel
 
 
 class StageModel(BaseModel):
@@ -52,6 +49,21 @@ class StageModel(BaseModel):
     @hybrid_property
     def status(self):
         attribute = self.attributes.filter(StageAttributeModel.name == "status").first()
+        if attribute:
+            return attribute.description
+        return None
+
+    @hybrid_property
+    def playerAccess(self):
+        # Mirrors the cover/visibility/status pattern: the value lives in the
+        # stage_attribute table (name="playerAccess", description=<JSON string>).
+        # Without this, the GraphQL Stage.playerAccess field always resolves to
+        # null even when the attribute row exists, because get_stage_by_id only
+        # merges hybrid properties (cover/visibility/status) into the response
+        # dict and stage.to_dict() doesn't see attribute-table rows.
+        attribute = self.attributes.filter(
+            StageAttributeModel.name == "playerAccess"
+        ).first()
         if attribute:
             return attribute.description
         return None

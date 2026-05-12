@@ -1,18 +1,14 @@
 # -*- coding: iso8859-15 -*-
-import os
-import sys
 
-from upstage_backend.global_config.schema import config_graphql_endpoints
 
 import random
-from upstage_backend.main import app
 from upstage_backend.global_config.database import ScopedSession
 from upstage_backend.global_config.env import JWT_HEADER_NAME
 import pytest
-from upstage_backend.authentication.http.schema import auth_graphql_app
 from upstage_backend.global_config.helpers.fernet_crypto import encrypt
 from upstage_backend.users.db_models.user import PLAYER, SUPER_ADMIN, UserModel
 from faker import Faker
+
 
 @pytest.mark.anyio
 class TestAuthenticationController:
@@ -47,18 +43,22 @@ class TestAuthenticationController:
             "payload": {"username": Faker().email(), "password": "testpassword"}
         }
         response = client.post(
-            "/api/studio_graphql", json={"query": self.login_query, "variables": variables}
+            "/api/studio_graphql",
+            json={"query": self.login_query, "variables": variables},
         )
         assert response.status_code == 200
         data = response.json()
         assert "errors" in data
-        assert data["errors"][0]["message"] == "Incorrect username or password. Please try again."
+        assert (
+            data["errors"][0]["message"]
+            == "Incorrect username or password. Please try again."
+        )
 
     async def test_02_login_successfully(self, client):
         email = f"{random.randint(1, 1000)}{Faker().email()}"
         user = UserModel(
             username=email,
-            password=encrypt(f"testpassword"),
+            password=encrypt("testpassword"),
             email=email,
             active=True,
             role=SUPER_ADMIN,
@@ -67,7 +67,8 @@ class TestAuthenticationController:
             s.add(user)
         variables = {"payload": {"username": email, "password": "testpassword"}}
         response = client.post(
-                     "/api/studio_graphql", json={"query": self.login_query, "variables": variables}
+            "/api/studio_graphql",
+            json={"query": self.login_query, "variables": variables},
         )
         assert response.status_code == 200
         data = response.json()
@@ -81,7 +82,7 @@ class TestAuthenticationController:
         email = f"{random.randint(1, 1000)}{Faker().email()}"
         user = UserModel(
             username=email,
-            password=encrypt(f"testpassword"),
+            password=encrypt("testpassword"),
             email=email,
             active=True,
             role=PLAYER,
@@ -90,7 +91,8 @@ class TestAuthenticationController:
             s.add(user)
         variables = {"payload": {"username": email, "password": "testpassword"}}
         response = client.post(
-            "/api/studio_graphql", json={"query": self.login_query, "variables": variables}
+            "/api/studio_graphql",
+            json={"query": self.login_query, "variables": variables},
         )
         assert response.status_code == 200
         data = response.json()
@@ -104,7 +106,7 @@ class TestAuthenticationController:
         email = f"{random.randint(1, 1000)}{Faker().email()}"
         user = UserModel(
             username=email,
-            password=encrypt(f"testpassword"),
+            password=encrypt("testpassword"),
             email=email,
             active=True,
             role=SUPER_ADMIN,
@@ -114,7 +116,8 @@ class TestAuthenticationController:
 
         variables = {"payload": {"username": email, "password": "testpassword"}}
         response = client.post(
-            "/api/studio_graphql", json={"query": self.login_query, "variables": variables}
+            "/api/studio_graphql",
+            json={"query": self.login_query, "variables": variables},
         )
         data = response.json()
         headers = {
@@ -122,7 +125,9 @@ class TestAuthenticationController:
             JWT_HEADER_NAME: data["data"]["login"]["refresh_token"],
         }
         response = client.post(
-            "/api/studio_graphql", json={"query": self.refresh_token_query}, headers=headers
+            "/api/studio_graphql",
+            json={"query": self.refresh_token_query},
+            headers=headers,
         )
         assert response.status_code == 200
         data = response.json()
@@ -131,11 +136,13 @@ class TestAuthenticationController:
 
     def test_04_refresh_token_failed(self, client):
         headers = {
-            "Authorization": f"Bearer invalid_token",
+            "Authorization": "Bearer invalid_token",
             JWT_HEADER_NAME: "invalid_token",
         }
         response = client.post(
-            "/api/studio_graphql", json={"query": self.refresh_token_query}, headers=headers
+            "/api/studio_graphql",
+            json={"query": self.refresh_token_query},
+            headers=headers,
         )
         assert response.status_code == 200
         data = response.json()
@@ -146,7 +153,7 @@ class TestAuthenticationController:
         email = f"{random.randint(1, 1000)}{Faker().email()}"
         user = UserModel(
             username=email,
-            password=encrypt(f"testpassword"),
+            password=encrypt("testpassword"),
             email=email,
             active=True,
             role=SUPER_ADMIN,
@@ -156,7 +163,8 @@ class TestAuthenticationController:
 
         variables = {"payload": {"username": email, "password": "testpassword"}}
         response = client.post(
-            "/api/studio_graphql", json={"query": self.login_query, "variables": variables}
+            "/api/studio_graphql",
+            json={"query": self.login_query, "variables": variables},
         )
         data = response.json()
         headers = {
@@ -169,7 +177,9 @@ class TestAuthenticationController:
             logout
         }
         """
-        response = client.post("/api/studio_graphql", json={"query": query}, headers=headers)
+        response = client.post(
+            "/api/studio_graphql", json={"query": query}, headers=headers
+        )
         assert response.status_code == 200
         data = response.json()
         assert "errors" not in data
@@ -178,7 +188,7 @@ class TestAuthenticationController:
 
     async def test_06_logout_failed(self, client):
         headers = {
-            "Authorization": f"Bearer invalid_token",
+            "Authorization": "Bearer invalid_token",
             JWT_HEADER_NAME: "invalid_token",
         }
 
@@ -187,7 +197,9 @@ class TestAuthenticationController:
             logout
         }
         """
-        response = client.post("/api/studio_graphql", json={"query": query}, headers=headers)
+        response = client.post(
+            "/api/studio_graphql", json={"query": query}, headers=headers
+        )
         assert response.status_code == 200
         data = response.json()
         assert "errors" in data
@@ -197,7 +209,7 @@ class TestAuthenticationController:
         email = f"{random.randint(1, 1000)}{Faker().email()}"
         user = UserModel(
             username=email,
-            password=encrypt(f"testpassword"),
+            password=encrypt("testpassword"),
             email=email,
             active=True,
             role=role,
@@ -207,7 +219,8 @@ class TestAuthenticationController:
 
         variables = {"payload": {"username": email, "password": "testpassword"}}
         response = client.post(
-            "/api/studio_graphql", json={"query": self.login_query, "variables": variables}
+            "/api/studio_graphql",
+            json={"query": self.login_query, "variables": variables},
         )
         data = response.json()
         return {

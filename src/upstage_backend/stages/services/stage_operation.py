@@ -1,6 +1,4 @@
 # -*- coding: iso8859-15 -*-
-import os
-import sys
 
 import json
 from upstage_backend.event_archive.db_models.event import EventModel
@@ -20,12 +18,10 @@ class StageOperationService:
     def assign_user_to_default_stage(self, user_ids: list[int]):
         session = get_session()
         stage = (
-            session.query(StageModel)
-            .filter(StageModel.name == "Demo Stage")
-            .first()
+            session.query(StageModel).filter(StageModel.name == "Demo Stage").first()
         )
 
-        if (not stage):
+        if not stage:
             return
 
         playerAccess = stage.attributes.filter(
@@ -114,6 +110,6 @@ class StageOperationService:
             .order_by(SceneModel.scene_order.asc())
         )
         if not input.performanceId:  # Only fetch disabled scene in performance replay
-            query = query.filter(SceneModel.active == True)
+            query = query.filter(SceneModel.active == True)  # noqa: E712  (SQLAlchemy column comparison)
         scenes = query.all()
         return [convert_keys_to_camel_case(scene.to_dict()) for scene in scenes]

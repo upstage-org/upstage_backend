@@ -1,10 +1,7 @@
 # -*- coding: iso8859-15 -*-
 import os
-import sys
 
-from base64 import b64decode
 import json
-import os
 import uuid
 from graphql import GraphQLError
 from sqlalchemy import and_, or_
@@ -177,9 +174,7 @@ class MediaService:
             session.flush()
             return
 
-        physical_path = self.remove_media_frames_and_get_path(
-            session, asset
-        )
+        physical_path = self.remove_media_frames_and_get_path(session, asset)
 
         self.file_handling.delete_file(physical_path)
 
@@ -250,9 +245,7 @@ class MediaService:
             ParentStageModel.child_asset_id == input.id
         ).delete()
         for stage_id in input.stageIds:
-            session.add(
-                ParentStageModel(stage_id=stage_id, child_asset_id=input.id)
-            )
+            session.add(ParentStageModel(stage_id=stage_id, child_asset_id=input.id))
         session.flush()
 
         asset = session.query(AssetModel).filter_by(id=input.id).first()

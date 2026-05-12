@@ -1,21 +1,11 @@
 # -*- coding: iso8859-15 -*-
-import os
-import sys
 
 import pytest
 
 from upstage_backend.authentication.tests.auth_test import TestAuthenticationController
-from upstage_backend.event_archive.db_models.event import EventModel
-from upstage_backend.global_config.database import ScopedSession
-from upstage_backend.assets.db_models.asset import AssetModel
-from upstage_backend.main import app
 from upstage_backend.global_config.env import JWT_HEADER_NAME
 from upstage_backend.global_config import get_session
-from upstage_backend.stages.db_models.parent_stage import ParentStageModel
-from upstage_backend.stages.db_models.stage_attribute import StageAttributeModel
-from upstage_backend.users.db_models.user import PLAYER, SUPER_ADMIN
 from upstage_backend.stages.db_models.stage import StageModel
-from upstage_backend.stages.http.schema import stage_graphql_app
 
 test_AuthenticationController = TestAuthenticationController()
 
@@ -258,7 +248,7 @@ class TestStageController:
     # async def test_12_update_status_failed(self, client):
     #     headers = test_AuthenticationController.get_headers(client, SUPER_ADMIN)
     #     variables = {"id": 1000}
-    #     query = """ 
+    #     query = """
     #         mutation updateStatus($id: ID!) {
     #             updateStatus(id: $id) {
     #                 result
@@ -294,7 +284,7 @@ class TestStageController:
     #     headers = test_AuthenticationController.get_headers(client, SUPER_ADMIN)
     #     stage = get_session().query(StageModel).all()[-1]
     #     variables = {"id": stage.id}
-    #     query = """ 
+    #     query = """
     #         mutation updateStatus($id: ID!) {
     #             updateStatus(id: $id) {
     #                 result
@@ -343,7 +333,7 @@ class TestStageController:
     # async def test_14_update_visibility_failed(self, client):
     #     headers = test_AuthenticationController.get_headers(client, SUPER_ADMIN)
     #     variables = {"id": 1000}
-    #     query = """ 
+    #     query = """
     #         mutation updateVisibility($id: ID!) {
     #             updateVisibility(id: $id) {
     #                 result
@@ -379,7 +369,7 @@ class TestStageController:
     #     headers = test_AuthenticationController.get_headers(client, SUPER_ADMIN)
     #     stage = get_session().query(StageModel).all()[-1]
     #     variables = {"id": stage.id}
-    #     query = """ 
+    #     query = """
     #         mutation updateVisibility($id: ID!) {
     #             updateVisibility(id: $id) {
     #                 result
@@ -428,7 +418,7 @@ class TestStageController:
     # async def test_16_update_last_access_failed(self, client):
     #     headers = test_AuthenticationController.get_headers(client, SUPER_ADMIN)
     #     variables = {"id": 1000}
-    #     query = """ 
+    #     query = """
     #         mutation updateLastAccess($id: ID!) {
     #             updateLastAccess(id: $id) {
     #                 result
@@ -464,7 +454,7 @@ class TestStageController:
     #     headers = test_AuthenticationController.get_headers(client, SUPER_ADMIN)
     #     stage = get_session().query(StageModel).all()[-1]
     #     variables = {"id": stage.id}
-    #     query = """ 
+    #     query = """
     #         mutation updateLastAccess($id: ID!) {
     #             updateLastAccess(id: $id) {
     #                 result

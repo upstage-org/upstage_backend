@@ -59,12 +59,22 @@ x-common-build: &common_build |
 
   # Bake in sources (replaces former /app_code_${SITE} bind mounts).
   COPY --chown=appuser:appuser pyproject.toml uv.lock* ./
+  COPY --chown=appuser:appuser pytest.ini conftest.py ./
   COPY --chown=appuser:appuser src ./src
   COPY --chown=appuser:appuser scripts ./scripts
   COPY --chown=appuser:appuser alembic ./alembic
   COPY --chown=appuser:appuser migration_scripts ./migration_scripts
+  COPY --chown=appuser:appuser tests ./tests
+  COPY --chown=appuser:appuser general_tests ./general_tests
   COPY --chown=appuser:appuser dashboard/demo ./dashboard/demo
   RUN chown -R appuser:appuser uploads /usr/app/dashboard/demo
+
+  # Editable install of upstage_backend itself (deps already in .venv from builder
+  # stage via `uv sync --no-install-project`). Per workspace rule, the package
+  # must be importable everywhere without PYTHONPATH exports.
+  RUN /usr/app/.venv/bin/python -m ensurepip --upgrade --default-pip \
+      && /usr/app/.venv/bin/pip install --no-deps --no-cache-dir -e . \
+      && /usr/app/.venv/bin/python -c "import upstage_backend; print('upstage_backend installed at', upstage_backend.__file__)"
 
   USER appuser
 
@@ -79,6 +89,7 @@ services:
     user: "${APP_USER}:${APP_GROUP}"
     ports:
       - "${APP_PORT}:3000"
+    # Host dir must exist and be writable by APP_USER:APP_GROUP (run_docker_compose_* scripts mkdir+chown).
     volumes:
       - /app_code_${SITE}/uploads:/usr/app/uploads
     command: >

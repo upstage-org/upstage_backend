@@ -1,6 +1,4 @@
 # -*- coding: iso8859-15 -*-
-import os
-import sys
 
 import loguru  # noqa: F401  # entrypoint: load loguru before upstage (see app_containers compose)
 
@@ -12,7 +10,10 @@ from contextlib import asynccontextmanager
 from starlette.requests import Request
 
 from upstage_backend.global_config import ENV_TYPE, config_graphql_endpoints, HOSTNAME
-from upstage_backend.global_config.db_context import request_session, current_session_or_none
+from upstage_backend.global_config.db_context import (
+    request_session,
+    current_session_or_none,
+)
 from upstage_backend.global_config.logger import logger
 
 
@@ -81,9 +82,8 @@ async def db_request_session(request: Request, call_next):
         except Exception:
             raise
         else:
-            if (
-                current_session_or_none() is session
-                and (session.new or session.dirty or session.deleted)
+            if current_session_or_none() is session and (
+                session.new or session.dirty or session.deleted
             ):
                 logger.warning(
                     "db_request_session: request %s finished with uncommitted "

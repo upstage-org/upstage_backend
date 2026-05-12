@@ -1,15 +1,10 @@
 # -*- coding: iso8859-15 -*-
-import os
-import sys
 
-from upstage_backend.global_config.schema import config_graphql_endpoints
 
 import base64
 import pytest
-from upstage_backend.main import app
 from upstage_backend.global_config.env import JWT_HEADER_NAME
 from upstage_backend.global_config import get_session
-from upstage_backend.assets.http.schema import asset_graphql_app
 from upstage_backend.authentication.tests.auth_test import TestAuthenticationController
 from upstage_backend.assets.db_models.asset import AssetModel
 from upstage_backend.stages.tests.test_stage import TestStageController
@@ -166,7 +161,7 @@ class TestAssetController:
 
     async def test_05_search_assets(self, client):
         data = await test_AuthenticationController.test_02_login_successfully(client)
-        asset = get_session().query(AssetModel).join(UserModel).first()
+        _ = get_session().query(AssetModel).join(UserModel).first()
         headers = {
             "Authorization": f"Bearer {data['data']['login']['access_token']}",
             JWT_HEADER_NAME: data["data"]["login"]["refresh_token"],

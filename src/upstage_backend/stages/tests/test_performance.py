@@ -1,19 +1,15 @@
 # -*- coding: iso8859-15 -*-
-import os
-import sys
 
 import pytest
 from upstage_backend.authentication.tests.auth_test import TestAuthenticationController
 from upstage_backend.global_config import get_session
 from upstage_backend.global_config.database import ScopedSession
 from upstage_backend.event_archive.db_models.event import EventModel
-from upstage_backend.main import app
 from upstage_backend.performance_config.db_models.performance import PerformanceModel
 from upstage_backend.performance_config.db_models.scene import SceneModel
 from upstage_backend.stages.db_models.stage import StageModel
 from upstage_backend.users.db_models.user import PLAYER, SUPER_ADMIN
 from upstage_backend.stages.tests.test_stage import TestStageController
-from upstage_backend.stages.http.schema import stage_graphql_app
 
 test_AuthenticationController = TestAuthenticationController()
 test_StageController = TestStageController()
@@ -211,7 +207,9 @@ class TestPerformanceController:
         assert "errors" in data
         assert data["errors"][0]["message"] == "Nothing to record!"
 
-        stage = get_session().query(StageModel).filter_by(id=performance.stage_id).first()
+        stage = (
+            get_session().query(StageModel).filter_by(id=performance.stage_id).first()
+        )
         with ScopedSession() as session:
             event = EventModel(
                 topic="/{}/".format(stage.file_location),

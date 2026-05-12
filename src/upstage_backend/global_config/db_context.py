@@ -12,8 +12,8 @@ Tests that have no HTTP request can use set_session() / reset_session()
 manually; scripts and background workers that have no request at all
 should continue to use ScopedSession from database.py for explicit scope.
 """
+
 import os
-import sys
 
 from contextlib import contextmanager
 from contextvars import ContextVar, Token
@@ -96,7 +96,12 @@ def request_session() -> Iterator[Session]:
     try:
         yield session
         try:
-            if session.in_transaction() or session.new or session.dirty or session.deleted:
+            if (
+                session.in_transaction()
+                or session.new
+                or session.dirty
+                or session.deleted
+            ):
                 session.commit()
         except Exception:
             logger.exception("request_session: commit failed, rolling back")
@@ -106,7 +111,9 @@ def request_session() -> Iterator[Session]:
         try:
             session.rollback()
         except Exception:
-            logger.exception("request_session: rollback after handler error also failed")
+            logger.exception(
+                "request_session: rollback after handler error also failed"
+            )
         raise
     finally:
         try:

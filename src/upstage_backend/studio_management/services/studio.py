@@ -1,11 +1,9 @@
 # -*- coding: iso8859-15 -*-
 import os
-import sys
 
 import asyncio
 from datetime import datetime
 import json
-import os
 from typing import List
 
 from sqlalchemy import and_, or_, nulls_last
@@ -29,12 +27,10 @@ from upstage_backend.mails.templates.templates import (
     user_approved,
     waiting_request_media_approve,
 )
-from upstage_backend.performance_config.db_models.performance import PerformanceModel
 from upstage_backend.stages.services.stage_operation import StageOperationService
 from upstage_backend.stages.db_models.parent_stage import ParentStageModel
 from upstage_backend.stages.db_models.stage import StageModel
 from upstage_backend.assets.db_models.asset import AssetModel
-from upstage_backend.stages.db_models.stage_attribute import StageAttributeModel
 from upstage_backend.performance_config.db_models.scene import SceneModel
 
 from upstage_backend.studio_management.http.validation import (
@@ -42,7 +38,13 @@ from upstage_backend.studio_management.http.validation import (
     ChangePasswordInput,
     UpdateUserInput,
 )
-from upstage_backend.users.db_models.user import ADMIN, GUEST, PLAYER, SUPER_ADMIN, UserModel
+from upstage_backend.users.db_models.user import (
+    ADMIN,
+    GUEST,
+    PLAYER,
+    SUPER_ADMIN,
+    UserModel,
+)
 from graphql import GraphQLError
 
 storagePath = UPLOAD_USER_CONTENT_FOLDER
@@ -122,11 +124,7 @@ class StudioService:
             session.add(user)
         session.flush()
 
-        users = (
-            session.query(UserModel)
-            .filter(UserModel.email.in_(emails))
-            .all()
-        )
+        users = session.query(UserModel).filter(UserModel.email.in_(emails)).all()
 
         self.stage_operation_service.assign_user_to_default_stage(
             [user.id for user in users]
@@ -247,9 +245,7 @@ class StudioService:
         if not user:
             raise GraphQLError("User not found!")
 
-        session.query(UserSessionModel).filter(
-            UserSessionModel.user_id == id
-        ).delete()
+        session.query(UserSessionModel).filter(UserSessionModel.user_id == id).delete()
 
         session.query(SceneModel).filter(SceneModel.owner_id == id).update(
             {SceneModel.owner_id: current_user.id}
@@ -269,11 +265,7 @@ class StudioService:
 
     def change_password(self, input: ChangePasswordInput):
         session = get_session()
-        user = (
-            session.query(UserModel)
-            .filter(UserModel.id == input.id)
-            .first()
-        )
+        user = session.query(UserModel).filter(UserModel.id == input.id).first()
         if not user:
             raise GraphQLError("User not found!")
 
@@ -294,7 +286,7 @@ class StudioService:
                 full_path = os.path.join(storagePath, media.file_location)
                 try:
                     size = os.path.getsize(full_path)
-                except:
+                except Exception:
                     size = 0  # file not exist
                 media.size = size
                 session.flush()
@@ -304,11 +296,7 @@ class StudioService:
 
     async def request_permission(self, user: UserModel, asset_id: int, note: str):
         session = get_session()
-        asset = (
-            session.query(AssetModel)
-            .filter(AssetModel.id == asset_id)
-            .first()
-        )
+        asset = session.query(AssetModel).filter(AssetModel.id == asset_id).first()
         if not asset:
             raise GraphQLError("Asset not found!")
         asset_usage = AssetUsageModel(
@@ -346,7 +334,7 @@ class StudioService:
             asyncio.create_task(
                 send(
                     [user.email],
-                    f"Media acknowledgement",
+                    "Media acknowledgement",
                     request_permission_acknowledgement(
                         user,
                         asset,
@@ -370,9 +358,7 @@ class StudioService:
     async def confirm_permission(self, user: UserModel, id: int, approved: bool):
         session = get_session()
         asset_usage = (
-            session.query(AssetUsageModel)
-            .filter(AssetUsageModel.id == id)
-            .first()
+            session.query(AssetUsageModel).filter(AssetUsageModel.id == id).first()
         )
         if not asset_usage:
             raise GraphQLError("Asset not found!")
@@ -432,19 +418,11 @@ class StudioService:
         session.flush()
 
         for stage_id in stage_ids:
-            asset = (
-                session.query(AssetModel)
-                .filter(AssetModel.id == asset_id)
-                .first()
-            )
+            asset = session.query(AssetModel).filter(AssetModel.id == asset_id).first()
             if not asset:
                 raise GraphQLError("Asset not found!")
 
-            stage = (
-                session.query(StageModel)
-                .filter(StageModel.id == stage_id)
-                .first()
-            )
+            stage = session.query(StageModel).filter(StageModel.id == stage_id).first()
             if not stage:
                 raise GraphQLError("Stage not found!")
 

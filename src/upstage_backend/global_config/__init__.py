@@ -1,5 +1,4 @@
 # -*- coding: iso8859-15 -*-
-import os
 import sys
 
 from upstage_backend.global_config.database import ScopedSession, DBSession
@@ -10,8 +9,8 @@ from upstage_backend.global_config.db_context import (
     request_session,
     SessionFactory,
 )
-import upstage_backend.global_config.env
-from upstage_backend.global_config.env import *
+import upstage_backend.global_config.env  # noqa: F401  (kept so sys.modules lookup below works)
+from upstage_backend.global_config.env import *  # noqa: F403  (intentional re-export of env constants)
 from upstage_backend.global_config.schema import config_graphql_endpoints
 from upstage_backend.global_config.db_models.base import BaseModel
 from upstage_backend.global_config.decorators.authenticated import authenticated
@@ -29,7 +28,7 @@ __all__ = [
     "decrypt",
     "snake_to_camel",
     "convert_keys_to_camel_case",
-    "db",
+    "db",  # noqa: F405  (re-exported from .env via star import above)
     "ScopedSession",
     "config_graphql_endpoints",
     "DBSession",
@@ -44,4 +43,8 @@ __all__ = [
     "logger",
 ]
 
-__all__ += [name for name in dir(sys.modules["upstage_backend.global_config.env"]) if not name.startswith("__")]
+__all__ += [
+    name
+    for name in dir(sys.modules["upstage_backend.global_config.env"])
+    if not name.startswith("__")
+]
