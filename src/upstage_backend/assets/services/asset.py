@@ -39,6 +39,7 @@ from upstage_backend.stages.db_models.stage import StageModel
 from upstage_backend.stages.db_models.parent_stage import ParentStageModel
 from upstage_backend.users.db_models.user import ADMIN, PLAYER, SUPER_ADMIN, UserModel
 from upstage_backend.files.file_handling import FileHandling
+from upstage_backend.files.video_poster import extract_first_frame
 from upstage_backend.mails.helpers.mail import send
 from upstage_backend.mails.templates.templates import notify_mark_media_active
 
@@ -169,6 +170,13 @@ class AssetService:
             ],
         }
 
+    # File extensions that FileHandling.validate_file_size treats as
+    # videos. Kept in sync manually because that method bakes the
+    # allowlist into an `if/elif` chain rather than exposing it. If
+    # a new format is added there, add it here too so posters get
+    # generated for it.
+    _VIDEO_EXTENSIONS = (".mp4", ".webm", ".opgg", ".3gp", ".flv")
+
     def upload_file(self, user: UserModel, base64: str, filename: str):
         file_size = self.file_handing.get_file_size(base64)
 
@@ -185,6 +193,18 @@ class AssetService:
         file_location = self.file_handing.upload_file(
             base64, filename, None, storagePath, "media"
         )
+
+        # Poster generation is best-effort and synchronous: the file
+        # is small (one JPEG) and ffmpeg's first-frame extraction is
+        # quick relative to the upload round-trip. If anything goes
+        # wrong (ffmpeg missing, corrupt video, timeout) we log and
+        # return the original location anyway — the frontend gracefully
+        # degrades to "no poster" for that asset.
+        _, ext = os.path.splitext(filename)
+        if ext.lower() in self._VIDEO_EXTENSIONS:
+            abs_video_path = os.path.join(storagePath, file_location)
+            extract_first_frame(abs_video_path)
+
         return {"url": file_location}
 
     def save_media(self, owner: UserModel, input: SaveMediaInput):
