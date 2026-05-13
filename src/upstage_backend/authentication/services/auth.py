@@ -66,7 +66,6 @@ class AuthenticationService:
         user.last_login = datetime.now()
 
         db = get_request_session()
-        db.query(UserSessionModel).filter(UserSessionModel.user_id == user.id).delete()
         db.add(user_session)
         db.flush()
 
