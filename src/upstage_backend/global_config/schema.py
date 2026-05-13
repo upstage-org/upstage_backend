@@ -220,6 +220,10 @@ def config_graphql_endpoints(app: FastAPI, endpoint="/api/studio_graphql"):
         studio_mutation._resolvers["confirmPermission"],
     )
     combined_mutation.set_field(
+        "dismissNotification",
+        studio_mutation._resolvers["dismissNotification"],
+    )
+    combined_mutation.set_field(
         "quickAssignMutation",
         studio_mutation._resolvers["quickAssignMutation"],
     )

@@ -1735,7 +1735,6 @@ mutation {
             userId
             assetId
             approved
-            seen
             createdOn
             note
             user {
@@ -1759,7 +1758,6 @@ Example Response:
                     "userId": 1,
                     "assetId": 1,
                     "approved": true,
-                    "seen": false,
                     "createdOn": "2023-10-01",
                     "note": "Permission note",
                     "user": {
@@ -1784,7 +1782,6 @@ mutation {
             userId
             assetId
             approved
-            seen
             createdOn
             note
             user {
@@ -1808,7 +1805,6 @@ Example Response:
                     "userId": 1,
                     "assetId": 1,
                     "approved": false,
-                    "seen": false,
                     "createdOn": "2023-10-01",
                     "note": "Requesting permission",
                     "user": {

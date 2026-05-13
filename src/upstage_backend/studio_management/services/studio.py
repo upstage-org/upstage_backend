@@ -299,12 +299,20 @@ class StudioService:
         asset = session.query(AssetModel).filter(AssetModel.id == asset_id).first()
         if not asset:
             raise GraphQLError("Asset not found!")
+        # Common base: requester initiated this, so `requester_seen`
+        # defaults to True on both branches — they don't need a bell
+        # entry telling them about something they just did. Owner-side
+        # `owner_seen=False` lights up the bell for the owner in both
+        # branches; the branches differ only in `approved`, which
+        # determines whether the bell row renders as a pending-action
+        # request (False) or an FYI acknowledgement (True).
         asset_usage = AssetUsageModel(
             user_id=user.id,
             asset_id=asset_id,
             note=note,
             approved=False,
-            seen=False,
+            owner_seen=False,
+            requester_seen=True,
         )
 
         if asset.copyright_level == 2:
@@ -371,8 +379,18 @@ class StudioService:
         asset_id = asset_usage.asset_id
         if approved:
             asset_usage.approved = True
-            asset_usage.seen = True
+            # Three-way bell semantics: the owner just acted on this
+            # row, so it leaves the owner's bell immediately. The
+            # requester, however, hasn't yet been told the request was
+            # approved — so flip `requester_seen` to False to light up
+            # the PERMISSION_APPROVED notification on their bell. The
+            # row stays in the DB until they dismiss it.
+            asset_usage.owner_seen = True
+            asset_usage.requester_seen = False
         else:
+            # Decline path: row is deleted, so there's no in-app
+            # notification for the requester (email-only). This is
+            # intentional and confirmed with the user.
             session.delete(asset_usage)
 
         studio_url = f"https://{HOSTNAME}/media"
@@ -407,6 +425,61 @@ class StudioService:
                 "success": True,
             },
         )
+
+    def dismiss_notification(self, user: UserModel, id: int):
+        """
+        Flip the per-recipient `*_seen` flag on the `asset_usage` row
+        so the bell entry drops off the current user's notifications.
+
+        The caller's relationship to the row determines which flag is
+        touched:
+          * Owner of the asset (or an admin)      -> owner_seen     = True
+          * Requester (`asset_usage.user_id`)     -> requester_seen = True
+
+        We deliberately accept either side from admins so a
+        SUPER_ADMIN / ADMIN can clear stale rows on either bell.
+
+        Returns the camelCased row so the caller can update its cache
+        without a full refetch if it wants to.
+        """
+        session = get_session()
+        asset_usage = (
+            session.query(AssetUsageModel).filter(AssetUsageModel.id == id).first()
+        )
+        if not asset_usage:
+            raise GraphQLError("Notification not found!")
+
+        is_owner = user.id == asset_usage.asset.owner_id
+        is_requester = user.id == asset_usage.user_id
+        is_admin = user.role in [SUPER_ADMIN, ADMIN]
+
+        if not (is_owner or is_requester or is_admin):
+            raise GraphQLError("You are not authorized to dismiss this notification!")
+
+        # Prefer the side the caller logically owns. Admins acting on
+        # someone else's row default to whichever flag is still false
+        # (i.e. whichever bell still shows the entry) so the dismiss
+        # button does what the admin sees on their own bell.
+        if is_requester and not is_owner:
+            asset_usage.requester_seen = True
+        elif is_owner and not is_requester:
+            asset_usage.owner_seen = True
+        elif is_owner and is_requester:
+            # Self-owned asset usage (unusual; would mean a user
+            # requested permission on their own media). Clear both so
+            # the row leaves their bell entirely.
+            asset_usage.owner_seen = True
+            asset_usage.requester_seen = True
+        else:
+            # Admin who is neither party: clear whichever bell still
+            # shows the notification.
+            if not asset_usage.owner_seen:
+                asset_usage.owner_seen = True
+            if not asset_usage.requester_seen:
+                asset_usage.requester_seen = True
+
+        session.flush()
+        return convert_keys_to_camel_case(asset_usage.to_dict())
 
     def quick_assign_mutation(
         self, user: UserModel, stage_ids: list[int], asset_id: int

@@ -148,6 +148,14 @@ async def confirm_permission(_, info, id: int, approved: Optional[bool] = False)
     )
 
 
+@mutation.field("dismissNotification")
+@authenticated(allowed_roles=[SUPER_ADMIN, ADMIN, PLAYER])
+def dismiss_notification(_, info, id: int):
+    return StudioService().dismiss_notification(
+        UserModel(**info.context["request"].state.current_user), id
+    )
+
+
 @mutation.field("quickAssignMutation")
 @authenticated()
 def quick_assign_mutation(_, info, stageIds: list[int], assetId: int):

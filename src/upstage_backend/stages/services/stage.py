@@ -607,17 +607,79 @@ class StageService:
         ]
 
     def get_notifications(self, user: UserModel):
+        """
+        Bell entries are derived on the fly from `asset_usage` rows;
+        there is no separate notifications table. Three distinct row
+        shapes feed the bell, all sharing the GraphQL `Notification`
+        envelope and distinguished by `type` so the frontend can pick
+        the right copy / action buttons:
+
+          * MEDIA_USAGE (1)            – the asset's *owner* sees a
+            pending strict-permission request awaiting approval. The
+            owner clears it by approving/declining (existing flow);
+            the row leaves the bell once `approved` flips to True
+            (and `owner_seen` is set to True at the same time).
+          * MEDIA_ACKNOWLEDGEMENT (3)  – the asset's *owner* sees an
+            FYI that a player has acknowledged use of one of their
+            media items (non-strict copyright levels 0/1/3). No
+            action required; clears when the owner dismisses.
+          * PERMISSION_APPROVED (2)    – the *requester* sees that
+            their strict-permission request was approved. No action
+            required; clears when they dismiss.
+
+        Per-recipient dismissal flags (`owner_seen` /
+        `requester_seen`) keep the three streams cleanly separated
+        even though they share one row: e.g. after the owner
+        approves a strict request the row already has
+        `owner_seen=True, requester_seen=False`, so it leaves the
+        owner's bell and lights up on the requester's bell.
+        """
         session = get_session()
-        notifications = (
+
+        # Owner-side: both pending strict requests (approved=False)
+        # and acknowledgement FYIs (approved=True). The same query
+        # captures both — they're distinguished by `approved` when we
+        # project to the right NotificationType below.
+        owner_rows = (
             session.query(AssetUsageModel)
-            .filter(AssetUsageModel.approved == False)  # noqa: E712  (SQLAlchemy column comparison)
+            .filter(AssetUsageModel.owner_seen == False)  # noqa: E712
             .filter(AssetUsageModel.asset.has(owner_id=user.id))
             .all()
         )
 
-        return [
-            convert_keys_to_camel_case(
-                {"type": NotificationType.MEDIA_USAGE.value, "mediaUsage": x.to_dict()}
+        # Requester-side: this user's own approved-and-not-yet-dismissed
+        # requests. Strict requests only ever reach `approved=True` via
+        # the owner-confirm path, so this naturally maps to "your
+        # request was approved" — the new PERMISSION_APPROVED bell.
+        requester_rows = (
+            session.query(AssetUsageModel)
+            .filter(AssetUsageModel.user_id == user.id)
+            .filter(AssetUsageModel.approved == True)  # noqa: E712
+            .filter(AssetUsageModel.requester_seen == False)  # noqa: E712
+            .all()
+        )
+
+        notifications = []
+        for row in owner_rows:
+            notif_type = (
+                NotificationType.MEDIA_ACKNOWLEDGEMENT.value
+                if row.approved
+                else NotificationType.MEDIA_USAGE.value
             )
-            for x in notifications
-        ]
+            notifications.append(
+                convert_keys_to_camel_case(
+                    {"type": notif_type, "mediaUsage": row.to_dict()}
+                )
+            )
+
+        for row in requester_rows:
+            notifications.append(
+                convert_keys_to_camel_case(
+                    {
+                        "type": NotificationType.PERMISSION_APPROVED.value,
+                        "mediaUsage": row.to_dict(),
+                    }
+                )
+            )
+
+        return notifications
