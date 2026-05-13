@@ -301,34 +301,45 @@ class AssetService:
         asset: AssetModel,
         file_location: str,
     ):
-        if input.urls:
-            urls = input.urls
+        # Voice / link / note used to be nested inside `if input.urls:`, which
+        # meant clicking Save on the Voice tab (or Link tab) without uploading
+        # new frames silently discarded those edits. Persist the attribute
+        # JSON whenever any of url/voice/link/note input fields are provided.
+        attribute_update = (
+            bool(input.urls)
+            or input.voice is not None
+            or input.link is not None
+            or input.note is not None
+        )
+        if attribute_update:
             if not asset.description:
                 asset.description = "{}"
 
             attributes = json.loads(asset.description)
 
-            if "frames" not in attributes or attributes["frames"]:
-                attributes["frames"] = []
+            if input.urls:
+                urls = input.urls
+                if "frames" not in attributes or attributes["frames"]:
+                    attributes["frames"] = []
 
-            asset.size = 0
-            for url in urls:
-                attributes["frames"].append(url)
-                full_path = os.path.join(storagePath, url)
-                try:
-                    size = os.path.getsize(full_path)
-                except Exception:
-                    size = 0  # file not exist
-                asset.size += size
+                asset.size = 0
+                for url in urls:
+                    attributes["frames"].append(url)
+                    full_path = os.path.join(storagePath, url)
+                    try:
+                        size = os.path.getsize(full_path)
+                    except Exception:
+                        size = 0  # file not exist
+                    asset.size += size
 
-            attributes["multi"] = True if len(urls) > 1 else False
-            attributes["frames"] = attributes["frames"] if len(urls) > 1 else []
-            attributes["w"] = input.w
-            attributes["h"] = input.h
-            if asset_type.name == "stream" and "/" not in file_location:
-                attributes["isRTMP"] = True
+                attributes["multi"] = True if len(urls) > 1 else False
+                attributes["frames"] = attributes["frames"] if len(urls) > 1 else []
+                attributes["w"] = input.w
+                attributes["h"] = input.h
+                if asset_type.name == "stream" and "/" not in file_location:
+                    attributes["isRTMP"] = True
 
-            if input.voice:
+            if input.voice is not None:
                 voice = input.voice
                 if voice and voice.voice:
                     attributes["voice"] = {
@@ -341,7 +352,7 @@ class AssetService:
                 elif "voice" in attributes:
                     del attributes["voice"]
 
-            if input.link:
+            if input.link is not None:
                 link = input.link
                 if link and link.url:
                     attributes["link"] = {
@@ -352,7 +363,9 @@ class AssetService:
                 elif "link" in attributes:
                     del attributes["link"]
 
-            attributes["note"] = input.note
+            if input.note is not None:
+                attributes["note"] = input.note
+
             asset.description = json.dumps(attributes)
             local_db_session.flush()
         if not len(input.stageIds):

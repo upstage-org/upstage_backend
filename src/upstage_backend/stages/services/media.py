@@ -104,7 +104,12 @@ class MediaService:
             local_db_session=session,
             copyright_level=input.copyrightLevel,
         )
-        asset.description = self.process_uploaded_frames(input, asset, asset_type)
+        # process_uploaded_frames returns None when input.uploadedFrames is
+        # falsy; assigning that back would wipe asset.description (and any
+        # saved voice/link/note attributes) on every non-frame edit.
+        processed_description = self.process_uploaded_frames(input, asset, asset_type)
+        if processed_description is not None:
+            asset.description = processed_description
         session.flush()
         asset = session.query(AssetModel).filter_by(id=asset.id).first()
         return convert_keys_to_camel_case(asset.to_dict())
