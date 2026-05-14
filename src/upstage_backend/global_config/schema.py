@@ -143,6 +143,10 @@ def config_graphql_endpoints(app: FastAPI, endpoint="/api/studio_graphql"):
         "deletePerformance", stage_mutation._resolvers["deletePerformance"]
     )
     combined_mutation.set_field(
+        "duplicatePerformanceWithTrimmedPauses",
+        stage_mutation._resolvers["duplicatePerformanceWithTrimmedPauses"],
+    )
+    combined_mutation.set_field(
         "startRecording", stage_mutation._resolvers["startRecording"]
     )
     combined_mutation.set_field(

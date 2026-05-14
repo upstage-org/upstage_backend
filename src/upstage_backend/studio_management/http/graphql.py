@@ -145,6 +145,13 @@ type_defs = gql("""
         name: String!
         description: String
     }
+
+    input DuplicatePerformanceTrimInput {
+        sourcePerformanceId: ID!
+        name: String!
+        description: String
+        minPauseSeconds: Float!
+    }
     
     input SceneInput {
         name: String
@@ -669,6 +676,7 @@ type_defs = gql("""
         deleteScene(id: ID!): CommonResponse
         updatePerformance(input: PerformanceInput!): CommonResponse
         deletePerformance(id: ID!): CommonResponse
+        duplicatePerformanceWithTrimmedPauses(input: DuplicatePerformanceTrimInput!): Performance
         startRecording(input: RecordInput!): Performance
         saveRecording(id: ID!): Performance
         updateStatus(id: ID!): UpdateStageResponse

@@ -334,7 +334,86 @@ class TestPerformanceController:
             == "You are not allowed to delete this performance"
         )
 
-    async def test_09_save_scene(self, client):
+    async def test_09_duplicate_performance_with_trimmed_pauses(self, client):
+        headers = test_AuthenticationController.get_headers(client, SUPER_ADMIN)
+        stage = await test_StageController.test_01_create_stage(client)
+        variables = {
+            "input": {"stageId": stage["id"], "name": "Source", "description": "d"}
+        }
+        query_rec = """
+            mutation startRecording($input: RecordInput!) {
+                startRecording(input: $input) { id }
+            }
+        """
+        response = client.post(
+            "/api/studio_graphql",
+            json={"query": query_rec, "variables": variables},
+            headers=headers,
+        )
+        assert response.status_code == 200
+        data = response.json()
+        assert "errors" not in data
+        performance_id = int(data["data"]["startRecording"]["id"])
+
+        stage_row = (
+            get_session().query(StageModel).filter_by(id=int(stage["id"])).first()
+        )
+        with ScopedSession() as session:
+            loc = stage_row.file_location
+            for ts in (1000.0, 1010.0, 1120.0):
+                session.add(
+                    EventModel(
+                        topic=f"/{loc}/board",
+                        mqtt_timestamp=ts,
+                        performance_id=performance_id,
+                        payload={"t": ts},
+                    )
+                )
+            session.flush()
+
+        dup_query = """
+            mutation dup($input: DuplicatePerformanceTrimInput!) {
+                duplicatePerformanceWithTrimmedPauses(input: $input) {
+                    id
+                    name
+                }
+            }
+        """
+        dup_vars = {
+            "input": {
+                "sourcePerformanceId": performance_id,
+                "name": "Trimmed copy",
+                "minPauseSeconds": 30.0,
+            }
+        }
+        response = client.post(
+            "/api/studio_graphql",
+            json={"query": dup_query, "variables": dup_vars},
+            headers=headers,
+        )
+        assert response.status_code == 200
+        data = response.json()
+        assert "errors" not in data
+        new_id = int(data["data"]["duplicatePerformanceWithTrimmedPauses"]["id"])
+
+        cloned = (
+            get_session()
+            .query(EventModel)
+            .filter(EventModel.performance_id == new_id)
+            .order_by(EventModel.mqtt_timestamp.asc())
+            .all()
+        )
+        assert [e.mqtt_timestamp for e in cloned] == [1000.0, 1010.0, 1040.0]
+
+        source_left = (
+            get_session()
+            .query(EventModel)
+            .filter(EventModel.performance_id == performance_id)
+            .count()
+        )
+        assert source_left == 3
+
+    async def test_10_save_scene(self, client):
         headers = test_AuthenticationController.get_headers(client, SUPER_ADMIN)
         stage = await test_StageController.test_01_create_stage(client)
         variables = {
@@ -407,7 +486,7 @@ class TestPerformanceController:
         assert "saveScene" in data["data"]
         assert data["data"]["saveScene"] is None
 
-    async def test_10_delete_scene(self, client):
+    async def test_11_delete_scene(self, client):
         headers = test_AuthenticationController.get_headers(client, SUPER_ADMIN)
         scene = get_session().query(SceneModel).first()
         variables = {"id": scene.id}

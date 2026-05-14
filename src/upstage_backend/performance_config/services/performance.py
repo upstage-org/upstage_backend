@@ -1,5 +1,6 @@
 # -*- coding: iso8859-15 -*-
 
+import json
 from datetime import datetime
 from graphql import GraphQLError
 from upstage_backend.global_config import get_session
@@ -13,7 +14,17 @@ from upstage_backend.performance_config.db_models.performance_config import (
     PerformanceConfigModel,
 )
 from upstage_backend.stages.db_models.stage import StageModel
-from upstage_backend.stages.http.validation import PerformanceInput, RecordInput
+from upstage_backend.performance_config.timeline_trim import (
+    compress_sorted_times_ms,
+    is_chat_topic,
+    ms_to_mqtt_storage,
+    mqtt_timestamp_to_ms,
+)
+from upstage_backend.stages.http.validation import (
+    DuplicatePerformanceTrimInput,
+    PerformanceInput,
+    RecordInput,
+)
 from upstage_backend.users.db_models.user import ADMIN, SUPER_ADMIN, UserModel
 from sqlalchemy.orm.session import make_transient
 
@@ -77,6 +88,90 @@ class PerformanceService:
         session.flush()
 
         return {"success": True}
+
+    def duplicate_performance_with_trimmed_pauses(
+        self, user: UserModel, input: DuplicatePerformanceTrimInput
+    ):
+        session = get_session()
+        source = (
+            session.query(PerformanceModel)
+            .filter_by(id=input.sourcePerformanceId)
+            .first()
+        )
+        if not source:
+            raise GraphQLError("Performance not found")
+
+        if (
+            user.role not in [SUPER_ADMIN, ADMIN]
+            and user.id != source.stage.owner_id
+        ):
+            raise GraphQLError("You are not allowed to duplicate this performance")
+
+        description = (
+            source.description
+            if input.description is None
+            else input.description
+        )
+
+        events = (
+            session.query(EventModel)
+            .filter(EventModel.performance_id == source.id)
+            .order_by(EventModel.id.asc())
+            .all()
+        )
+
+        if not events:
+            raise GraphQLError("Nothing to duplicate: this performance has no events")
+
+        min_pause_ms = float(input.minPauseSeconds) * 1000.0
+
+        def _sort_time_ms(ev: EventModel) -> float:
+            pl = ev.payload
+            if (
+                is_chat_topic(ev.topic)
+                and isinstance(pl, dict)
+                and isinstance(pl.get("at"), (int, float))
+            ):
+                return float(pl["at"])
+            return mqtt_timestamp_to_ms(ev.mqtt_timestamp)
+
+        ordered = sorted(events, key=lambda e: (_sort_time_ms(e), e.id))
+        times_ms = [_sort_time_ms(e) for e in ordered]
+        new_times_ms = compress_sorted_times_ms(times_ms, min_pause_ms)
+
+        new_performance = PerformanceModel(
+            name=input.name,
+            description=description,
+            recording=source.recording,
+            stage_id=source.stage_id,
+            saved_on=source.saved_on,
+        )
+        session.add(new_performance)
+        session.flush()
+
+        for ev, new_ms in zip(ordered, new_times_ms, strict=True):
+            payload_out = (
+                json.loads(json.dumps(ev.payload))
+                if ev.payload is not None
+                else None
+            )
+            if (
+                is_chat_topic(ev.topic)
+                and isinstance(payload_out, dict)
+                and isinstance(payload_out.get("at"), (int, float))
+            ):
+                payload_out["at"] = int(round(float(new_ms)))
+
+            new_ev = EventModel(
+                topic=ev.topic,
+                mqtt_timestamp=ms_to_mqtt_storage(ev.mqtt_timestamp, new_ms),
+                performance_id=new_performance.id,
+                payload=payload_out,
+            )
+            session.add(new_ev)
+
+        session.flush()
+        return convert_keys_to_camel_case(new_performance.to_dict())
 
     def delete_performance(self, user: UserModel, id: int):
         session = get_session()

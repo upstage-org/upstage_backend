@@ -165,6 +165,7 @@ class AssetService:
                         convert_keys_to_camel_case(permission.to_dict())
                         for permission in self.resolve_permissions(asset.id)
                     ],
+                    "tags": self._tag_names_for_asset(asset),
                 }
                 for asset in assets
             ],
@@ -595,6 +596,19 @@ class AssetService:
                     return "editor"
         return "none"
 
+    @staticmethod
+    def _tag_names_for_asset(asset: AssetModel) -> list[str]:
+        """
+        ``AssetModel.tags`` is a dynamic relationship; ``BaseModel.to_dict`` does
+        not expand it into tag names. GraphQL exposes ``tags: [String]``.
+        """
+        names: list[str] = []
+        for media_tag in asset.tags:
+            tag = media_tag.tag
+            if tag is not None and tag.name:
+                names.append(tag.name)
+        return names
+
     def resolve_fields(self, asset: AssetModel, user: Optional[UserModel] = None):
         src = self.resolve_src(asset)
         sign = self.resolve_sign(asset.owner, asset)
@@ -614,6 +628,7 @@ class AssetService:
                 convert_keys_to_camel_case(permission.to_dict())
                 for permission in self.resolve_permissions(asset.id)
             ],
+            "tags": self._tag_names_for_asset(asset),
         }
 
     def get_media_types(self):

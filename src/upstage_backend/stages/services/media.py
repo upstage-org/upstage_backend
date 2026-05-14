@@ -112,7 +112,7 @@ class MediaService:
             asset.description = processed_description
         session.flush()
         asset = session.query(AssetModel).filter_by(id=asset.id).first()
-        return convert_keys_to_camel_case(asset.to_dict())
+        return self.asset_service.resolve_fields(asset)
 
     def retrieve_asset(self, input, local_db_session):
         if input.id:
@@ -254,4 +254,4 @@ class MediaService:
         session.flush()
 
         asset = session.query(AssetModel).filter_by(id=input.id).first()
-        return convert_keys_to_camel_case(asset.to_dict())
+        return self.asset_service.resolve_fields(asset)
