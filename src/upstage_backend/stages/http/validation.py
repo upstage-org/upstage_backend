@@ -4,6 +4,22 @@ from typing import List, Optional
 from pydantic import BaseModel, Field, conint
 
 
+class DuplicatePerformanceTrimInput(BaseModel):
+    sourcePerformanceId: int = Field(
+        ..., description="Performance to copy events and chats from"
+    )
+    name: str = Field(..., description="Name for the new performance archive")
+    description: str | None = Field(
+        None, description="Optional description; copies source when omitted"
+    )
+    minPauseSeconds: float = Field(
+        ...,
+        gt=0,
+        description="Gaps longer than this (seconds) are shortened so only this "
+        "much pause remains",
+    )
+
+
 class StageInput(BaseModel):
     id: Optional[int] = Field(None, description="ID of the stage")
     fileLocation: Optional[str] = Field(None, description="Location of the file")

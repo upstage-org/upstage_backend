@@ -39,6 +39,7 @@ from upstage_backend.stages.db_models.stage import StageModel
 from upstage_backend.stages.db_models.parent_stage import ParentStageModel
 from upstage_backend.users.db_models.user import ADMIN, PLAYER, SUPER_ADMIN, UserModel
 from upstage_backend.files.file_handling import FileHandling
+from upstage_backend.files.video_poster import extract_first_frame
 from upstage_backend.mails.helpers.mail import send
 from upstage_backend.mails.templates.templates import notify_mark_media_active
 
@@ -164,10 +165,18 @@ class AssetService:
                         convert_keys_to_camel_case(permission.to_dict())
                         for permission in self.resolve_permissions(asset.id)
                     ],
+                    "tags": self._tag_names_for_asset(asset),
                 }
                 for asset in assets
             ],
         }
+
+    # File extensions that FileHandling.validate_file_size treats as
+    # videos. Kept in sync manually because that method bakes the
+    # allowlist into an `if/elif` chain rather than exposing it. If
+    # a new format is added there, add it here too so posters get
+    # generated for it.
+    _VIDEO_EXTENSIONS = (".mp4", ".webm", ".opgg", ".3gp", ".flv")
 
     def upload_file(self, user: UserModel, base64: str, filename: str):
         file_size = self.file_handing.get_file_size(base64)
@@ -185,6 +194,18 @@ class AssetService:
         file_location = self.file_handing.upload_file(
             base64, filename, None, storagePath, "media"
         )
+
+        # Poster generation is best-effort and synchronous: the file
+        # is small (one JPEG) and ffmpeg's first-frame extraction is
+        # quick relative to the upload round-trip. If anything goes
+        # wrong (ffmpeg missing, corrupt video, timeout) we log and
+        # return the original location anyway — the frontend gracefully
+        # degrades to "no poster" for that asset.
+        _, ext = os.path.splitext(filename)
+        if ext.lower() in self._VIDEO_EXTENSIONS:
+            abs_video_path = os.path.join(storagePath, file_location)
+            extract_first_frame(abs_video_path)
+
         return {"url": file_location}
 
     def save_media(self, owner: UserModel, input: SaveMediaInput):
@@ -301,34 +322,45 @@ class AssetService:
         asset: AssetModel,
         file_location: str,
     ):
-        if input.urls:
-            urls = input.urls
+        # Voice / link / note used to be nested inside `if input.urls:`, which
+        # meant clicking Save on the Voice tab (or Link tab) without uploading
+        # new frames silently discarded those edits. Persist the attribute
+        # JSON whenever any of url/voice/link/note input fields are provided.
+        attribute_update = (
+            bool(input.urls)
+            or input.voice is not None
+            or input.link is not None
+            or input.note is not None
+        )
+        if attribute_update:
             if not asset.description:
                 asset.description = "{}"
 
             attributes = json.loads(asset.description)
 
-            if "frames" not in attributes or attributes["frames"]:
-                attributes["frames"] = []
+            if input.urls:
+                urls = input.urls
+                if "frames" not in attributes or attributes["frames"]:
+                    attributes["frames"] = []
 
-            asset.size = 0
-            for url in urls:
-                attributes["frames"].append(url)
-                full_path = os.path.join(storagePath, url)
-                try:
-                    size = os.path.getsize(full_path)
-                except Exception:
-                    size = 0  # file not exist
-                asset.size += size
+                asset.size = 0
+                for url in urls:
+                    attributes["frames"].append(url)
+                    full_path = os.path.join(storagePath, url)
+                    try:
+                        size = os.path.getsize(full_path)
+                    except Exception:
+                        size = 0  # file not exist
+                    asset.size += size
 
-            attributes["multi"] = True if len(urls) > 1 else False
-            attributes["frames"] = attributes["frames"] if len(urls) > 1 else []
-            attributes["w"] = input.w
-            attributes["h"] = input.h
-            if asset_type.name == "stream" and "/" not in file_location:
-                attributes["isRTMP"] = True
+                attributes["multi"] = True if len(urls) > 1 else False
+                attributes["frames"] = attributes["frames"] if len(urls) > 1 else []
+                attributes["w"] = input.w
+                attributes["h"] = input.h
+                if asset_type.name == "stream" and "/" not in file_location:
+                    attributes["isRTMP"] = True
 
-            if input.voice:
+            if input.voice is not None:
                 voice = input.voice
                 if voice and voice.voice:
                     attributes["voice"] = {
@@ -341,7 +373,7 @@ class AssetService:
                 elif "voice" in attributes:
                     del attributes["voice"]
 
-            if input.link:
+            if input.link is not None:
                 link = input.link
                 if link and link.url:
                     attributes["link"] = {
@@ -352,7 +384,9 @@ class AssetService:
                 elif "link" in attributes:
                     del attributes["link"]
 
-            attributes["note"] = input.note
+            if input.note is not None:
+                attributes["note"] = input.note
+
             asset.description = json.dumps(attributes)
             local_db_session.flush()
         if not len(input.stageIds):
@@ -562,6 +596,19 @@ class AssetService:
                     return "editor"
         return "none"
 
+    @staticmethod
+    def _tag_names_for_asset(asset: AssetModel) -> list[str]:
+        """
+        ``AssetModel.tags`` is a dynamic relationship; ``BaseModel.to_dict`` does
+        not expand it into tag names. GraphQL exposes ``tags: [String]``.
+        """
+        names: list[str] = []
+        for media_tag in asset.tags:
+            tag = media_tag.tag
+            if tag is not None and tag.name:
+                names.append(tag.name)
+        return names
+
     def resolve_fields(self, asset: AssetModel, user: Optional[UserModel] = None):
         src = self.resolve_src(asset)
         sign = self.resolve_sign(asset.owner, asset)
@@ -581,6 +628,7 @@ class AssetService:
                 convert_keys_to_camel_case(permission.to_dict())
                 for permission in self.resolve_permissions(asset.id)
             ],
+            "tags": self._tag_names_for_asset(asset),
         }
 
     def get_media_types(self):

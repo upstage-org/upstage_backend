@@ -401,7 +401,6 @@ class TestStudioController:
                             userId
                             assetId
                             approved
-                            seen
                             createdOn
                             note
                             user {
@@ -479,7 +478,6 @@ class TestStudioController:
                             userId
                             assetId
                             approved
-                            seen
                             createdOn
                             note
                             user {

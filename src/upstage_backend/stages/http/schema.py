@@ -10,6 +10,7 @@ from ariadne.asgi import GraphQL
 from upstage_backend.stages.http.validation import (
     AssignMediaInput,
     AssignStagesInput,
+    DuplicatePerformanceTrimInput,
     DuplicateStageInput,
     PerformanceInput,
     RecordInput,
@@ -174,6 +175,15 @@ def update_performance(_, info, input):
 def delete_performance(_, info, id: int):
     return PerformanceService().delete_performance(
         UserModel(**info.context["request"].state.current_user), id
+    )
+
+
+@mutation.field("duplicatePerformanceWithTrimmedPauses")
+@authenticated(allowed_roles=[SUPER_ADMIN, ADMIN, PLAYER])
+def duplicate_performance_with_trimmed_pauses(_, info, input):
+    return PerformanceService().duplicate_performance_with_trimmed_pauses(
+        UserModel(**info.context["request"].state.current_user),
+        DuplicatePerformanceTrimInput(**input),
     )
 
 

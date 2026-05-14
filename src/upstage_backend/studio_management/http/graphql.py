@@ -145,6 +145,13 @@ type_defs = gql("""
         name: String!
         description: String
     }
+
+    input DuplicatePerformanceTrimInput {
+        sourcePerformanceId: ID!
+        name: String!
+        description: String
+        minPauseSeconds: Float!
+    }
     
     input SceneInput {
         name: String
@@ -313,7 +320,6 @@ type_defs = gql("""
         userId: Int!
         assetId: Int!
         approved: Boolean!
-        seen: Boolean!
         createdOn: Date!
         note: String
         user: User!
@@ -458,7 +464,6 @@ type_defs = gql("""
         userId
         assetId
         approved
-        seen
         createdOn
         note
         user {
@@ -629,6 +634,12 @@ type_defs = gql("""
         calcSizes: Size
         confirmPermission(id: ID!, approved: Boolean): ConfirmPermissionResponse
         requestPermission(assetId: ID!, note: String): ConfirmPermissionResponse
+        # Drops a bell notification for the caller without otherwise
+        # affecting the underlying asset_usage row (the row stays so
+        # the asset's permission state is preserved). Flips
+        # owner_seen or requester_seen depending on the caller's
+        # role on the row; see StudioService.dismiss_notification.
+        dismissNotification(id: ID!): AssetUsage
         quickAssignMutation(stageIds: [ID]!, assetId: ID!): CommonResponse,
         
         createUser(inbound: CreateUserInput!): CreateUserPayload
@@ -665,6 +676,7 @@ type_defs = gql("""
         deleteScene(id: ID!): CommonResponse
         updatePerformance(input: PerformanceInput!): CommonResponse
         deletePerformance(id: ID!): CommonResponse
+        duplicatePerformanceWithTrimmedPauses(input: DuplicatePerformanceTrimInput!): Performance
         startRecording(input: RecordInput!): Performance
         saveRecording(id: ID!): Performance
         updateStatus(id: ID!): UpdateStageResponse
@@ -718,6 +730,11 @@ type_defs = gql("""
         notifications: [Notification]
     }    
                 
+    # `type` discriminates which bell-row variant this is — mapped
+    # to NotificationType in upstage_backend.assets.db_models.asset_usage:
+    #   1  MEDIA_USAGE           – owner sees a pending strict request
+    #   2  PERMISSION_APPROVED   – requester sees an approval result
+    #   3  MEDIA_ACKNOWLEDGEMENT – owner sees an FYI acknowledgement
     type Notification {
         type: Int
         mediaUsage: AssetUsage
@@ -748,7 +765,8 @@ type_defs = gql("""
         assetId: Int!
         userId: Int!
         approved: Boolean!
-        seen: Boolean!
+        ownerSeen: Boolean!
+        requesterSeen: Boolean!
         note: String
         createdOn: String!
         user: User
