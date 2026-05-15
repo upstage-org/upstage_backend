@@ -41,6 +41,11 @@ x-common-build: &common_build |
 
   WORKDIR /usr/app
 
+  # First-frame JPEG posters for uploads + Alembic backfill (video_poster.py).
+  RUN apt-get update \
+      && apt-get install -y --no-install-recommends ffmpeg \
+      && rm -rf /var/lib/apt/lists/*
+
   # Copy project venv from builder (shebangs point to /usr/app/.venv/bin/python)
   COPY --from=builder /usr/app/.venv /usr/app/.venv
   RUN test -d /usr/app/.venv && test -x /usr/app/.venv/bin/python \
@@ -96,6 +101,9 @@ services:
     image: upstage/backend:${SITE}
     container_name: upstage_db_migrate_${SITE}
     user: "${APP_USER}:${APP_GROUP}"
+    # Same mount as upstage_backend: poster backfill migrations walk this tree.
+    volumes:
+      - /app_code_${SITE}/uploads:/usr/app/uploads
     command: >
       /bin/bash -c "
       cd /usr/app &&
