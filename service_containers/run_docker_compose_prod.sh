@@ -79,7 +79,10 @@ if [ ! -d "${PG_DATA_DIR}" ]; then
 fi
 sudo chown -R 999:999 ${PG_DATA_DIR}
 
-docker network create upstage-network-${SITE}
+NETWORK="upstage-network-${SITE}"
+if ! docker network inspect "${NETWORK}" >/dev/null 2>&1; then
+    docker network create "${NETWORK}"
+fi
 
 docker compose -f ${DOCKERFILE} -p ${SERVICES} down --remove-orphans
 #docker compose rm -f

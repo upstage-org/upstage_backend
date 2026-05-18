@@ -5,8 +5,9 @@ services:
     container_name: postgres_container_${SITE}
     user: "999:999"
     volumes:
-      - ${PG_DATA_DIR}/var:/var/lib/postgresql
-      - ${PG_DATA_DIR}/data:/data/postgres
+      # :z relabels bind mounts for SELinux (Fedora/RHEL); ignored elsewhere
+      - ${PG_DATA_DIR}/var:/var/lib/postgresql:z
+      - ${PG_DATA_DIR}/data:/data/postgres:z
     #ports:
     #  - "127.0.0.1:5433:5432"
     environment:
@@ -26,8 +27,8 @@ services:
       #- "2096:1883" docker containers use the internal port when on the same machine and network.
       - "127.0.0.1:${MOSQUITTO_EXPOSED_WS_PORT}:9001"
     volumes:
-      - ${MQ_DATA_DIR}/etc/mosquitto:/etc/mosquitto
-      - ${MQ_DATA_DIR}/var/lib/mosquitto:/var/lib/mosquitto
+      - ${MQ_DATA_DIR}/etc/mosquitto:/etc/mosquitto:z
+      - ${MQ_DATA_DIR}/var/lib/mosquitto:/var/lib/mosquitto:z
     networks:
       - upstage-network
     command:
