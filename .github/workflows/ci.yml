@@ -1,0 +1,110 @@
+name: CI
+
+# Mirrors the local `pre-push` gate (`scripts/verify.sh`) so a
+# `git push --no-verify` bypass is still caught server-side. Two jobs:
+#
+#   * verify  — fast, no docker. Same gate as pre-push.
+#   * tests   — slower; spins up Postgres + Mosquitto and runs the
+#               full pytest suite (the bits the developer machine
+#               cannot run without docker).
+#
+# If a step is added to `scripts/verify.sh`, add it here too — local
+# and server-side gates must stay in lockstep.
+on:
+  push:
+  pull_request:
+
+# Avoid wasting CI minutes when a branch is force-pushed mid-run.
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    name: ruff + tests/unit + pip-audit
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          # Matches `requires-python = ">=3.12"` in pyproject.toml. We
+          # pin to 3.12 (not 3.13) so CI matches the production
+          # container image; bump in a separate PR alongside the image.
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e .[dev]
+
+      - name: Run verify suite
+        run: ./scripts/verify.sh
+
+  tests:
+    name: full pytest (services)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    # `services:` containers run on the GitHub-hosted runner network;
+    # the FastAPI app inside the test process reaches them on
+    # localhost via the mapped ports. Versions track the dev compose
+    # files in `service_containers/docker-compose-services.yaml`.
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: upstage
+        ports:
+          - 5432:5432
+        # Wait for Postgres to be ready before the test step starts —
+        # otherwise the autouse `db_engine` fixture races the boot.
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+      mosquitto:
+        image: eclipse-mosquitto:2
+        ports:
+          - 1883:1883
+
+    env:
+      # Pointed at the `services:` Postgres above; matches what the
+      # autouse `db_engine` fixture in `/conftest.py` imports.
+      DATABASE_URL: postgresql+psycopg2://postgres:postgres@localhost:5432/upstage
+      DATABASE_NAME: upstage
+      ALGORITHM: HS256
+      SECRET_KEY: ci-secret
+      REFRESH_SECRET_KEY: ci-refresh-secret
+      HOSTNAME: localhost
+      ENV_TYPE: Test
+      MQTT_BROKER: localhost
+      MQTT_ADMIN_USER: ci
+      MQTT_ADMIN_PASSWORD: ci
+      MQTT_ADMIN_PORT: "1883"
+      MQTT_TRANSPORT: tcp
+      PERFORMANCE_TOPIC_RULE: "+/+/+"
+      STRICT_DB_CONTEXT: "0"
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e .[dev]
+
+      - name: Run full pytest
+        run: pytest

@@ -21,7 +21,11 @@ dependencies = [
     "databases",
     "email-validator",
     "faker",
-    "fastapi",
+    # `!= 0.136.3` works around MAL-2026-4750 (malicious release that
+    # injected an undocumented `fastar` typosquat into the [standard]
+    # extras group on 2026-05-23). Drop the constraint when upstream
+    # ships a clean 0.136.x or higher version.
+    "fastapi != 0.136.3",
     "fastapi_exception",
     "fastapi_global_variable",
     "fastapi_pagination",
@@ -47,8 +51,69 @@ dependencies = [
     "reportlab",
 ]
 
+# Optional install group for developer-only tooling. Keeps the runtime
+# `dependencies` list above lean (these aren't needed in the prod
+# container image). Install with `pip install -e .[dev]`.
+[project.optional-dependencies]
+dev = [
+    "pre-commit",
+    "pip-audit",
+]
+
 # `pip install -e .` makes `upstage_backend` importable from anywhere; no
 # PYTHONPATH manipulation, no sys.path headers, no `from src.X` imports.
 [tool.setuptools.packages.find]
 where = ["src"]
 include = ["upstage_backend*"]
+
+# ============================================================================
+# Linter / formatter (ruff)
+# ============================================================================
+# Deliberately narrow starter selection so the existing ~189 .py files in src/
+# don't drown the team in findings on day one. We only enforce real-correctness
+# rules right now:
+#   * E   - pycodestyle errors (syntax / indentation that even Python disagrees with)
+#   * F   - pyflakes (undefined names, unused imports — real bugs)
+#
+# Everything else (W, I, B, UP, SIM, RUF, PT, PERF, …) is queued for follow-up
+# cleanup PRs. The `ruff-format` hook in `.pre-commit-config.yaml` is the
+# pressure valve for stylistic drift on new / modified code; we deliberately
+# do NOT run `ruff format --check` against the whole repo in `verify.sh`,
+# because that would force a 63-file reformat-everything PR ahead of the
+# protections actually getting installed.
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+extend-exclude = [
+    "alembic/versions",
+    "migration_scripts",
+    "build",
+    "dist",
+    ".venv",
+    # `{REPLACE_*}` template that is sed-substituted by
+    # `initial_scripts/environments/generate_environments_script.sh`. Until
+    # then it isn't valid Python (e.g. `CIPHER_KEY = {REPLACE_CIPHER_KEY}`),
+    # so ruff would always flag F821 on the placeholder names.
+    "initial_scripts/environments/env_app_template.py",
+]
+
+[tool.ruff.lint]
+select = ["E", "F"]
+ignore = [
+    "E501",  # long lines — formatter handles new code; many legacy lines remain
+]
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
+
+# ============================================================================
+# Vulnerability scanner (pip-audit)
+# ============================================================================
+# Empty allowlist on day one. Add advisories here ONLY when:
+#   * there is no patched version available upstream, AND
+#   * the team has explicitly accepted the risk.
+# Each entry must carry a one-line trailing comment naming the reviewer
+# and the date of acceptance (e.g. # accepted 2026-05-27 by alice).
+[tool.pip-audit]
+ignore-vulns = []

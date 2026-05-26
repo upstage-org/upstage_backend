@@ -1,0 +1,64 @@
+# Pre-commit framework config for upstage_backend.
+#
+# Mirrors the husky setup in `../upstage_frontend`: a fast staged-files
+# gate at commit time, a light commit-message gate, and a slower full-
+# repo gate at push time. CI runs the same `scripts/verify.sh` so a
+# `--no-verify` bypass is still caught server-side.
+#
+# Install:
+#   pip install -e .[dev]
+#   pre-commit install --install-hooks
+# (commit-msg and pre-push are picked up via `default_install_hook_types`.)
+#
+# Bump pinned `rev:` values periodically with: `pre-commit autoupdate`.
+default_install_hook_types: [pre-commit, commit-msg, pre-push]
+default_stages: [pre-commit]
+
+repos:
+  # Standard hygiene hooks. Keep the list small and unambiguous so we
+  # never have to argue about whether the hook is right vs the file.
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v6.0.0
+    hooks:
+      - id: trailing-whitespace
+      - id: end-of-file-fixer
+      - id: check-yaml
+      - id: check-toml
+      - id: check-merge-conflict
+      - id: detect-private-key
+      - id: mixed-line-ending
+        args: [--fix=lf]
+
+  # Linter + formatter. Config lives in `pyproject.toml [tool.ruff]`.
+  # `ruff --fix` autocorrects on-commit; anything that survives is a
+  # real error and blocks the commit.
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.15.14
+    hooks:
+      - id: ruff
+        args: [--fix]
+      - id: ruff-format
+
+  - repo: local
+    hooks:
+      # Light commit-message policy, ported from
+      # ../upstage_frontend/.husky/commit-msg. Only inspects the SUBJECT
+      # line so machine-generated trailers (Co-authored-by:, Signed-off-by:)
+      # do not smuggle a bare "fix" past the length gate.
+      - id: commit-msg-policy
+        name: commit-msg light policy
+        language: script
+        entry: scripts/hooks/check_commit_msg.sh
+        stages: [commit-msg]
+
+      # Pre-push verify suite. Slower (~seconds), runs on push only.
+      # Identical to `scripts/verify.sh` and the CI verify job, so a
+      # clean local push means the CI verify build will pass for the
+      # same reasons.
+      - id: backend-pre-push
+        name: pre-push verify (ruff + tests/unit + pip-audit)
+        language: script
+        entry: scripts/verify.sh
+        stages: [pre-push]
+        pass_filenames: false
+        always_run: true

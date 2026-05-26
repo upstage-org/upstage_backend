@@ -85,3 +85,90 @@ If you omit streaming/Jitsi, skip phases `80_streaming_jitsi` and adjust DNS/REA
 - **Certbot fails** — wait for DNS propagation; confirm port 80 reaches this host.
 - **Nginx `nginx -t` fails after phase 51** — ensure Jitsi is installed (phase 80) so `/usr/share/jitsi-meet` exists.
 - **`run_docker_compose_prod.sh` still shows `HARDCODED_HOSTNAME=upstage.live`** — that comes from the existing script in the repo; change only if your deployment requires it (outside this directory).
+
+## Local protections (git hooks)
+
+This repo uses [pre-commit](https://pre-commit.com/) to run a small
+suite of local protections against the same checks that run in CI.
+They exist so problems are caught at the developer's machine — before
+they hit `main` — and so a `git push --no-verify` bypass is still
+caught server-side by `.github/workflows/ci.yml`.
+
+The frontend repo (`../upstage_frontend`) uses Husky for the same
+purpose; the two configurations are deliberately symmetrical.
+
+### One-time install
+
+```sh
+pip install -e .[dev]
+pre-commit install --install-hooks
+```
+
+The `default_install_hook_types` line in `.pre-commit-config.yaml`
+picks up `commit-msg` and `pre-push` automatically — no extra
+`--hook-type` flags needed.
+
+### What runs and when
+
+| Hook         | What it does                                                                                                                                | Typical time |
+| ------------ | ------------------------------------------------------------------------------------------------------------------------------------------- | ------------ |
+| `pre-commit` | Standard hygiene (`trailing-whitespace`, `end-of-file-fixer`, `check-yaml`/`-toml`, `detect-private-key`, `mixed-line-ending`) + `ruff --fix` + `ruff-format`, scoped to staged files. | < 5 s        |
+| `commit-msg` | Light gate: rejects empty / `wip` / `fixup!` subjects shorter than 10 characters. Trailers like `Co-authored-by:` are intentionally ignored. | instant      |
+| `pre-push`   | `scripts/verify.sh`: `ruff check .` + `ruff format --check .` + `pytest tests/unit/` + `pip-audit --strict`.                                 | ~10 s        |
+
+The `pre-push` hook is byte-for-byte identical to `scripts/verify.sh`
+and to the CI `verify` job, so a clean local push is a strong signal
+that CI's verify build will pass.
+
+The full pytest suite (which needs Postgres and Mosquitto) runs **only
+in CI's `tests` job**, where the GitHub Actions `services:` block
+brings up the dependencies. Locally, only `tests/unit/` is run on
+push — that directory carries `tests/unit/conftest.py` no-op overrides
+of the root conftest's autouse `client` and `db_engine` fixtures, so
+it is actually runnable without the docker stack.
+
+### Manual run
+
+```sh
+./scripts/verify.sh           # full pre-push gate (ruff + tests/unit + pip-audit)
+ruff check . && ruff format --check .
+pytest tests/unit/            # DB-free smoke
+pip-audit --strict            # honours [tool.pip-audit] ignore-vulns
+```
+
+### Vulnerability allowlist
+
+`pip-audit` exits non-zero on any finding — there is no severity
+threshold. When upstream has no patched version available and the
+team has explicitly accepted the risk, add the advisory ID to the
+`[tool.pip-audit] ignore-vulns` list in `pyproject.toml` with a
+trailing comment naming the reviewer and the date of acceptance:
+
+```toml
+[tool.pip-audit]
+ignore-vulns = [
+    "GHSA-xxxx-xxxx-xxxx",  # accepted 2026-05-27 by alice; no upstream fix
+]
+```
+
+### Bypassing for emergencies
+
+```sh
+git commit --no-verify -m "hotfix: ..."
+git push --no-verify
+```
+
+Use sparingly. CI still runs the full verify suite plus the full
+pytest with services on the pushed branch and on the PR, so a bypass
+only delays the failure — it does not hide it.
+
+### Adding a new check
+
+1. Add a one-liner to [scripts/verify.sh](scripts/verify.sh) so it can
+   be run standalone.
+2. Mirror it in [.github/workflows/ci.yml](.github/workflows/ci.yml)
+   under the `verify` job so the local gate and the server-side gate
+   stay in lockstep.
+3. If the check is fast enough to run on every commit (not just every
+   push), add it to [.pre-commit-config.yaml](.pre-commit-config.yaml)
+   under the appropriate `repo:` block.
