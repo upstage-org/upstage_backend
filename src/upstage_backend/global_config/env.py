@@ -4,6 +4,8 @@ import os
 import socket
 from dotenv import load_dotenv
 
+from upstage_backend.global_config.logger import logger
+
 load_dotenv()
 ENV_TYPE = os.getenv("ENV_TYPE")
 
@@ -40,7 +42,7 @@ CLOUDFLARE_CAPTCHA_VERIFY_ENDPOINT = os.getenv("CLOUDFLARE_CAPTCHA_VERIFY_ENDPOI
 
 
 HOSTNAME = os.getenv("HOSTNAME")
-print("*****************Hostname is: " + HOSTNAME)
+logger.info("Hostname is: {}", HOSTNAME)
 EMAIL_HOST_FROM = os.getenv("EMAIL_HOST_FROM")
 EMAIL_HOST_LOGIN = os.getenv("EMAIL_HOST_LOGIN")
 SUPPORT_EMAILS = os.getenv("SUPPORT_EMAILS", "support@upstage.live").split(",")
@@ -72,11 +74,9 @@ if "HARDCODED_HOSTNAME" in os.environ:
 else:
     ORIG_HOSTNAME = socket.gethostname()
     HOSTNAME = socket.gethostname().replace(".", "_").replace("-", "_")
-print("*****************Hostname is now: " + HOSTNAME)
+logger.info("Hostname is now: {}", HOSTNAME)
 
-UPLOAD_USER_CONTENT_FOLDER = (
-    "/usr/app/uploads"  # This is mounted here by docker-compose file.
-)
+UPLOAD_USER_CONTENT_FOLDER = "/usr/app/uploads"  # This is mounted here by docker-compose file.
 DEMO_MEDIA_FOLDER = "./dashboard/demo"
 
 UPSTAGE_FRONTEND_URL = os.getenv("UPSTAGE_FRONTEND_URL", "http://localhost:3000")
