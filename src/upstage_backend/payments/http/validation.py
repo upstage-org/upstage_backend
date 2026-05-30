@@ -1,10 +1,13 @@
 # -*- coding: iso8859-15 -*-
+from typing import Optional
+
 from pydantic import BaseModel, Field
 
 
 class PaymentIntentInput(BaseModel):
     amount: int = Field(...)
     currency: str = Field(default="usd")
+    token: Optional[str] = Field(None, min_length=5, max_length=10000)
 
 
 class OneTimePurchaseInput(BaseModel):
