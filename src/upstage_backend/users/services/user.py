@@ -8,7 +8,7 @@ from fastapi import Request
 from graphql import GraphQLError
 import pyotp
 import requests
-from upstage_backend.global_config import get_session
+from upstage_backend.global_config import get_session, logger
 from upstage_backend.global_config.env import (
     ENV_TYPE,
     CLOUDFLARE_CAPTCHA_SECRETKEY,
@@ -72,15 +72,9 @@ class UserService:
         session.add(user)
         session.flush()
 
-        user = (
-            session.query(UserModel)
-            .filter(UserModel.username == data["username"])
-            .first()
-        )
+        user = session.query(UserModel).filter(UserModel.username == data["username"]).first()
 
-        asyncio.create_task(
-            send([user.email], "Welcome to UpStage!", user_registration(user))
-        )
+        asyncio.create_task(send([user.email], "Welcome to UpStage!", user_registration(user)))
         admin_emails = SUPPORT_EMAILS
         approval_url = f"https://{HOSTNAME}/admin/player?sortByCreated=true"
         asyncio.create_task(
@@ -118,18 +112,27 @@ class UserService:
 
         result = requests.post(CLOUDFLARE_CAPTCHA_VERIFY_ENDPOINT, data=formData)
         outcome = result.json()
-        print(f"************* Using {ip} or {cf_ip} , outcome: {outcome} ****")
+        remoteip = cf_ip or ip
 
-        if not outcome["success"]:
-            raise GraphQLError(
-                "We think you are not a human! " + ", ".join(outcome["error-codes"])
+        if outcome.get("success"):
+            logger.debug(
+                "Cloudflare Turnstile verified (remoteip={}, cf_connecting_ip={})",
+                remoteip,
+                cf_ip,
             )
+        else:
+            error_codes = outcome.get("error-codes", [])
+            logger.warning(
+                "Cloudflare Turnstile verification failed (remoteip={}, cf_connecting_ip={}, error_codes={})",
+                remoteip,
+                cf_ip,
+                error_codes,
+            )
+            raise GraphQLError("We think you are not a human! " + ", ".join(error_codes))
 
     def update(self, user: UserModel):
         session = get_session()
-        session.query(UserModel).filter(UserModel.id == user.id).update(
-            {**user.to_dict()}
-        )
+        session.query(UserModel).filter(UserModel.id == user.id).update({**user.to_dict()})
         session.flush()
 
     async def request_password_reset(self, email: str):
@@ -145,9 +148,7 @@ class UserService:
         totp = pyotp.TOTP(pyotp.random_base32())
         otp = totp.now()
 
-        session.query(OneTimeTOTPModel).filter(
-            OneTimeTOTPModel.user_id == user.id
-        ).delete()
+        session.query(OneTimeTOTPModel).filter(OneTimeTOTPModel.user_id == user.id).delete()
 
         session.flush()
         session.add(OneTimeTOTPModel(user_id=user.id, code=otp))
@@ -169,9 +170,7 @@ class UserService:
     async def verify_password_reset(self, input):
         session = get_session()
         otp = (
-            session.query(OneTimeTOTPModel)
-            .filter(OneTimeTOTPModel.code == input["token"])
-            .first()
+            session.query(OneTimeTOTPModel).filter(OneTimeTOTPModel.code == input["token"]).first()
         )
 
         if not otp:
@@ -190,9 +189,7 @@ class UserService:
     async def reset_password(self, input):
         session = get_session()
         otp = (
-            session.query(OneTimeTOTPModel)
-            .filter(OneTimeTOTPModel.code == input["token"])
-            .first()
+            session.query(OneTimeTOTPModel).filter(OneTimeTOTPModel.code == input["token"]).first()
         )
 
         if not otp:

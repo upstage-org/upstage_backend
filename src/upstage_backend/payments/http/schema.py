@@ -12,7 +12,6 @@ from upstage_backend.payments.http.validation import (
     CreateSubscriptionInput,
 )
 from upstage_backend.users.services.user import UserService
-from upstage_backend.global_config.env import ENV_TYPE
 
 query = QueryType()
 mutation = MutationType()
@@ -21,29 +20,6 @@ mutation = MutationType()
 @mutation.field("paymentSecret")
 async def get_payment_secret(_, info, input: PaymentIntentInput):
     dto = PaymentIntentInput(**input) if isinstance(input, dict) else input
-    # #region agent log
-    import json
-    import time
-
-    with open("/root/upstage_dev/upstage_frontend/.cursor/debug-40ed5e.log", "a") as _log_f:
-        _log_f.write(
-            json.dumps(
-                {
-                    "sessionId": "40ed5e",
-                    "hypothesisId": "H2-H3",
-                    "location": "payments/http/schema.py:get_payment_secret",
-                    "message": "paymentSecret resolver entry",
-                    "data": {
-                        "envType": ENV_TYPE,
-                        "hasToken": bool(dto.token),
-                        "amount": dto.amount,
-                    },
-                    "timestamp": int(time.time() * 1000),
-                }
-            )
-            + "\n"
-        )
-    # #endregion
     UserService().verify_captcha(dto.token, info.context["request"])
     secret = PaymentService().create_payment_intent(amount=dto.amount, currency=dto.currency)
     return secret or "Stripe failed"
