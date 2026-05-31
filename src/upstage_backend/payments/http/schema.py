@@ -11,6 +11,7 @@ from upstage_backend.payments.http.validation import (
     OneTimePurchaseInput,
     CreateSubscriptionInput,
 )
+from upstage_backend.users.services.user import UserService
 
 query = QueryType()
 mutation = MutationType()
@@ -18,7 +19,9 @@ mutation = MutationType()
 
 @mutation.field("paymentSecret")
 async def get_payment_secret(_, info, input: PaymentIntentInput):
-    secret = PaymentService().create_payment_intent(**input)
+    dto = PaymentIntentInput(**input) if isinstance(input, dict) else input
+    UserService().verify_captcha(dto.token, info.context["request"])
+    secret = PaymentService().create_payment_intent(amount=dto.amount, currency=dto.currency)
     return secret or "Stripe failed"
 
 
@@ -29,9 +32,7 @@ async def one_time_purchase(_, info, input: OneTimePurchaseInput):
 
 @mutation.field("createSubscription")
 async def create_subscription(_, info, input: CreateSubscriptionInput):
-    return await PaymentService().create_subscription_process(
-        CreateSubscriptionInput(**input)
-    )
+    return await PaymentService().create_subscription_process(CreateSubscriptionInput(**input))
 
 
 @mutation.field("cancelSubscription")

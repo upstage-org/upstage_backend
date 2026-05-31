@@ -24,4 +24,5 @@ exec uvicorn upstage_backend.main:app \
     --proxy-headers \
     --forwarded-allow-ips='*' \
     --host 0.0.0.0 \
-    --port 3000
+    --port 3000 \
+    --log-config ./scripts/uvicorn_log_config.json

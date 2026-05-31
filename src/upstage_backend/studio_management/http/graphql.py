@@ -5,9 +5,9 @@ type_defs = gql("""
     input BatchUserInput {
         username: String!
         password: String!
-        email: String!            
+        email: String!
     }
-                
+
     input CreateUserInput {
         username: String!
         password: String!
@@ -17,13 +17,13 @@ type_defs = gql("""
         intro: String
         token: String
     }
-                
+
     input ResetPasswordInput {
         email: String!
         token: String!
         password: String
     }
-            
+
     input UpdateUserInput {
         id: ID!
         username: String
@@ -39,7 +39,7 @@ type_defs = gql("""
         uploadLimit: Int
         intro: String
     }
-    
+
     input MediaTableInput {
         page: Int
         limit: Int
@@ -52,7 +52,7 @@ type_defs = gql("""
         dormant: Boolean
         createdBetween: [Date]
     }
-                
+
     input LoginInput {
         token: String
         username: String!
@@ -64,14 +64,14 @@ type_defs = gql("""
         newPassword: String!
         id: ID!
     }
-    
+
     input SendEmailInput {
         subject: String!
         body: String!
         recipients: String!
         bcc: String
     }
-    
+
   input SaveMediaInput {
         id: ID
         name: String!
@@ -102,16 +102,17 @@ type_defs = gql("""
         blank: Boolean
         effect: Boolean
     }
-            
+
     input LicenseInput {
         assetId: ID!
         level: Int!
         permissions: String!
     }
-            
+
     input PaymentIntentInput {
         amount: Int!
         currency: String
+        token: String
     }
 
     input CreateSubscriptionInput {
@@ -132,14 +133,14 @@ type_defs = gql("""
         cvc: String!
         amount: Float!
     }
-    
-                    
+
+
     input RecordInput {
         stageId: ID!
         name: String!
-        description: String 
+        description: String
     }
-                
+
     input PerformanceInput {
         id: ID!
         name: String!
@@ -152,14 +153,14 @@ type_defs = gql("""
         description: String
         minPauseSeconds: Float!
     }
-    
+
     input SceneInput {
         name: String
         preview: String
         payload: String
         stageId: ID
     }
-    
+
     input SearchStageInput {
         page: Int
         limit: Int
@@ -169,12 +170,12 @@ type_defs = gql("""
         createdBetween: [Date]
         access: [String]
     }
-                
+
      input AssignMediaInput {
         id: ID!
         mediaIds: [ID]
     }
-                
+
     input StageInput {
         id: ID
         fileLocation: String
@@ -187,7 +188,7 @@ type_defs = gql("""
         config: String
         owner: ID
     }
-                
+
     input UpdateMediaInput {
         id: ID!
         name: String!
@@ -199,14 +200,14 @@ type_defs = gql("""
         playerAccess: String
         uploadedFrames: [String]
     }
-                
+
     input SystemEmailInput {
         subject: String!
         body: String!
         recipients: String!
         bcc: String
     }
-                
+
     input ConfigInput {
         name: String!
         value: String
@@ -220,55 +221,55 @@ type_defs = gql("""
         mediaType: String!
         filename: String!
     }
-                
+
     input AssignStagesInput {
         id: ID!
         stageIds: [ID!]
     }
-                
+
     input StageStreamInput {
         fileLocation: String
         performanceId: ID
         cursor: Int
     }
-                
+
     input UpdateMediaStatusInput {
         id: ID!
-        status: MediaStatusEnum!    
+        status: MediaStatusEnum!
     }
-                
+
    type StagesResponse {
         totalCount: Int
         edges: [Stage]
     }
-            
+
     type SweepResponse {
         success: Boolean
         performanceId: ID
     }
-                      
+
     type AdminPlayerConnection {
         totalCount: Int!
         edges: [User!]!
-    }   
+    }
 
     type NginxConfig {
-        limit: Int!            
+        limit: Int!
     }
-            
-        
+
+
     type Tag {
         id: ID!
         name: String!
         color: String
-        createdOn: Date  
+        createdOn: Date
     }
-                
+
     type RefreshTokenResponse {
         access_token: String!
         refresh_token: String!
     }
-    
+
     type User {
         id: ID!
         username: String!
@@ -289,7 +290,7 @@ type_defs = gql("""
         lastLogin: String
         roleName: String
     }
-                
+
     type Asset {
         id: ID!
         name: String
@@ -307,14 +308,14 @@ type_defs = gql("""
         permissions: [Permission]
         privilege: Int
         fileLocation: String
-    }     
+    }
 
     type AssetConnection {
         totalCount: Int!
         edges: [Asset!]!
     }
-            
-                
+
+
     type Permission {
         id: ID!
         userId: Int!
@@ -324,12 +325,12 @@ type_defs = gql("""
         note: String
         user: User!
     }
-                
+
     type AssetType {
         id: ID
         name: String!
     }
-      
+
      type Stage {
         id: ID!
         name: String
@@ -338,20 +339,20 @@ type_defs = gql("""
         visibility: Boolean
         cover: String
         description: String
-        playerAccess: String    
+        playerAccess: String
         permission: String
         owner: User
-        assets: [Asset]    
-        chats: [Event]  
-        events: [Event]  
+        assets: [Asset]
+        chats: [Event]
+        events: [Event]
         scenes: [Scene]
         lastAccess: Date
         createdOn: Date
         attributes:[StageAttribute]
         performances: [Performance]
     }
-                
-                
+
+
     type Event {
         id: ID!
         topic: String
@@ -362,7 +363,7 @@ type_defs = gql("""
         created: Date
     }
 
-                
+
     type PerformanceCommunication {
         id: ID!
         ownerId: ID!
@@ -376,7 +377,7 @@ type_defs = gql("""
         expiresOn: String
         performanceConfigId: Int!
     }
-                
+
     type PerformanceConfig {
         id: ID!
         name: String!
@@ -386,7 +387,7 @@ type_defs = gql("""
         splashScreenAnimationUrls: String
         createdOn: String!
         expiresOn: String
-    }   
+    }
 
     type Scene {
         id: ID!
@@ -399,8 +400,8 @@ type_defs = gql("""
         ownerId: ID!
         stageId: ID!
         owner: User
-    }   
-                
+    }
+
     type ParentStage {
         id: ID!
         stageId: ID!
@@ -408,11 +409,11 @@ type_defs = gql("""
         stage: Stage!
         childAsset: Asset!
     }
-               
+
     type CreateUserPayload {
         user: User
     }
-    
+
     type TokenType {
         user_id: Int
         access_token: String
@@ -423,12 +424,12 @@ type_defs = gql("""
         username: String
         title: String
     }
-    
+
     type GroupType {
         id: Int
         name: String
     }
-            
+
 
     type License {
         id: ID!
@@ -438,27 +439,27 @@ type_defs = gql("""
         permissions: String!
         assetPath: String
     }
-    
-                
+
+
     type ConfirmPermissionResponse {
         success: Boolean
         permissions: [Permission]
         message: String
     }
-                
+
     type Size {
         size: Int
     }
-                       
+
     type BatchUserCreationPayload {
         users: [User!]!
     }
-                
+
     type CommonResponse {
         success: Boolean
         message: String
     }
-                
+
      fragment permissionFragment on Permission {
         id
         userId
@@ -492,7 +493,7 @@ type_defs = gql("""
         lastLogin
         roleName
     }
-                
+
     type File {
         url: String!
     }
@@ -500,16 +501,16 @@ type_defs = gql("""
     type SaveMediaPayload {
         asset: Asset!
     }
-                
+
     type DeleteMediaPayload {
         success: Boolean!
         message: String!
     }
-        
+
     type UpdateStageResponse {
         result: String
     }
-                
+
     type Performance {
         id: ID!
         name: String
@@ -520,42 +521,42 @@ type_defs = gql("""
         savedOn: Date
         recording: Boolean
     }
-                
+
     type Config{
         id: Int!
         name: String!
         value: String
         createdOn: Date
     }
-                
+
     type BooleanConfig{
         id: Int!
         name: String!
         value: Boolean
         createdOn: Date
     }
-                
+
     type SystemConfig {
         termsOfService: Config
         manual: Config
         esp: Config
-        enableDonate: BooleanConfig   
-        emailSignature: Config 
+        enableDonate: BooleanConfig
+        emailSignature: Config
         addingEmailSignature: BooleanConfig
     }
-                
+
     type FoyerConfig {
         title: Config
         description: Config
         menu: Config
         showRegistration: BooleanConfig
     }
-                
+
     type ReceiptFile {
         fileBase64: String!
         fileName: String!
     }
-            
+
 
     scalar Date
     scalar JSONString
@@ -582,7 +583,7 @@ type_defs = gql("""
         COPYRIGHT_LEVEL_ASC
         COPYRIGHT_LEVEL_DESC
     }
-    
+
     enum AdminPlayerSortEnum {
         USERNAME_ASC
         USERNAME_DESC
@@ -595,13 +596,13 @@ type_defs = gql("""
         EMAIL_ASC
         EMAIL_DESC
     }
-                
+
     enum MediaStatusEnum {
         Active
         Remove
         Dormant
     }
-                
+
     enum StageSortEnum {
         ID_ASC
         ID_DESC
@@ -620,8 +621,8 @@ type_defs = gql("""
         ACCESS_DESC
         ACCESS_ASC
     }
-                
-    type Mutation { 
+
+    type Mutation {
         batchUserCreation(users: [BatchUserInput]!): BatchUserCreationPayload
         updateUser(input: UpdateUserInput!): User
         deleteUser(id: ID!): CommonResponse
@@ -641,19 +642,19 @@ type_defs = gql("""
         # role on the row; see StudioService.dismiss_notification.
         dismissNotification(id: ID!): AssetUsage
         quickAssignMutation(stageIds: [ID]!, assetId: ID!): CommonResponse,
-        
+
         createUser(inbound: CreateUserInput!): CreateUserPayload
         requestPasswordReset(email: String!): CommonResponse
         verifyPasswordReset(input: ResetPasswordInput!): CommonResponse
-        resetPassword(input: ResetPasswordInput!): CommonResponse    
-                
+        resetPassword(input: ResetPasswordInput!): CommonResponse
+
         login(payload: LoginInput!): TokenType
         refreshToken: RefreshTokenResponse
         logout: String
-                
+
         createLicense(input: LicenseInput!): License!
         revokeLicense(id: ID!): String!
-                
+
         paymentSecret(input: PaymentIntentInput!): String!
         oneTimePurchase(input: OneTimePurchaseInput!): CommonResponse
         createSubscription(input: CreateSubscriptionInput!): CommonResponse
@@ -661,7 +662,7 @@ type_defs = gql("""
         updateEmailCustomer(customer_id: String!, email: String!): CommonResponse
         generateReceipt(receivedFrom: String!,description: String!,amount: String!, date: String!): ReceiptFile!
 
-                
+
         createStage(input: StageInput!): Stage
         updateStage(input: StageInput!): Stage
         duplicateStage(id: ID!, name: String!): Stage
@@ -680,15 +681,15 @@ type_defs = gql("""
         startRecording(input: RecordInput!): Performance
         saveRecording(id: ID!): Performance
         updateStatus(id: ID!): UpdateStageResponse
-        updateVisibility(id: ID!): UpdateStageResponse   
-        updateLastAccess(id: ID!): UpdateStageResponse   
-                
+        updateVisibility(id: ID!): UpdateStageResponse
+        updateLastAccess(id: ID!): UpdateStageResponse
+
         updateTermsOfService(url: String!): Config
         saveConfig(input: ConfigInput!): Config
         sendSystemEmail(input: SystemEmailInput!): CommonResponse
-        
+
     }
-                
+
     type Query {
         hello: String
         whoami: User
@@ -698,38 +699,38 @@ type_defs = gql("""
             sort: [AdminPlayerSortEnum],
             usernameLike: String,
             createdBetween: [String]
-        ): AdminPlayerConnection      
-        media(input: MediaTableInput!): AssetConnection!  
+        ): AdminPlayerConnection
+        media(input: MediaTableInput!): AssetConnection!
         mediaList(mediaType: String, owner: String): [Asset!]!
         mediaTypes: [AssetType!]!
         tags: [Tag!]!
         users(active: Boolean): [User!]!
         getAllStages: [Stage!]!
-                
+
         currentUser: User
-                
+
         access(path: String!): License!
-                
+
         performanceCommunication:  [PerformanceCommunication!]!
         performanceConfig: [PerformanceConfig!]!
         scene: [Scene!]!
         parentStage: [ParentStage!]
-                
+
         stages(input: SearchStageInput): StagesResponse
         stage(id: ID!): Stage
         foyerStageList: [Stage!]!
         stageList(input: StageStreamInput): [Stage!]!
-                
+
 
         nginx: NginxConfig!
         system: SystemConfig!
         foyer: FoyerConfig!
-                
+
         voices: [Voice!]
-                
+
         notifications: [Notification]
-    }    
-                
+    }
+
     # `type` discriminates which bell-row variant this is — mapped
     # to NotificationType in upstage_backend.assets.db_models.asset_usage:
     #   1  MEDIA_USAGE           – owner sees a pending strict request
@@ -739,13 +740,13 @@ type_defs = gql("""
         type: Int
         mediaUsage: AssetUsage
     }
-            
+
 
     type Voice {
         avatar: Asset
         voice: AvatarVoice
-    }  
-                
+    }
+
     type AvatarVoice {
         voice: String
         variant: String!
@@ -753,13 +754,13 @@ type_defs = gql("""
         speed: Int!
         amplitude: Int!
     }
-                
+
     type StageAttribute {
         id: ID
         name: String
         description: String
     }
-                
+
     type AssetUsage {
         id: ID!
         assetId: Int!

@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # -*- coding: iso8859-15 -*-
 
-# import loguru  # noqa: F401  # entrypoint: load loguru before upstage (see app_containers compose)
+import loguru  # noqa: F401  # entrypoint: load loguru before upstage (see app_containers compose)
 
 from upstage_backend.global_config import (
     MQTT_BROKER,

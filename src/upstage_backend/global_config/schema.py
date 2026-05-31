@@ -10,6 +10,7 @@ from upstage_backend.global_config.db_context import (
     set_session,
 )
 from upstage_backend.global_config.env import ENV_TYPE
+from upstage_backend.global_config.logger import logger
 
 
 def _make_graphql_context(request, data=None):
@@ -69,25 +70,15 @@ def config_graphql_endpoints(app: FastAPI, endpoint="/api/studio_graphql"):
     combined_mutation = MutationType()
 
     combined_mutation.set_field("login", auth_mutation._resolvers["login"])
-    combined_mutation.set_field(
-        "refreshToken", auth_mutation._resolvers["refreshToken"]
-    )
+    combined_mutation.set_field("refreshToken", auth_mutation._resolvers["refreshToken"])
     combined_mutation.set_field("logout", auth_mutation._resolvers["logout"])
 
-    combined_mutation.set_field(
-        "createLicense", license_mutation._resolvers["createLicense"]
-    )
-    combined_mutation.set_field(
-        "revokeLicense", license_mutation._resolvers["revokeLicense"]
-    )
+    combined_mutation.set_field("createLicense", license_mutation._resolvers["createLicense"])
+    combined_mutation.set_field("revokeLicense", license_mutation._resolvers["revokeLicense"])
 
-    combined_mutation.set_field(
-        "paymentSecret", payment_mutation._resolvers["paymentSecret"]
-    )
+    combined_mutation.set_field("paymentSecret", payment_mutation._resolvers["paymentSecret"])
 
-    combined_mutation.set_field(
-        "oneTimePurchase", payment_mutation._resolvers["oneTimePurchase"]
-    )
+    combined_mutation.set_field("oneTimePurchase", payment_mutation._resolvers["oneTimePurchase"])
     combined_mutation.set_field(
         "createSubscription", payment_mutation._resolvers["createSubscription"]
     )
@@ -98,17 +89,13 @@ def config_graphql_endpoints(app: FastAPI, endpoint="/api/studio_graphql"):
         "updateEmailCustomer", payment_mutation._resolvers["updateEmailCustomer"]
     )
 
-    combined_mutation.set_field(
-        "generateReceipt", payment_mutation._resolvers["generateReceipt"]
-    )
+    combined_mutation.set_field("generateReceipt", payment_mutation._resolvers["generateReceipt"])
 
     combined_query.set_field(
         "performanceCommunication",
         performance_query._resolvers["performanceCommunication"],
     )
-    combined_query.set_field(
-        "performanceConfig", performance_query._resolvers["performanceConfig"]
-    )
+    combined_query.set_field("performanceConfig", performance_query._resolvers["performanceConfig"])
     combined_query.set_field("scene", performance_query._resolvers["scene"])
     combined_query.set_field("parentStage", performance_query._resolvers["parentStage"])
 
@@ -122,45 +109,27 @@ def config_graphql_endpoints(app: FastAPI, endpoint="/api/studio_graphql"):
     combined_mutation.set_field("updateStage", stage_mutation._resolvers["updateStage"])
     combined_mutation.set_field("deleteStage", stage_mutation._resolvers["deleteStage"])
     combined_mutation.set_field("assignMedia", stage_mutation._resolvers["assignMedia"])
-    combined_mutation.set_field(
-        "duplicateStage", stage_mutation._resolvers["duplicateStage"]
-    )
+    combined_mutation.set_field("duplicateStage", stage_mutation._resolvers["duplicateStage"])
     combined_mutation.set_field("uploadMedia", stage_mutation._resolvers["uploadMedia"])
     combined_mutation.set_field(
         "deleteMediaOnStage", stage_mutation._resolvers["deleteMediaOnStage"]
     )
     combined_mutation.set_field("updateMedia", stage_mutation._resolvers["updateMedia"])
-    combined_mutation.set_field(
-        "assignStages", stage_mutation._resolvers["assignStages"]
-    )
+    combined_mutation.set_field("assignStages", stage_mutation._resolvers["assignStages"])
     combined_mutation.set_field("sweepStage", stage_mutation._resolvers["sweepStage"])
     combined_mutation.set_field("saveScene", stage_mutation._resolvers["saveScene"])
     combined_mutation.set_field("deleteScene", stage_mutation._resolvers["deleteScene"])
-    combined_mutation.set_field(
-        "updatePerformance", stage_mutation._resolvers["updatePerformance"]
-    )
-    combined_mutation.set_field(
-        "deletePerformance", stage_mutation._resolvers["deletePerformance"]
-    )
+    combined_mutation.set_field("updatePerformance", stage_mutation._resolvers["updatePerformance"])
+    combined_mutation.set_field("deletePerformance", stage_mutation._resolvers["deletePerformance"])
     combined_mutation.set_field(
         "duplicatePerformanceWithTrimmedPauses",
         stage_mutation._resolvers["duplicatePerformanceWithTrimmedPauses"],
     )
-    combined_mutation.set_field(
-        "startRecording", stage_mutation._resolvers["startRecording"]
-    )
-    combined_mutation.set_field(
-        "saveRecording", stage_mutation._resolvers["saveRecording"]
-    )
-    combined_mutation.set_field(
-        "updateStatus", stage_mutation._resolvers["updateStatus"]
-    )
-    combined_mutation.set_field(
-        "updateVisibility", stage_mutation._resolvers["updateVisibility"]
-    )
-    combined_mutation.set_field(
-        "updateLastAccess", stage_mutation._resolvers["updateLastAccess"]
-    )
+    combined_mutation.set_field("startRecording", stage_mutation._resolvers["startRecording"])
+    combined_mutation.set_field("saveRecording", stage_mutation._resolvers["saveRecording"])
+    combined_mutation.set_field("updateStatus", stage_mutation._resolvers["updateStatus"])
+    combined_mutation.set_field("updateVisibility", stage_mutation._resolvers["updateVisibility"])
+    combined_mutation.set_field("updateLastAccess", stage_mutation._resolvers["updateLastAccess"])
 
     combined_query.set_field("currentUser", user_query._resolvers["currentUser"])
     combined_mutation.set_field("createUser", user_mutation._resolvers["createUser"])
@@ -170,9 +139,7 @@ def config_graphql_endpoints(app: FastAPI, endpoint="/api/studio_graphql"):
     combined_mutation.set_field(
         "verifyPasswordReset", user_mutation._resolvers["verifyPasswordReset"]
     )
-    combined_mutation.set_field(
-        "resetPassword", user_mutation._resolvers["resetPassword"]
-    )
+    combined_mutation.set_field("resetPassword", user_mutation._resolvers["resetPassword"])
 
     combined_query.set_field("nginx", upstage_options_query._resolvers["nginx"])
     combined_query.set_field("system", upstage_options_query._resolvers["system"])
@@ -182,9 +149,7 @@ def config_graphql_endpoints(app: FastAPI, endpoint="/api/studio_graphql"):
         "updateTermsOfService",
         upstage_options_mutation._resolvers["updateTermsOfService"],
     )
-    combined_mutation.set_field(
-        "saveConfig", upstage_options_mutation._resolvers["saveConfig"]
-    )
+    combined_mutation.set_field("saveConfig", upstage_options_mutation._resolvers["saveConfig"])
     combined_mutation.set_field(
         "sendSystemEmail", upstage_options_mutation._resolvers["sendSystemEmail"]
     )
@@ -204,16 +169,12 @@ def config_graphql_endpoints(app: FastAPI, endpoint="/api/studio_graphql"):
     )
     combined_mutation.set_field("uploadFile", asset_mutation._resolvers["uploadFile"])
     combined_mutation.set_field("saveMedia", asset_mutation._resolvers["saveMedia"])
-    combined_mutation.set_field(
-        "updateMediaStatus", asset_mutation._resolvers["updateMediaStatus"]
-    )
+    combined_mutation.set_field("updateMediaStatus", asset_mutation._resolvers["updateMediaStatus"])
     combined_mutation.set_field("deleteMedia", asset_mutation._resolvers["deleteMedia"])
     combined_mutation.set_field("updateUser", studio_mutation._resolvers["updateUser"])
     combined_mutation.set_field("deleteUser", studio_mutation._resolvers["deleteUser"])
     combined_mutation.set_field("sendEmail", studio_mutation._resolvers["sendEmail"])
-    combined_mutation.set_field(
-        "changePassword", studio_mutation._resolvers["changePassword"]
-    )
+    combined_mutation.set_field("changePassword", studio_mutation._resolvers["changePassword"])
     combined_mutation.set_field("calcSizes", studio_mutation._resolvers["calcSizes"])
     combined_mutation.set_field(
         "requestPermission",
@@ -231,9 +192,7 @@ def config_graphql_endpoints(app: FastAPI, endpoint="/api/studio_graphql"):
         "quickAssignMutation",
         studio_mutation._resolvers["quickAssignMutation"],
     )
-    combined_schema = make_executable_schema(
-        studio_type_defs, combined_query, combined_mutation
-    )
+    combined_schema = make_executable_schema(studio_type_defs, combined_query, combined_mutation)
 
     combined_graphql_app = GraphQL(
         combined_schema,
@@ -241,6 +200,6 @@ def config_graphql_endpoints(app: FastAPI, endpoint="/api/studio_graphql"):
         context_value=_make_graphql_context,
     )
 
-    print(endpoint)
+    logger.info("GraphQL endpoint mounted at {}", endpoint)
     app.add_route(endpoint, combined_graphql_app)
     app.add_api_websocket_route(endpoint, combined_graphql_app)
