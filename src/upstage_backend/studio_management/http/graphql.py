@@ -341,6 +341,8 @@ type_defs = gql("""
         description: String
         playerAccess: String
         permission: String
+        players: Int
+        audiences: Int
         owner: User
         assets: [Asset]
         chats: [Event]
