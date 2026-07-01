@@ -59,9 +59,7 @@ class AssetService:
             .join(AssetTypeModel)
             .join(UserModel)
             .outerjoin(AssetLicenseModel)
-            .outerjoin(
-                ParentStageModel, AssetModel.id == ParentStageModel.child_asset_id
-            )
+            .outerjoin(ParentStageModel, AssetModel.id == ParentStageModel.child_asset_id)
             .outerjoin(StageModel, ParentStageModel.stage_id == AssetModel.id)
             .filter(AssetModel.dormant.is_not(True))
             .order_by(AssetModel.created_on.desc())
@@ -84,10 +82,8 @@ class AssetService:
             .join(UserModel)
             .join(AssetTypeModel)
             .outerjoin(AssetLicenseModel)
-            .outerjoin(
-                ParentStageModel, AssetModel.id == ParentStageModel.child_asset_id
-            )
-            .outerjoin(StageModel, ParentStageModel.stage_id == AssetModel.id)
+            .outerjoin(ParentStageModel, AssetModel.id == ParentStageModel.child_asset_id)
+            .outerjoin(StageModel, ParentStageModel.stage_id == StageModel.id)
             .group_by(AssetModel.id)
         )
 
@@ -97,7 +93,22 @@ class AssetService:
             query = query.filter(AssetModel.dormant.is_(search_assets.dormant))
 
         if search_assets.name:
-            query = query.filter(AssetModel.name.ilike(f"%{search_assets.name}%"))
+            # The search box matches media name, tags, and the note/attributes
+            # blob (stored inside the `description` column). Previously only the
+            # `name` column was searched, so an avatar the author knows by a tag
+            # or note — but whose stored name is the raw uploaded filename —
+            # would not surface (e.g. searching "helen" when "helen" is a tag).
+            term = f"%{search_assets.name}%"
+            tag_matches = (
+                session.query(MediaTagModel.asset_id)
+                .join(TagModel, MediaTagModel.tag_id == TagModel.id)
+                .filter(TagModel.name.ilike(term))
+            )
+            query = query.filter(
+                AssetModel.name.ilike(term)
+                | AssetModel.description.ilike(term)
+                | AssetModel.id.in_(tag_matches)
+            )
         if search_assets.mediaTypes:
             query = query.filter(AssetTypeModel.name.in_(search_assets.mediaTypes))
         if search_assets.owners:
@@ -105,9 +116,7 @@ class AssetService:
 
         if search_assets.stages:
             query = query.filter(
-                AssetModel.stages.any(
-                    ParentStageModel.stage_id.in_(search_assets.stages)
-                )
+                AssetModel.stages.any(ParentStageModel.stage_id.in_(search_assets.stages))
             )
         if search_assets.tags:
             query = (
@@ -125,25 +134,28 @@ class AssetService:
         total_count = query.count()
 
         if search_assets.sort:
-            sort_option = search_assets.sort[-1]
-            field, direction = sort_option.rsplit("_", 1)
-            if field == "ASSET_TYPE_ID":
-                sort_field = AssetModel.asset_type_id
-            elif field == "OWNER_ID":
-                sort_field = AssetModel.owner_id
-            elif field == "NAME":
-                sort_field = AssetModel.name
-            elif field == "CREATED_ON":
-                sort_field = AssetModel.created_on
-            elif field == "SIZE":
-                sort_field = AssetModel.size
-            elif field == "COPYRIGHT_LEVEL":
-                sort_field = AssetModel.copyright_level
-
-            if direction == "ASC":
-                query = query.order_by(sort_field.asc())
-            elif direction == "DESC":
-                query = query.order_by(sort_field.desc())
+            # The table sends an ordered list of sort keys for multi-column
+            # sorting (e.g. ["OWNER_ID_ASC", "NAME_ASC"]). Apply every one in
+            # priority order — previously only the last entry (`sort[-1]`) was
+            # honoured, so multi-column sort silently did nothing beyond one
+            # column. Unknown/blank keys (e.g. a cleared column) are skipped
+            # rather than raising an UnboundLocalError.
+            sort_field_map = {
+                "ASSET_TYPE_ID": AssetModel.asset_type_id,
+                "OWNER_ID": AssetModel.owner_id,
+                "NAME": AssetModel.name,
+                "CREATED_ON": AssetModel.created_on,
+                "SIZE": AssetModel.size,
+                "COPYRIGHT_LEVEL": AssetModel.copyright_level,
+            }
+            for sort_option in search_assets.sort:
+                field, _, direction = sort_option.rpartition("_")
+                sort_field = sort_field_map.get(field)
+                if sort_field is None:
+                    continue
+                query = query.order_by(
+                    sort_field.asc() if direction == "ASC" else sort_field.desc()
+                )
 
         if search_assets.page and search_assets.limit:
             query = query.limit(search_assets.limit).offset(
@@ -158,8 +170,7 @@ class AssetService:
                     **convert_keys_to_camel_case(asset.to_dict()),
                     "privilege": self.resolve_privilege(user.id, asset),
                     "stages": [
-                        convert_keys_to_camel_case(item.stage.to_dict())
-                        for item in asset.stages
+                        convert_keys_to_camel_case(item.stage.to_dict()) for item in asset.stages
                     ],
                     "permissions": [
                         convert_keys_to_camel_case(permission.to_dict())
@@ -191,9 +202,7 @@ class AssetService:
                 f"File size must be under {self.file_handing.convert_KB_to_MB(user.upload_limit)}MB."
             )
 
-        file_location = self.file_handing.upload_file(
-            base64, filename, None, storagePath, "media"
-        )
+        file_location = self.file_handing.upload_file(base64, filename, None, storagePath, "media")
 
         # Poster generation is best-effort and synchronous: the file
         # is small (one JPEG) and ffmpeg's first-frame extraction is
@@ -235,18 +244,12 @@ class AssetService:
 
         return convert_keys_to_camel_case({"asset": {"id": asset.id}})
 
-    def update_asset_tags(
-        self, input: SaveMediaInput, local_db_session, asset: AssetModel
-    ):
+    def update_asset_tags(self, input: SaveMediaInput, local_db_session, asset: AssetModel):
         if input.tags:
             tags = input.tags
             asset.tags.delete()
             for tag in tags:
-                tag_model = (
-                    local_db_session.query(TagModel)
-                    .filter(TagModel.name == tag)
-                    .first()
-                )
+                tag_model = local_db_session.query(TagModel).filter(TagModel.name == tag).first()
                 if not tag_model:
                     tag_model = TagModel(name=tag)
                     local_db_session.add(tag_model)
@@ -254,11 +257,7 @@ class AssetService:
                 asset.tags.append(MediaTagModel(tag_id=tag_model.id))
 
             local_db_session.flush()
-            asset = (
-                local_db_session.query(AssetModel)
-                .filter(AssetModel.id == asset.id)
-                .first()
-            )
+            asset = local_db_session.query(AssetModel).filter(AssetModel.id == asset.id).first()
 
         return asset
 
@@ -283,9 +282,7 @@ class AssetService:
         local_db_session.refresh(asset)
         return asset
 
-    def update_asset_permissions(
-        self, input: SaveMediaInput, local_db_session, asset: AssetModel
-    ):
+    def update_asset_permissions(self, input: SaveMediaInput, local_db_session, asset: AssetModel):
         if not (len(input.userIds)):
             asset.permissions.delete()
             local_db_session.flush()
@@ -395,16 +392,12 @@ class AssetService:
         if len(input.stageIds):
             asset.stages.delete()
             for id in input.stageIds:
-                asset.stages.append(
-                    ParentStageModel(stage_id=id, child_asset_id=asset.id)
-                )
+                asset.stages.append(ParentStageModel(stage_id=id, child_asset_id=asset.id))
 
     def change_owner(self, owner: str, local_db_session, asset: AssetModel):
         if owner:
             new_owner = (
-                local_db_session.query(UserModel)
-                .filter(UserModel.username == owner)
-                .first()
+                local_db_session.query(UserModel).filter(UserModel.username == owner).first()
             )
             if new_owner:
                 if new_owner.id != asset.owner_id and new_owner.role in (
@@ -440,9 +433,7 @@ class AssetService:
     def validate_asset_type(self, input, local_db_session):
         media_type = input.mediaType
         asset_type = (
-            local_db_session.query(AssetTypeModel)
-            .filter(AssetTypeModel.name == media_type)
-            .first()
+            local_db_session.query(AssetTypeModel).filter(AssetTypeModel.name == media_type).first()
         )
 
         if not asset_type:
@@ -534,15 +525,15 @@ class AssetService:
         local_db_session.query(ParentStageModel).filter(
             ParentStageModel.child_asset_id == asset.id
         ).delete(synchronize_session=False)
-        local_db_session.query(MediaTagModel).filter(
-            MediaTagModel.asset_id == asset.id
-        ).delete(synchronize_session=False)
+        local_db_session.query(MediaTagModel).filter(MediaTagModel.asset_id == asset.id).delete(
+            synchronize_session=False
+        )
         local_db_session.query(AssetLicenseModel).filter(
             AssetLicenseModel.asset_id == asset.id
         ).delete(synchronize_session=False)
-        local_db_session.query(AssetUsageModel).filter(
-            AssetUsageModel.asset_id == asset.id
-        ).delete(synchronize_session=False)
+        local_db_session.query(AssetUsageModel).filter(AssetUsageModel.asset_id == asset.id).delete(
+            synchronize_session=False
+        )
 
         for multiframe_media in (
             local_db_session.query(AssetModel)
@@ -562,12 +553,8 @@ class AssetService:
 
     def resolve_sign(self, user: UserModel, asset: AssetModel):
         if asset.owner_id == user.id:
-            timestamp = int(
-                (datetime.now() + timedelta(days=STREAM_EXPIRY_DAYS)).timestamp()
-            )
-            payload = "/live/{0}-{1}-{2}".format(
-                asset.file_location, timestamp, STREAM_KEY
-            )
+            timestamp = int((datetime.now() + timedelta(days=STREAM_EXPIRY_DAYS)).timestamp())
+            payload = "/live/{0}-{1}-{2}".format(asset.file_location, timestamp, STREAM_KEY)
             hashvalue = hashlib.md5(payload.encode("utf-8")).hexdigest()
             return "{0}-{1}".format(timestamp, hashvalue)
         return ""
@@ -620,10 +607,7 @@ class AssetService:
             "sign": sign,
             "permission": permission,
             "privilege": self.resolve_privilege(user.id if user else None, asset),
-            "stages": [
-                convert_keys_to_camel_case(item.stage.to_dict())
-                for item in asset.stages
-            ],
+            "stages": [convert_keys_to_camel_case(item.stage.to_dict()) for item in asset.stages],
             "permissions": [
                 convert_keys_to_camel_case(permission.to_dict())
                 for permission in self.resolve_permissions(asset.id)
@@ -635,9 +619,7 @@ class AssetService:
         session = get_session()
         return [
             convert_keys_to_camel_case(type.to_dict())
-            for type in session.query(AssetTypeModel)
-            .order_by(AssetTypeModel.name.asc())
-            .all()
+            for type in session.query(AssetTypeModel).order_by(AssetTypeModel.name.asc()).all()
         ]
 
     def get_tags(self):
