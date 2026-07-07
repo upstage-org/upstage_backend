@@ -13,6 +13,16 @@ A publisher must present the token produced by AssetService.resolve_sign():
 passed either as ?token=<...> on the RTMP URL query (what the studio's
 ingest panel emits) or in the RTMP password slot (OBS "Use authentication").
 The stream key must also belong to an existing asset of type "stream".
+
+One token-less exception: the in-container Opus mirror. MediaMTX's
+runOnReady ffmpeg (see /root/streaming2/mediamtx.yml) republishes each
+live/<key> feed as live/<key>-opus with the audio transcoded AAC→Opus so
+WebRTC playback has sound. That republish arrives over MediaMTX's
+container-internal RTSP listener, so MediaMTX reports the loopback ip —
+which no external publisher can present (RTMP and WebRTC publishes carry
+the client's real address, and the RTSP port is neither published by
+docker-compose nor proxied by nginx). Such publishes are accepted when the
+mirrored base key belongs to a real stream asset.
 """
 
 import hashlib
@@ -31,6 +41,8 @@ from upstage_backend.global_config.logger import logger
 router = APIRouter()
 
 RTMP_PATH_PREFIX = "live/"
+OPUS_MIRROR_SUFFIX = "-opus"
+LOOPBACK_IPS = ("127.0.0.1", "::1")
 
 
 class MtxAuthPayload(BaseModel):
@@ -76,6 +88,22 @@ async def rtmp_auth(payload: MtxAuthPayload):
     if not payload.path.startswith(RTMP_PATH_PREFIX):
         raise HTTPException(status_code=401, detail="Unknown path")
     key = payload.path[len(RTMP_PATH_PREFIX) :]
+
+    # In-container Opus mirror (loopback-only; see module docstring). Falls
+    # through to normal token validation when it doesn't match, so a real
+    # asset whose key happens to end in "-opus" still publishes normally.
+    if payload.ip in LOOPBACK_IPS and key.endswith(OPUS_MIRROR_SUFFIX):
+        base_key = key[: -len(OPUS_MIRROR_SUFFIX)]
+        base_asset = (
+            get_session().query(AssetModel).filter(AssetModel.file_location == base_key).first()
+        )
+        if (
+            base_asset is not None
+            and base_asset.asset_type
+            and base_asset.asset_type.name == "stream"
+        ):
+            logger.info("rtmp_auth: accepted opus-mirror publish for {}", payload.path)
+            return Response(status_code=204)
 
     token = _extract_token(payload)
     if not token or not _token_is_valid(key, token):

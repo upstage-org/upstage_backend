@@ -155,3 +155,29 @@ class TestRtmpAuth:
         token = make_token(STREAM_ASSET_KEY, ts, "")
         response = client.post("/api/rtmp/auth", json=auth_payload(query=f"token={token}"))
         assert response.status_code == 503
+
+    # --- Opus mirror (token-less loopback republish; see rtmp_auth docstring) ---
+
+    async def test_10_opus_mirror_from_loopback_accepted(self, client, db_engine):
+        await self._create_stream_asset(client, db_engine)
+        response = client.post(
+            "/api/rtmp/auth",
+            json=auth_payload(
+                path=f"live/{STREAM_ASSET_KEY}-opus", ip="127.0.0.1", protocol="rtsp"
+            ),
+        )
+        assert response.status_code == 204, response.text
+
+    async def test_11_opus_mirror_from_external_ip_rejected(self, client):
+        response = client.post(
+            "/api/rtmp/auth",
+            json=auth_payload(path=f"live/{STREAM_ASSET_KEY}-opus", ip="203.0.113.7"),
+        )
+        assert response.status_code == 401
+
+    async def test_12_opus_mirror_for_unknown_base_key_rejected(self, client):
+        response = client.post(
+            "/api/rtmp/auth",
+            json=auth_payload(path="live/nosuchstreamkey-opus", ip="127.0.0.1", protocol="rtsp"),
+        )
+        assert response.status_code == 401
