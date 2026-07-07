@@ -44,9 +44,7 @@ class MediaService:
         if stage.owner_id != user.id and user.role not in [ADMIN, SUPER_ADMIN]:
             raise GraphQLError("You are not authorized to update this stage")
 
-        session.query(ParentStageModel).filter(
-            ParentStageModel.stage_id == input.id
-        ).delete()
+        session.query(ParentStageModel).filter(ParentStageModel.stage_id == input.id).delete()
 
         for media_id in input.mediaIds:
             media = ParentStageModel(stage_id=input.id, child_asset_id=media_id)
@@ -76,7 +74,7 @@ class MediaService:
             local_db_session=session,
         )
 
-        return self.asset_service.resolve_fields(asset)
+        return self.asset_service.resolve_fields(asset, user)
 
     def update_media(self, input: UpdateMediaInput):
         session = get_session()
@@ -132,9 +130,7 @@ class MediaService:
                 .first()
             )
             if existed_asset:
-                raise GraphQLError(
-                    "Media with the same key already existed, please pick another!"
-                )
+                raise GraphQLError("Media with the same key already existed, please pick another!")
 
         return asset
 
@@ -165,12 +161,7 @@ class MediaService:
 
     def delete_media(self, id: int):
         session = get_session()
-        asset = (
-            session.query(AssetModel)
-            .outerjoin(ParentStageModel)
-            .filter_by(id=id)
-            .first()
-        )
+        asset = session.query(AssetModel).outerjoin(ParentStageModel).filter_by(id=id).first()
         if not asset:
             raise GraphQLError("Media not found")
 
@@ -219,15 +210,15 @@ class MediaService:
         local_db_session.query(ParentStageModel).filter(
             ParentStageModel.child_asset_id == id
         ).delete(synchronize_session=False)
-        local_db_session.query(MediaTagModel).filter(
-            MediaTagModel.asset_id == id
-        ).delete(synchronize_session=False)
-        local_db_session.query(AssetLicenseModel).filter(
-            AssetLicenseModel.asset_id == id
-        ).delete(synchronize_session=False)
-        local_db_session.query(AssetUsageModel).filter(
-            AssetUsageModel.asset_id == id
-        ).delete(synchronize_session=False)
+        local_db_session.query(MediaTagModel).filter(MediaTagModel.asset_id == id).delete(
+            synchronize_session=False
+        )
+        local_db_session.query(AssetLicenseModel).filter(AssetLicenseModel.asset_id == id).delete(
+            synchronize_session=False
+        )
+        local_db_session.query(AssetUsageModel).filter(AssetUsageModel.asset_id == id).delete(
+            synchronize_session=False
+        )
 
     def remove_asset_from_frames(self, local_db_session, asset: AssetModel):
         for multiple_frame_media in (
@@ -246,9 +237,7 @@ class MediaService:
 
     def assign_stages(self, input: AssignStagesInput):
         session = get_session()
-        session.query(ParentStageModel).filter(
-            ParentStageModel.child_asset_id == input.id
-        ).delete()
+        session.query(ParentStageModel).filter(ParentStageModel.child_asset_id == input.id).delete()
         for stage_id in input.stageIds:
             session.add(ParentStageModel(stage_id=stage_id, child_asset_id=input.id))
         session.flush()
