@@ -31,6 +31,7 @@ from upstage_backend.performance_config.db_models.scene import SceneModel
 from upstage_backend.stages.db_models.parent_stage import ParentStageModel
 from upstage_backend.stages.db_models.stage import StageModel
 from upstage_backend.stages.db_models.stage_attribute import StageAttributeModel
+from upstage_backend.upstage_stats.db_models.stage_statistic import StageStatisticModel
 from upstage_backend.users.db_models.user import UserModel
 from upstage_backend.assets.db_models.asset import AssetModel
 
@@ -38,6 +39,18 @@ from upstage_backend.assets.db_models.asset import AssetModel
 class StageService:
     def __init__(self):
         self.stage_operation_service = StageOperationService()
+
+    def _stage_stats_map(self, session, file_locations):
+        """Return {file_location: {"players", "audiences"}} for the given
+        stages, sourced from the counts the upstage_stats worker keeps current
+        from retained MQTT statistics. Missing stages simply have no entry."""
+        locs = [f for f in file_locations if f]
+        if not locs:
+            return {}
+        rows = (
+            session.query(StageStatisticModel).filter(StageStatisticModel.stage_url.in_(locs)).all()
+        )
+        return {row.stage_url: {"players": row.players, "audiences": row.audiences} for row in rows}
 
     def get_all_stages(self, user: UserModel, input: SearchStageInput):
         session = get_session()
@@ -57,9 +70,7 @@ class StageService:
 
         if input.createdBetween:
             query = query.filter(
-                StageModel.created_on.between(
-                    input.createdBetween[0], input.createdBetween[1]
-                )
+                StageModel.created_on.between(input.createdBetween[0], input.createdBetween[1])
             )
 
         total_count = query.count()
@@ -92,9 +103,7 @@ class StageService:
         data = query.all()
 
         access = (
-            input.access
-            if input.access and len(input.access)
-            else ["owner", "editor", "player"]
+            input.access if input.access and len(input.access) else ["owner", "editor", "player"]
         )
 
         stages = []
@@ -126,13 +135,17 @@ class StageService:
         end = start + limit
         paginated_stages = stages[start:end]
 
+        stats_map = self._stage_stats_map(
+            session, [stage.get("fileLocation") for stage in paginated_stages]
+        )
+
         return {
             "edges": [
                 {
                     **stage,
-                    "assets": [
-                        asset.child_asset.to_dict() for asset in stage["assets"]
-                    ],
+                    "assets": [asset.child_asset.to_dict() for asset in stage["assets"]],
+                    "players": stats_map.get(stage.get("fileLocation"), {}).get("players", 0),
+                    "audiences": stats_map.get(stage.get("fileLocation"), {}).get("audiences", 0),
                 }
                 for stage in paginated_stages
             ],
@@ -175,9 +188,7 @@ class StageService:
                 {
                     **stage.to_dict(),
                     "assets": [asset.child_asset.to_dict() for asset in stage.assets],
-                    "scenes": self.stage_operation_service.get_scene_list(
-                        input, stage.id
-                    ),
+                    "scenes": self.stage_operation_service.get_scene_list(input, stage.id),
                     "events": self.stage_operation_service.get_event_list(input, stage),
                     "cover": stage.cover,
                     "visibility": stage.visibility,
@@ -188,15 +199,11 @@ class StageService:
                     ),
                     "performances": [
                         convert_keys_to_camel_case(pf.to_dict())
-                        for pf in self.stage_operation_service.resolve_performances(
-                            stage.id
-                        )
+                        for pf in self.stage_operation_service.resolve_performances(stage.id)
                     ],
                     "chats": [
                         convert_keys_to_camel_case(chat.to_dict())
-                        for chat in self.stage_operation_service.resolve_chats(
-                            stage.file_location
-                        )
+                        for chat in self.stage_operation_service.resolve_chats(stage.file_location)
                     ],
                 }
             )
@@ -230,15 +237,11 @@ class StageService:
                 "permission": permission,
                 "performances": [
                     convert_keys_to_camel_case(pf.to_dict())
-                    for pf in self.stage_operation_service.resolve_performances(
-                        stage.id
-                    )
+                    for pf in self.stage_operation_service.resolve_performances(stage.id)
                 ],
                 "chats": [
                     convert_keys_to_camel_case(chat.to_dict())
-                    for chat in self.stage_operation_service.resolve_chats(
-                        stage.file_location
-                    )
+                    for chat in self.stage_operation_service.resolve_chats(stage.file_location)
                 ],
             }
         )
@@ -270,14 +273,10 @@ class StageService:
         session.flush()
 
         self.update_stage_attribute(stage.id, "cover", input.cover, session)
-        self.update_stage_attribute(
-            stage.id, "visibility", str(input.visibility).lower(), session
-        )
+        self.update_stage_attribute(stage.id, "visibility", str(input.visibility).lower(), session)
         self.update_stage_attribute(stage.id, "description", input.description, session)
         self.update_stage_attribute(stage.id, "status", input.status, session)
-        self.update_stage_attribute(
-            stage.id, "playerAccess", input.playerAccess, session
-        )
+        self.update_stage_attribute(stage.id, "playerAccess", input.playerAccess, session)
         # Hybrid properties (cover/visibility/status/playerAccess) live in the
         # stage_attribute table and are NOT enumerated by `to_dict()`. Without
         # explicitly merging them into the return dict the mutation response
@@ -314,19 +313,13 @@ class StageService:
             else stage.file_location
         )
 
-        stage.owner_id = (
-            input.owner if hasattr(input, "owner") and input.owner else stage.owner_id
-        )
+        stage.owner_id = input.owner if hasattr(input, "owner") and input.owner else stage.owner_id
 
         self.update_stage_attribute(stage.id, "cover", input.cover, session)
-        self.update_stage_attribute(
-            stage.id, "visibility", str(input.visibility).lower(), session
-        )
+        self.update_stage_attribute(stage.id, "visibility", str(input.visibility).lower(), session)
         self.update_stage_attribute(stage.id, "description", input.description, session)
         self.update_stage_attribute(stage.id, "status", input.status, session)
-        self.update_stage_attribute(
-            stage.id, "playerAccess", input.playerAccess, session
-        )
+        self.update_stage_attribute(stage.id, "playerAccess", input.playerAccess, session)
         self.update_stage_attribute(stage.id, "config", input.config, session)
         # Same hybrid-property merge as create_stage; see comment there.
         return convert_keys_to_camel_case(
@@ -357,9 +350,7 @@ class StageService:
             if stage_attribute:
                 stage_attribute.description = value
                 return
-            session.add(
-                StageAttributeModel(stage_id=stage_id, name=name, description=value)
-            )
+            session.add(StageAttributeModel(stage_id=stage_id, name=name, description=value))
             session.flush()
 
     def delete_stage(self, user: UserModel, id: int):
@@ -370,16 +361,12 @@ class StageService:
 
         self.extract_permission(user, stage)
 
-        session.query(StageAttributeModel).filter(
-            StageAttributeModel.stage_id == id
-        ).delete()
+        session.query(StageAttributeModel).filter(StageAttributeModel.stage_id == id).delete()
         session.query(ParentStageModel).filter(ParentStageModel.stage_id == id).delete()
 
         session.query(SceneModel).filter(SceneModel.stage_id == id).delete()
 
-        performances = session.query(PerformanceModel).filter(
-            PerformanceModel.stage_id == id
-        )
+        performances = session.query(PerformanceModel).filter(PerformanceModel.stage_id == id)
 
         session.query(EventModel).filter(
             EventModel.performance_id.in_([p.id for p in performances])
@@ -429,9 +416,7 @@ class StageService:
             )
 
         parent_stages = (
-            session.query(ParentStageModel)
-            .filter(ParentStageModel.stage_id == input.id)
-            .all()
+            session.query(ParentStageModel).filter(ParentStageModel.stage_id == input.id).all()
         )
         for parent_stage in parent_stages:
             session.add(
@@ -482,9 +467,7 @@ class StageService:
         else:
             raise GraphQLError("The stage is already sweeped!")
 
-        return convert_keys_to_camel_case(
-            {"success": True, "performanceId": performance.id}
-        )
+        return convert_keys_to_camel_case({"success": True, "performanceId": performance.id})
 
     def update_status(self, user: UserModel, id: int):
         session = get_session()
@@ -504,13 +487,9 @@ class StageService:
         )
 
         if attribute is not None:
-            attribute.description = (
-                "rehearsal" if attribute.description == "live" else "live"
-            )
+            attribute.description = "rehearsal" if attribute.description == "live" else "live"
         else:
-            attribute = StageAttributeModel(
-                stage_id=id, name="status", description="live"
-            )
+            attribute = StageAttributeModel(stage_id=id, name="status", description="live")
             session.add(attribute)
         session.flush()
 
@@ -542,13 +521,9 @@ class StageService:
         )
 
         if attribute is not None:
-            attribute.description = (
-                "true" if attribute.description != "true" else "false"
-            )
+            attribute.description = "true" if attribute.description != "true" else "false"
         else:
-            attribute = StageAttributeModel(
-                stage_id=id, name="visibility", description="true"
-            )
+            attribute = StageAttributeModel(stage_id=id, name="visibility", description="true")
             session.add(attribute)
         session.flush()
 
@@ -598,13 +573,21 @@ class StageService:
             .all()
         )
 
-        return [
+        result = [
             {
                 **convert_keys_to_camel_case(stage.to_dict()),
                 "cover": stage.cover,
             }
             for stage in stages
         ]
+
+        stats_map = self._stage_stats_map(session, [stage.get("fileLocation") for stage in result])
+        for stage in result:
+            stats = stats_map.get(stage.get("fileLocation"), {})
+            stage["players"] = stats.get("players", 0)
+            stage["audiences"] = stats.get("audiences", 0)
+
+        return result
 
     def get_notifications(self, user: UserModel):
         """
@@ -667,9 +650,7 @@ class StageService:
                 else NotificationType.MEDIA_USAGE.value
             )
             notifications.append(
-                convert_keys_to_camel_case(
-                    {"type": notif_type, "mediaUsage": row.to_dict()}
-                )
+                convert_keys_to_camel_case({"type": notif_type, "mediaUsage": row.to_dict()})
             )
 
         for row in requester_rows:
