@@ -9,6 +9,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
 from starlette.requests import Request
 
+from upstage_backend.assets.http.rtmp_auth import router as rtmp_auth_router
 from upstage_backend.global_config import ENV_TYPE, config_graphql_endpoints, HOSTNAME
 from upstage_backend.global_config.db_context import (
     request_session,
@@ -45,6 +46,7 @@ def start_app():
     bootstrap = Bootstrap(app)
     add_cors_middleware(app)
     config_graphql_endpoints(app)
+    app.include_router(rtmp_auth_router)
     bootstrap.init_exception()
 
 

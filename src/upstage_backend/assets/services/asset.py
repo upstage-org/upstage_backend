@@ -227,12 +227,20 @@ class AssetService:
                 raise GraphQLError("You are not allowed to update this asset")
         else:
             asset = AssetModel(owner_id=owner.id)
+
+        # Validate + assign file_location BEFORE mutating the asset or adding
+        # it to the session. GraphQL errors return HTTP 200, so anything left
+        # pending here gets committed by the db_request_session middleware:
+        # previously a duplicate-key rejection left a half-built row (NULL
+        # file_location) that crashed that commit, and on edits it silently
+        # committed partial name/copyright changes.
+        file_location = self.process_file_location(input, session, asset)
+        if not input.id:
             session.add(asset)
 
         asset.name = input.name
         asset.asset_type_id = asset_type.id
         asset.copyright_level = input.copyrightLevel
-        file_location = self.process_file_location(input, session, asset)
 
         self.change_owner(input.owner, session, asset)
 
@@ -598,7 +606,9 @@ class AssetService:
 
     def resolve_fields(self, asset: AssetModel, user: Optional[UserModel] = None):
         src = self.resolve_src(asset)
-        sign = self.resolve_sign(asset.owner, asset)
+        # Publish token: only meaningful (and only revealed) to the asset's
+        # owner. resolve_sign returns "" for anyone else.
+        sign = self.resolve_sign(user, asset) if user else ""
         user_id = user.id if user else asset.owner_id
         permission = self.resolve_permission(user_id, asset)
         return {
