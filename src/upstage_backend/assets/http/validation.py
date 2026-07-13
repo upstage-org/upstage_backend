@@ -34,6 +34,10 @@ class SaveMediaInput(BaseModel):
     urls: conlist(str)
     voice: Optional[VoiceInput] = None
     link: Optional[LinkInput] = None
+    # Per-media exit (removal) animation: how this item leaves the stage.
+    # Empty string / 0 mean "use the stage default" and delete the saved keys.
+    exitAnimation: Optional[str] = None
+    exitSpeed: Optional[confloat(ge=0)] = None
 
 
 class Asset(BaseModel):

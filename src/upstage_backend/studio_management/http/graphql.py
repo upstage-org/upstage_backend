@@ -87,6 +87,8 @@ type_defs = gql("""
         urls: [String!]!
         voice: VoiceInput
         link: LinkInput
+        exitAnimation: String
+        exitSpeed: Float
     }
 
     input VoiceInput {

@@ -336,6 +336,8 @@ class AssetService:
             or input.voice is not None
             or input.link is not None
             or input.note is not None
+            or input.exitAnimation is not None
+            or input.exitSpeed is not None
         )
         if attribute_update:
             if not asset.description:
@@ -391,6 +393,20 @@ class AssetService:
 
             if input.note is not None:
                 attributes["note"] = input.note
+
+            # Per-media exit animation (mirrors the voice/link contract):
+            # a non-empty value persists, an empty sentinel ("" / 0) means
+            # "use the stage default" and removes the stored key.
+            if input.exitAnimation is not None:
+                if input.exitAnimation:
+                    attributes["exitAnimation"] = input.exitAnimation
+                elif "exitAnimation" in attributes:
+                    del attributes["exitAnimation"]
+            if input.exitSpeed is not None:
+                if input.exitSpeed:
+                    attributes["exitSpeed"] = input.exitSpeed
+                elif "exitSpeed" in attributes:
+                    del attributes["exitSpeed"]
 
             asset.description = json.dumps(attributes)
             local_db_session.flush()
