@@ -18,10 +18,15 @@ from upstage_backend.global_config.helpers.object import convert_keys_to_camel_c
 from upstage_backend.files.file_handling import FileHandling
 from upstage_backend.stages.db_models.parent_stage import ParentStageModel
 from upstage_backend.stages.db_models.stage import StageModel
+from upstage_backend.stages.services.assignment import (
+    make_parent_stage,
+    snapshot_exit_settings,
+)
 from upstage_backend.stages.http.validation import (
     AssignMediaInput,
     AssignStagesInput,
     UpdateMediaInput,
+    UpdateStageAssignmentInput,
     UploadMediaInput,
 )
 from upstage_backend.users.db_models.user import ADMIN, SUPER_ADMIN, UserModel
@@ -44,11 +49,11 @@ class MediaService:
         if stage.owner_id != user.id and user.role not in [ADMIN, SUPER_ADMIN]:
             raise GraphQLError("You are not authorized to update this stage")
 
+        snapshot = snapshot_exit_settings(session, stage_id=input.id)
         session.query(ParentStageModel).filter(ParentStageModel.stage_id == input.id).delete()
 
         for media_id in input.mediaIds:
-            media = ParentStageModel(stage_id=input.id, child_asset_id=media_id)
-            session.add(media)
+            session.add(make_parent_stage(input.id, media_id, snapshot))
 
         session.flush()
         return convert_keys_to_camel_case(stage.to_dict())
@@ -237,10 +242,36 @@ class MediaService:
 
     def assign_stages(self, input: AssignStagesInput):
         session = get_session()
+        snapshot = snapshot_exit_settings(session, asset_id=input.id)
         session.query(ParentStageModel).filter(ParentStageModel.child_asset_id == input.id).delete()
         for stage_id in input.stageIds:
-            session.add(ParentStageModel(stage_id=stage_id, child_asset_id=input.id))
+            session.add(make_parent_stage(stage_id, input.id, snapshot))
         session.flush()
 
         asset = session.query(AssetModel).filter_by(id=input.id).first()
         return self.asset_service.resolve_fields(asset)
+
+    def update_stage_assignment(self, input: UpdateStageAssignmentInput, user: UserModel):
+        session = get_session()
+        row = (
+            session.query(ParentStageModel)
+            .filter(
+                ParentStageModel.stage_id == input.stageId,
+                ParentStageModel.child_asset_id == input.assetId,
+            )
+            .first()
+        )
+        if not row:
+            raise GraphQLError("Media is not assigned to this stage")
+
+        if (
+            row.stage.owner_id != user.id
+            and row.child_asset.owner_id != user.id
+            and user.role not in [ADMIN, SUPER_ADMIN]
+        ):
+            raise GraphQLError("You are not authorized to update this stage")
+
+        row.exit_animation = input.exitAnimation
+        row.exit_speed = input.exitSpeed
+        session.flush()
+        return convert_keys_to_camel_case(row.to_dict())

@@ -78,7 +78,7 @@ type_defs = gql("""
         mediaType: String!
         copyrightLevel: Int!
         owner: String!
-        stageIds: [ID!]!
+        stageAssignments: [StageAssignmentInput!]!
         userIds: [ID!]
         tags: [String!]
         w: Float!
@@ -87,8 +87,12 @@ type_defs = gql("""
         urls: [String!]!
         voice: VoiceInput
         link: LinkInput
+    }
+
+    input StageAssignmentInput {
+        stageId: ID!
         exitAnimation: String
-        exitSpeed: Float
+        exitSpeed: Int
     }
 
     input VoiceInput {
@@ -310,6 +314,8 @@ type_defs = gql("""
         permissions: [Permission]
         privilege: Int
         fileLocation: String
+        exitAnimation: String
+        exitSpeed: Int
     }
 
     type AssetConnection {
@@ -354,6 +360,8 @@ type_defs = gql("""
         createdOn: Date
         attributes:[StageAttribute]
         performances: [Performance]
+        exitAnimation: String
+        exitSpeed: Int
     }
 
 
@@ -410,6 +418,8 @@ type_defs = gql("""
         id: ID!
         stageId: ID!
         childAssetId: ID!
+        exitAnimation: String
+        exitSpeed: Int
         stage: Stage!
         childAsset: Asset!
     }
@@ -676,6 +686,7 @@ type_defs = gql("""
         updateMedia(input: UpdateMediaInput!): Asset
         deleteMediaOnStage(id: ID!): CommonResponse
         assignStages(input: AssignStagesInput!): Asset
+        updateStageAssignment(stageId: ID!, assetId: ID!, exitAnimation: String, exitSpeed: Int): ParentStage
         sweepStage(id: ID!): SweepResponse
         saveScene(input: SceneInput!): Scene
         deleteScene(id: ID!): CommonResponse

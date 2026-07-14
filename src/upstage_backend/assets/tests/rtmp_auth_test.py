@@ -82,7 +82,7 @@ class TestRtmpAuth:
                         "owner": "",
                         "urls": [STREAM_ASSET_KEY],
                         "copyrightLevel": 0,
-                        "stageIds": [],
+                        "stageAssignments": [],
                         "userIds": [],
                         "tags": [],
                         "w": 16,

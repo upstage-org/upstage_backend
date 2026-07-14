@@ -116,6 +116,9 @@ def config_graphql_endpoints(app: FastAPI, endpoint="/api/studio_graphql"):
     )
     combined_mutation.set_field("updateMedia", stage_mutation._resolvers["updateMedia"])
     combined_mutation.set_field("assignStages", stage_mutation._resolvers["assignStages"])
+    combined_mutation.set_field(
+        "updateStageAssignment", stage_mutation._resolvers["updateStageAssignment"]
+    )
     combined_mutation.set_field("sweepStage", stage_mutation._resolvers["sweepStage"])
     combined_mutation.set_field("saveScene", stage_mutation._resolvers["saveScene"])
     combined_mutation.set_field("deleteScene", stage_mutation._resolvers["deleteScene"])

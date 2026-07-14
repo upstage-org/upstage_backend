@@ -20,6 +20,7 @@ from upstage_backend.stages.http.validation import (
     StageInput,
     StageStreamInput,
     UpdateMediaInput,
+    UpdateStageAssignmentInput,
     UploadMediaInput,
 )
 from upstage_backend.stages.services.media import MediaService
@@ -60,9 +61,7 @@ def get_stage(_, info, id: int):
 @query.field("notifications")
 @authenticated(allowed_roles=[SUPER_ADMIN, ADMIN, PLAYER])
 def get_notifications(_, info):
-    return StageService().get_notifications(
-        UserModel(**info.context["request"].state.current_user)
-    )
+    return StageService().get_notifications(UserModel(**info.context["request"].state.current_user))
 
 
 @mutation.field("createStage")
@@ -85,9 +84,7 @@ def update_stage(_, info, input):
 @mutation.field("deleteStage")
 @authenticated(allowed_roles=[SUPER_ADMIN, ADMIN, PLAYER])
 def delete_stage(_, info, id):
-    return StageService().delete_stage(
-        UserModel(**info.context["request"].state.current_user), id
-    )
+    return StageService().delete_stage(UserModel(**info.context["request"].state.current_user), id)
 
 
 @mutation.field("duplicateStage")
@@ -137,12 +134,24 @@ def assign_stages(_, info, input: AssignStagesInput):
     return MediaService().assign_stages(AssignStagesInput(**input))
 
 
+@mutation.field("updateStageAssignment")
+@authenticated(allowed_roles=[SUPER_ADMIN, ADMIN, PLAYER])
+def update_stage_assignment(_, info, stageId, assetId, exitAnimation=None, exitSpeed=None):
+    return MediaService().update_stage_assignment(
+        UpdateStageAssignmentInput(
+            stageId=stageId,
+            assetId=assetId,
+            exitAnimation=exitAnimation,
+            exitSpeed=exitSpeed,
+        ),
+        UserModel(**info.context["request"].state.current_user),
+    )
+
+
 @mutation.field("sweepStage")
 @authenticated(allowed_roles=[SUPER_ADMIN, ADMIN, PLAYER])
 def sweep_stage(_, info, id: int):
-    return StageService().sweep_stage(
-        UserModel(**info.context["request"].state.current_user), id
-    )
+    return StageService().sweep_stage(UserModel(**info.context["request"].state.current_user), id)
 
 
 @mutation.field("saveScene")
@@ -156,9 +165,7 @@ def save_scene(_, info, input: SceneInput):
 @mutation.field("deleteScene")
 @authenticated(allowed_roles=[SUPER_ADMIN, ADMIN, PLAYER])
 def delete_scene(_, info, id: int):
-    return SceneService().delete_scene(
-        UserModel(**info.context["request"].state.current_user), id
-    )
+    return SceneService().delete_scene(UserModel(**info.context["request"].state.current_user), id)
 
 
 @mutation.field("updatePerformance")
@@ -207,9 +214,7 @@ def save_recording(_, info, id: int):
 @mutation.field("updateStatus")
 @authenticated(allowed_roles=[SUPER_ADMIN, ADMIN, PLAYER])
 def update_status(_, info, id: int):
-    return StageService().update_status(
-        UserModel(**info.context["request"].state.current_user), id
-    )
+    return StageService().update_status(UserModel(**info.context["request"].state.current_user), id)
 
 
 @mutation.field("updateVisibility")

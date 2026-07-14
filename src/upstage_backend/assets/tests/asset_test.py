@@ -74,9 +74,7 @@ class TestAssetController:
 
     async def test_03_save_media_successfully(self, client):
         data = await test_AuthenticationController.test_02_login_successfully(client)
-        assigned_user = await test_AuthenticationController.test_02_login_successfully(
-            client
-        )
+        assigned_user = await test_AuthenticationController.test_02_login_successfully(client)
 
         headers = {
             "Authorization": f"Bearer {data['data']['login']['access_token']}",
@@ -104,7 +102,7 @@ class TestAssetController:
                 "h": 100,
                 "tags": ["test"],
                 "copyrightLevel": 0,
-                "stageIds": [stage["id"]],
+                "stageAssignments": [{"stageId": stage["id"]}],
                 "userIds": [assigned_user["data"]["login"]["user_id"]],
                 "owner": data["data"]["login"]["username"],
             }
@@ -144,7 +142,7 @@ class TestAssetController:
                 "h": 100,
                 "tags": ["test"],
                 "copyrightLevel": 0,
-                "stageIds": [stage.id for stage in stages],
+                "stageAssignments": [{"stageId": stage.id} for stage in stages],
                 "userIds": [user.id for user in users],
                 "owner": "test",
             }
@@ -283,7 +281,7 @@ class TestAssetController:
                 "h": 100,
                 "tags": ["test"],
                 "copyrightLevel": 0,
-                "stageIds": [],
+                "stageAssignments": [],
                 "userIds": [],
                 "owner": data["data"]["login"]["username"],
             }
@@ -297,9 +295,7 @@ class TestAssetController:
         assert response.status_code == 200
 
     async def test_08_update_media_failed(self, client):
-        data = await test_AuthenticationController.test_player_login_successfully(
-            client
-        )
+        data = await test_AuthenticationController.test_player_login_successfully(client)
         asset = get_session().query(AssetModel).join(UserModel).first()
 
         headers = {
@@ -327,7 +323,7 @@ class TestAssetController:
                 "h": 100,
                 "tags": ["test"],
                 "copyrightLevel": 0,
-                "stageIds": [],
+                "stageAssignments": [],
                 "userIds": [],
                 "owner": data["data"]["login"]["username"],
             }
@@ -342,9 +338,7 @@ class TestAssetController:
 
     async def test_09_delete_media_failed(self, client):
         asset = get_session().query(AssetModel).first()
-        data = await test_AuthenticationController.test_player_login_successfully(
-            client
-        )
+        data = await test_AuthenticationController.test_player_login_successfully(client)
 
         headers = {
             "Authorization": f"Bearer {data['data']['login']['access_token']}",
