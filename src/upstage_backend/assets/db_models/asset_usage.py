@@ -17,7 +17,7 @@ from upstage_backend.global_config.db_models.base import BaseModel
 
 class AssetUsageModel(BaseModel):
     __tablename__ = "asset_usage"
-    id = Column(BigInteger, primary_key=True)
+    id = Column(BigInteger().with_variant(Integer, "sqlite"), primary_key=True)
     asset_id = Column(Integer, ForeignKey("asset.id"), nullable=False, default=0)
     user_id = Column(Integer, ForeignKey("upstage_user.id"), nullable=False, default=0)
     approved = Column(Boolean, nullable=False, default=False)

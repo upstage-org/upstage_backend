@@ -433,7 +433,16 @@ class AssetService:
         local_db_session.flush()
 
     def process_file_location(self, input, local_db_session, asset):
-        file_location = input["urls"][0] if "urls" in input else input.urls[0]
+        # Called with a SaveMediaInput (saveMedia) or a plain dict (updateMedia).
+        urls = input["urls"] if isinstance(input, dict) else input.urls
+        if not urls:
+            # Saving an attribute-only edit (voice/link/note) resends no
+            # frames; keep the existing file. A brand-new asset has no file
+            # to fall back to and the column is NOT NULL.
+            if not asset.file_location:
+                raise GraphQLError("A media file is required")
+            return asset.file_location
+        file_location = urls[0]
         if "?" in file_location:
             file_location = file_location[: file_location.index("?")]
         if file_location != asset.file_location and "/" not in file_location:

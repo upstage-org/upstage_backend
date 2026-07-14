@@ -473,21 +473,25 @@ class StudioService:
 
     def quick_assign_mutation(self, user: UserModel, stage_ids: list[int], asset_id: int):
         session = get_session()
+        asset = session.query(AssetModel).filter(AssetModel.id == asset_id).first()
+        if not asset:
+            raise GraphQLError("Asset not found!")
+
+        wanted_ids = [int(stage_id) for stage_id in stage_ids]
+        found_ids = {
+            row.id
+            for row in session.query(StageModel.id).filter(StageModel.id.in_(wanted_ids)).all()
+        }
+        if any(stage_id not in found_ids for stage_id in wanted_ids):
+            raise GraphQLError("Stage not found!")
+
         snapshot = snapshot_exit_settings(session, asset_id=asset_id)
         session.query(ParentStageModel).filter(ParentStageModel.child_asset_id == asset_id).delete()
         session.flush()
 
-        for stage_id in stage_ids:
-            asset = session.query(AssetModel).filter(AssetModel.id == asset_id).first()
-            if not asset:
-                raise GraphQLError("Asset not found!")
-
-            stage = session.query(StageModel).filter(StageModel.id == stage_id).first()
-            if not stage:
-                raise GraphQLError("Stage not found!")
-
+        for stage_id in wanted_ids:
             asset.stages.append(make_parent_stage(stage_id, asset_id, snapshot))
-            session.flush()
+        session.flush()
         return {"success": True}
 
     def get_users(self, active: bool):

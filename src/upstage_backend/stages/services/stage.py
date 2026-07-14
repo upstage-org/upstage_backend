@@ -143,7 +143,10 @@ class StageService:
             "edges": [
                 {
                     **stage,
-                    "assets": [self._asset_with_exit_settings(asset) for asset in stage["assets"]],
+                    "assets": [
+                        convert_keys_to_camel_case(self._asset_with_exit_settings(asset))
+                        for asset in stage["assets"]
+                    ],
                     "players": stats_map.get(stage.get("fileLocation"), {}).get("players", 0),
                     "audiences": stats_map.get(stage.get("fileLocation"), {}).get("audiences", 0),
                 }
@@ -155,8 +158,8 @@ class StageService:
     @staticmethod
     def _asset_with_exit_settings(parent_stage):
         """Flatten one stage assignment: the asset dict plus this stage's
-        per-assignment exit settings. Keys are camelCase because not every
-        caller runs its assets list through convert_keys_to_camel_case."""
+        per-assignment exit settings. Every caller camelizes the result
+        (directly or via the surrounding stage dict)."""
         return {
             **parent_stage.child_asset.to_dict(),
             "exitAnimation": parent_stage.exit_animation,

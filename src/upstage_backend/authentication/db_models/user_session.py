@@ -9,7 +9,7 @@ from upstage_backend.users.db_models.user import UserModel
 
 class UserSessionModel(BaseModel):
     __tablename__ = "user_session"
-    id = Column(BigInteger, primary_key=True, autoincrement=True)
+    id = Column(BigInteger().with_variant(Integer, "sqlite"), primary_key=True, autoincrement=True)
     user_id = Column(
         Integer,
         ForeignKey(UserModel.id, deferrable=True, initially="DEFERRED"),
@@ -18,9 +18,7 @@ class UserSessionModel(BaseModel):
     )
     access_token = Column(Text, default=None)
     refresh_token = Column(Text, default=None)
-    recorded_time = Column(
-        DateTime, nullable=False, index=True, default=datetime.utcnow
-    )
+    recorded_time = Column(DateTime, nullable=False, index=True, default=datetime.utcnow)
     app_version = Column(Text, default=None)
     app_os_type = Column(Text, default=None)
     app_os_version = Column(Text, default=None)

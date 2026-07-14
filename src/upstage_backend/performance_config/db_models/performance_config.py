@@ -8,7 +8,7 @@ from sqlalchemy.orm import relationship
 
 class PerformanceConfigModel(BaseModel):
     __tablename__ = "performance_config"
-    id = Column(BigInteger, primary_key=True)
+    id = Column(BigInteger().with_variant(Integer, "sqlite"), primary_key=True)
     name = Column(String, nullable=False)
     owner_id = Column(Integer, ForeignKey("upstage_user.id"), nullable=False, default=0)
     description = Column(Text, nullable=False)

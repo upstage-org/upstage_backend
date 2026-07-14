@@ -7,7 +7,8 @@ from fastapi_exception import FastApiException
 from fastapi_global_variable import GlobalVariable
 from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
-from starlette.requests import Request
+from starlette.requests import ClientDisconnect, Request
+from starlette.responses import Response
 
 from upstage_backend.assets.http.rtmp_auth import router as rtmp_auth_router
 from upstage_backend.global_config import ENV_TYPE, config_graphql_endpoints, HOSTNAME
@@ -40,6 +41,18 @@ class Bootstrap:
 
     def init_exception(self):
         FastApiException.config()
+        # A browser aborting an in-flight request (page navigation, flaky
+        # network) raises ClientDisconnect while the body is being read.
+        # Without a class-specific handler it falls through to the catch-all
+        # Exception handler in ServerErrorMiddleware, which re-raises and
+        # makes uvicorn log a full "Exception in ASGI application" traceback
+        # for what is routine client behavior. Answer 499 (nginx's "client
+        # closed request") — nobody is listening anyway.
+        self.app.add_exception_handler(ClientDisconnect, _client_disconnect_handler)
+
+
+async def _client_disconnect_handler(request: Request, exc: ClientDisconnect) -> Response:
+    return Response(status_code=499)
 
 
 def start_app():

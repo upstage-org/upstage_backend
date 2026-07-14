@@ -14,7 +14,7 @@ class ParentStageModel(BaseModel):
     """
 
     __tablename__ = "parent_stage"
-    id = Column(BigInteger, primary_key=True)
+    id = Column(BigInteger().with_variant(Integer, "sqlite"), primary_key=True)
     stage_id = Column(Integer, ForeignKey("stage.id"), nullable=False, default=0)
     child_asset_id = Column(Integer, ForeignKey("asset.id"), nullable=False, default=0)
     # Per-assignment exit (removal) animation; NULL = default ("vanish" / 1000 ms).

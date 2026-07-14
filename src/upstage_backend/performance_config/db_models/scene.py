@@ -11,7 +11,7 @@ from upstage_backend.users.db_models.user import UserModel
 
 class SceneModel(BaseModel):
     __tablename__ = "scene"
-    id = Column(BigInteger, primary_key=True)
+    id = Column(BigInteger().with_variant(Integer, "sqlite"), primary_key=True)
     name = Column(Text, nullable=False)
     scene_order = Column(Integer, index=True, nullable=True, default=0)
     scene_preview = Column(Text, nullable=True)

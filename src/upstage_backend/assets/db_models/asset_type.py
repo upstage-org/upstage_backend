@@ -1,7 +1,7 @@
 # -*- coding: iso8859-15 -*-
 
 from datetime import datetime
-from sqlalchemy import BigInteger, Column, DateTime, String, Text
+from sqlalchemy import BigInteger, Column, DateTime, Integer, String, Text
 from upstage_backend.global_config.db_models.base import BaseModel
 
 
@@ -13,7 +13,7 @@ class AssetTypeModel(BaseModel):
     """
 
     __tablename__ = "asset_type"
-    id = Column(BigInteger, primary_key=True)
+    id = Column(BigInteger().with_variant(Integer, "sqlite"), primary_key=True)
     name = Column(String, nullable=False)
     description = Column(Text, nullable=True)
     file_location = Column(Text, nullable=False)
