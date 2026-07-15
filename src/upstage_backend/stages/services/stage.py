@@ -287,7 +287,14 @@ class StageService:
         session.flush()
 
         self.update_stage_attribute(stage.id, "cover", input.cover, session)
-        self.update_stage_attribute(stage.id, "visibility", str(input.visibility).lower(), session)
+        # visibility must be stringified only when actually supplied:
+        # str(None) is the truthy string "none", which used to overwrite the
+        # attribute (and "none" != "true" reads as hidden) on every mutation
+        # that omitted the field.
+        if input.visibility is not None:
+            self.update_stage_attribute(
+                stage.id, "visibility", str(input.visibility).lower(), session
+            )
         self.update_stage_attribute(stage.id, "description", input.description, session)
         self.update_stage_attribute(stage.id, "status", input.status, session)
         self.update_stage_attribute(stage.id, "playerAccess", input.playerAccess, session)
@@ -330,7 +337,12 @@ class StageService:
         stage.owner_id = input.owner if hasattr(input, "owner") and input.owner else stage.owner_id
 
         self.update_stage_attribute(stage.id, "cover", input.cover, session)
-        self.update_stage_attribute(stage.id, "visibility", str(input.visibility).lower(), session)
+        # Same guard as create_stage: partial updates (e.g. the Customisation
+        # tab saves only id+config) must not clobber visibility with "none".
+        if input.visibility is not None:
+            self.update_stage_attribute(
+                stage.id, "visibility", str(input.visibility).lower(), session
+            )
         self.update_stage_attribute(stage.id, "description", input.description, session)
         self.update_stage_attribute(stage.id, "status", input.status, session)
         self.update_stage_attribute(stage.id, "playerAccess", input.playerAccess, session)
