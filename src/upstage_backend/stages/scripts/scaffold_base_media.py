@@ -281,15 +281,15 @@ def get_or_create_user(session, username, email, role, password=None):
 
 
 def create_demo_users(session):
-    """Create the default logins: admin, guest, and the Demo1 player used in
-    demos/workshops (its password is the one publicly documented in the
-    upstage.live foyer text). Returns the Demo1 user so it can be granted
-    player access on the Demo Stage."""
+    """Create the default logins: admin, guest, and the Demo1/Demo2/Demo3
+    players referenced by the demo scene info and the docs (their shared
+    password is the one publicly documented in the upstage.live foyer text)."""
     get_or_create_user(session, "admin", "support@upstage.live", ADMIN)
     get_or_create_user(session, "guest", "guest@upstage.live", GUEST)
-    return get_or_create_user(
-        session, "Demo1", "demo1@upstage.org.nz", GUEST, password="DemoUpStage"
-    )
+    for n in (1, 2, 3):
+        get_or_create_user(
+            session, f"Demo{n}", f"demo{n}@upstage.org.nz", GUEST, password="DemoUpStage"
+        )
 
 
 def grant_player_access(session, stage, users):
@@ -305,18 +305,21 @@ def grant_player_access(session, stage, users):
         return
     if not isinstance(accesses, list) or not accesses or not isinstance(accesses[0], list):
         return
-    changed = False
+    granted = []
     for user in users:
         user_id = str(user.id)
         if user_id not in accesses[0]:
             accesses[0].append(user_id)
-            changed = True
-    if changed:
+            granted.append(user.username)
+    if granted:
         attribute.description = json.dumps(accesses)
         session.flush()
         logger.warning(
-            '✅ Granted player access on "{}" to: {}'.format(
-                stage.name, ", ".join(u.username for u in users)
+            '✅ Granted player access on "{}" to {} user(s): {}{}'.format(
+                stage.name,
+                len(granted),
+                ", ".join(granted[:10]),
+                ", ..." if len(granted) > 10 else "",
             )
         )
 
@@ -359,7 +362,7 @@ def main():
     with ScopedSession() as s:
         # Users first, so the admin lookup below finds the account this very
         # run created on a fresh database.
-        demo_player = create_demo_users(s)
+        create_demo_users(s)
         owner = s.query(UserModel).filter(UserModel.username == "admin").first()
         owner_id = owner.id if owner else 0
 
@@ -367,9 +370,10 @@ def main():
         stage = create_demo_stage(s, owner_id, media, seed)
         create_demo_scene(s, stage, owner_id, seed)
         seed_board_events(s, stage, seed)
-        # Users created via the API get this from assign_user_to_default_stage;
-        # scaffold-created logins need it granted here.
-        grant_player_access(s, stage, [demo_player])
+        # Every user existing at seed time gets player access on the demo
+        # stage (on a fresh install that's admin/guest/Demo1). Users created
+        # later via the API get theirs from assign_user_to_default_stage.
+        grant_player_access(s, stage, s.query(UserModel).all())
         scaffold_foyer(s)
         scaffold_system_configuration(s)
 

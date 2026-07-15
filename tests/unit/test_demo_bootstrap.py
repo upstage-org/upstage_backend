@@ -223,3 +223,57 @@ def test_create_demo_stage_skips_when_stage_exists():
     stage = scaffold_base_media.create_demo_stage(session, owner_id=1, media=[], seed=_seed())
     assert stage is session._existing
     assert session.added == []
+
+
+# ------------------------------------------------------ player access grant
+
+
+class _Attr:
+    def __init__(self, description):
+        self.name = "playerAccess"
+        self.description = description
+
+
+class _AttrCollection:
+    """Mimics the stage.attributes dynamic relationship."""
+
+    def __init__(self, attr):
+        self._attr = attr
+
+    def filter(self, *_):
+        return self
+
+    def first(self):
+        return self._attr
+
+
+class _AccessStage:
+    name = "Demo Stage"
+
+    def __init__(self, attr):
+        self.attributes = _AttrCollection(attr)
+
+
+class _FlushSession:
+    def flush(self):
+        pass
+
+
+class _User:
+    def __init__(self, uid, username):
+        self.id = uid
+        self.username = username
+
+
+def test_grant_player_access_adds_all_users_once():
+    # All users existing at seed time land in the player list (index 0);
+    # re-granting is a no-op so --force re-runs never duplicate ids.
+    attr = _Attr(json.dumps([["1"], []]))
+    stage = _AccessStage(attr)
+    users = [_User(1, "admin"), _User(2, "guest"), _User(3, "Demo1")]
+
+    scaffold_base_media.grant_player_access(_FlushSession(), stage, users)
+    assert json.loads(attr.description) == [["1", "2", "3"], []]
+
+    scaffold_base_media.grant_player_access(_FlushSession(), stage, users)
+    assert json.loads(attr.description) == [["1", "2", "3"], []]
