@@ -23,7 +23,7 @@ class StageLicenseModel(BaseModel):
     """
 
     __tablename__ = "stage_license"
-    id = Column(BigInteger, primary_key=True)
+    id = Column(BigInteger().with_variant(Integer, "sqlite"), primary_key=True)
     stage_id = Column(Integer, ForeignKey(StageModel.id), nullable=False, default=0)
     created_on = Column(DateTime, nullable=False, default=datetime.utcnow)
     expires_on = Column(DateTime, nullable=True)

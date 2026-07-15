@@ -17,7 +17,7 @@ from sqlalchemy.orm import relationship
 
 class PerformanceModel(BaseModel):
     __tablename__ = "performance"
-    id = Column(BigInteger, primary_key=True)
+    id = Column(BigInteger().with_variant(Integer, "sqlite"), primary_key=True)
     name = Column(String, nullable=True)
     description = Column(Text, nullable=True)
     stage_id = Column(Integer, ForeignKey("stage.id"), nullable=False, default=0)

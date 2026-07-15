@@ -81,11 +81,23 @@ DEMO_MEDIA_FOLDER = "./dashboard/demo"
 
 UPSTAGE_FRONTEND_URL = os.getenv("UPSTAGE_FRONTEND_URL", "http://localhost:3000")
 ENV_TYPE = os.getenv("ENV_TYPE", "development")
-hstr = "from .load_env import *"
 
 VIDEO_MAX_SIZE = 500 * 1024 * 1024  # KB
 OTHER_MEDIA_MAX_SIZE = 500 * 1024 * 1024  # KB
 
-exec(hstr)
+# `load_env.py` is a machine-specific, git-ignored overrides file generated at
+# install time (installation/phases/45_sync_load_env.sh) and present only on
+# deployed hosts. It is absent in CI and on fresh checkouts, so its import is
+# optional: when missing we fall back to the process environment already read
+# via os.getenv above. The GitHub pipeline must never depend on local vars.
+try:
+    from .load_env import *  # noqa: F401,F403
+except ModuleNotFoundError:
+    logger.info("load_env.py not present; using environment configuration only")
 
-DATABASE_URL = f"{DATABASE_CONNECT}://{DATABASE_USER}:{DATABASE_PASSWORD}@{DATABASE_HOST}:{DATABASE_PORT}/{DATABASE_NAME}"
+if DATABASE_CONNECT:
+    DATABASE_URL = f"{DATABASE_CONNECT}://{DATABASE_USER}:{DATABASE_PASSWORD}@{DATABASE_HOST}:{DATABASE_PORT}/{DATABASE_NAME}"
+else:
+    # No DB parts configured (CI / DB-free unit tests): honor a full
+    # DATABASE_URL from the environment, defaulting to in-memory SQLite.
+    DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///:memory:")

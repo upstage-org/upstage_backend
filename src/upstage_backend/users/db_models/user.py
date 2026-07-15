@@ -20,7 +20,7 @@ ROLES = {
 class UserModel(BaseModel):
     __tablename__ = "upstage_user"
 
-    id = Column(BigInteger, primary_key=True, autoincrement=True)
+    id = Column(BigInteger().with_variant(Integer, "sqlite"), primary_key=True, autoincrement=True)
     username = Column(Text, nullable=False, unique=True, default="")
     password = Column(Text, nullable=False, default="")
     email = Column(Text, nullable=True, default="")

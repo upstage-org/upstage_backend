@@ -85,7 +85,11 @@ x-common-build: &common_build |
 
 # ====================== Services ======================
 services:
-  # One-shot migration runner. Exits 0 once Alembic is at heads. The three
+  # One-shot migration + install-bootstrap runner. Exits 0 once Alembic is at
+  # heads and, on a NEW installation only (zero stages in the DB), the demo
+  # scaffold has seeded the Demo Stage (media, scene, board, default logins) —
+  # see scripts/run_bootstrap.py. On established installs the bootstrap is a
+  # no-op skip. The three
   # long-running services below `depends_on` this with
   # `service_completed_successfully`, so on a fresh DB nobody tries to write
   # to a not-yet-created table (formerly produced
@@ -108,7 +112,8 @@ services:
       /bin/bash -c "
       cd /usr/app &&
       export HARDCODED_HOSTNAME=${HARDCODED_HOSTNAME} &&
-      python -m alembic -c ./scripts/alembic.ini upgrade heads"
+      python -m alembic -c ./scripts/alembic.ini upgrade heads &&
+      python -m scripts.run_bootstrap"
     restart: "no"
     networks:
       - upstage-network

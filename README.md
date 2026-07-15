@@ -1,208 +1,282 @@
 # UpStage Backend
 
-FastAPI GraphQL backend, Docker compose stacks, and the single-host installer for UpStage. **UpStage installs on a single Debian host via Docker — run the installer and it handles everything** (OS setup, TLS, secrets, Postgres, Mosquitto, backend workers, and the frontend build).
+UpStage is an open-source platform for live online performance: performers
+("players") manipulate avatars, props, backdrops and streams on a shared
+stage, watched live by an audience in the browser.
 
-The frontend SPA lives in the sibling [`upstage_frontend`](../upstage_frontend/) repo.
+This repository is the backend. It provides:
 
-## Quick start
+- **HTTP API** — FastAPI + Ariadne GraphQL, served at **`/api/studio_graphql`**
+  (see [API.md](API.md) for request/response examples).
+- **Realtime** — MQTT (Mosquitto). Live-stage traffic goes over MQTT topics
+  `<namespace>/<stage>/<topic>`; the browser connects via WebSocket.
+- **Persistence** — PostgreSQL, migrated with Alembic.
+- **Workers** — `event_archive` (persists MQTT events to Postgres so
+  performances can be replayed) and `upstage_stats` (live audience/player
+  counts).
 
-Clone both repos as siblings on the target host, then run the installer:
+The frontend (Vue SPA) lives in the sibling
+[`upstage_frontend`](../upstage_frontend) repository and has its own README.
+For architecture depth (module map, data model, GraphQL + MQTT flows, the
+DB-session model) see [DEVELOPER_GUIDE.md](DEVELOPER_GUIDE.md).
 
-```sh
-git clone https://github.com/upstage-org/upstage_backend
-git clone https://github.com/upstage-org/upstage_frontend
+---
 
-cd upstage_backend/installation
-chmod +x install_single_host.sh phases/*.sh lib/*.sh
-./install_single_host.sh --all
+## Architecture & ports
+
+Deployment is two docker-compose tiers on one shared external network
+(`upstage-network-<site>`, where `<site>` is `dev` or `prod`):
+
+| Tier | Directory | Services |
+|---|---|---|
+| Service tier | `service_containers/` | `postgres_container_<site>` (Postgres), `mosquitto_container_<site>` (MQTT broker) |
+| App tier | `app_containers/` | `upstage_db_migrate` (one-shot: `alembic upgrade heads`), `upstage_backend` (API), `upstage_event_archive`, `upstage_stats` |
+
+Application code and the Python venv are **baked into the image at build
+time** (no source bind mounts). The three long-running app services wait for
+the one-shot migration container to finish (`service_completed_successfully`)
+before starting.
+
+**Ports:**
+
+| What | Where |
+|---|---|
+| Backend API (uvicorn) | container `:3000` → host `:9090` (dev) / `:9091` (prod) |
+| Postgres | `:5432` inside the docker network only (not host-published) |
+| Mosquitto MQTT (tcp) | `:1883` inside the docker network only |
+| Mosquitto WebSocket | `127.0.0.1:9001` (dev) / `127.0.0.1:9002` (prod) |
+| Uploaded media | bind mount `/app_code_<site>/uploads` ↔ `/usr/app/uploads` |
+
+### TLS: all SSL is stripped at nginx
+
+Every service behind the reverse proxy speaks **plain HTTP / plain
+WebSocket**. nginx (or your proxy of choice) terminates all TLS and forwards:
+
+- `https://<host>/api/` → `http://127.0.0.1:9090` (dev) or `:9091` (prod)
+- `https://<host>/resources/` → served directly from `/app_code_<site>/uploads`
+- `wss://mqtt-<host>:443` → `http://127.0.0.1:9001` (dev) / `:9002` (prod)
+  (WebSocket upgrade; this is the browser's MQTT connection)
+- everything else → the frontend's built `dist/` (see the frontend README;
+  the SPA needs an HTML5-history fallback: `try_files $uri /index.html`)
+
+No ready-made nginx config ships for this flow; the templates under
+`initial_scripts/nginx_templates/` are reference material from the old
+installer and need adapting. HTTPS is required in production — browsers only
+grant camera/microphone access to secure origins.
+
+---
+
+## Setting up an instance
+
+Prerequisites: Docker with the compose plugin. (Python 3.12 is only needed
+for host-side development, not to run the stack.)
+
+### 1. Configuration files
+
+**a) `src/upstage_backend/global_config/load_env.py`** — the real runtime
+configuration. It is gitignored and overrides everything in
+`global_config/env.py` (imported last via `from .load_env import *`).
+Sample, copied from a working dev instance with secrets X'd out:
+
+```python
+HOSTNAME="dev.example.org"
+
+DATABASE_CONNECT = "postgresql"
+DATABASE_HOST = "postgres_container_dev"   # container name on the shared network
+DATABASE_PORT = 5432
+DATABASE_USER = "postgres"
+DATABASE_PASSWORD = "XXXXXXXXXXXX"
+DATABASE_NAME = "upstage"
+
+EMAIL_USE_TLS = False  # seems counterintuitive, but TLS happens by default.
+EMAIL_HOST = "mail.smtp2go.com"
+EMAIL_HOST_FROM = "support@example.org"
+EMAIL_HOST_LOGIN = "example_login"
+EMAIL_HOST_PASSWORD = "XXXXXXXXXXXXXXXX"
+EMAIL_PORT = 587
+EMAIL_HOST_DISPLAY_NAME = "UpStage Support"
+
+MQTT_BROKER = "mosquitto_container_dev"    # container name on the shared network
+MQTT_TRANSPORT = "tcp"
+MQTT_ADMIN_USER = "admin"
+MQTT_ADMIN_PASSWORD = "XXXXXXXXXXXXX"      # must match pw.backup (see below)
+MQTT_ADMIN_PORT = 1883
+MQTT_USER = "performance"
+MQTT_PASSWORD = "XXXXXXXXXXXXX"            # must match pw.backup AND the frontend's VITE_MQTT_PASSWORD
+MQTT_PORT = 1883
+
+CLOUDFLARE_CAPTCHA_SECRETKEY = "XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX"
+CLOUDFLARE_CAPTCHA_VERIFY_ENDPOINT = "https://challenges.cloudflare.com/turnstile/v0/siteverify"
+SECRET_KEY = "XXXX"   # JWT signing key: openssl rand -hex 48
+CIPHER_KEY = b"XXXX"  # Fernet key (bytes!): python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key())"
+
+CLIENT_MAX_BODY_SIZE = 500 * 1024 * 1024
+
+UPLOAD_USER_CONTENT_FOLDER = "/usr/app/uploads"   # mounted this way in docker-compose
+DEMO_MEDIA_FOLDER = "/usr/app/dashboard/demo"
+
+# Payment — only for instances that sell subscriptions; leave empty otherwise.
+STRIPE_KEY = ""
+STRIPE_PRODUCT_ID = ""
+
+# Email proxying — upstage.live-specific; leave as-is/empty for other instances.
+ACCEPT_EMAIL_HOST = ["dev.example.org"]
+ACCEPT_SERVER_SEND_EMAIL_EXTERNAL = []
+SEND_EMAIL_SERVER = "https://dev.example.org"
+
+# Change to "Production" for official releases (locks down CORS to HOSTNAME).
+ENV_TYPE = "Dev"
+
+JWT_ACCESS_TOKEN_MINUTES = "86400"  # 1 day
+JWT_REFRESH_TOKEN_DAYS = "30"
+
+# RTMP streaming (optional, needs an external MediaMTX server): shared secret
+# for signing publish tokens. Generate with: openssl rand -hex 24
+STREAM_KEY = "XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX"
 ```
 
-Set `UPSTAGE_BACKEND_DIR` and `UPSTAGE_FRONTEND_DIR` if your checkouts are not at the default sibling paths next to `installation/`.
+Notes:
+- `DATABASE_HOST`/`MQTT_BROKER` are the *container names*; the app tier
+  reaches them over the shared docker network on their internal ports
+  (5432/1883). Do not use the old proxied ports (5433/1884) from
+  `initial_scripts/environments/env_app_template.py` — that template predates
+  the compose flow.
+- `MONGO_*` variables found in older configs are legacy and unused.
 
-Phase `20_collect_domains` writes `state.env` (see [`installation/state.env.example`](installation/state.env.example)) with:
+**b) `.env`** (repo root) — one line, consumed by the service-tier script:
 
-| Variable | Purpose |
-|----------|---------|
-| `APP_DOMAIN` | Public app hostname (GraphQL + SPA) |
-| `SVC_DOMAIN` | Service hostname (Postgres / MQTT) |
-| `STREAMING_DOMAIN` | Jitsi / streaming hostname |
-| `CERTBOT_EMAIL` | Let's Encrypt contact email |
-| `UPSTAGE_COMPOSE_PROFILE` | `prod` or `dev` — selects which `run_docker_compose_*` scripts the installer uses |
+```sh
+export POSTGRES_PASSWORD_DEV=XXXXXXXXXXXX
+```
 
-For `--list`, `--phase`, and troubleshooting, see [`installation/README.md`](installation/README.md).
+(Use `POSTGRES_PASSWORD_PROD` for a prod site. Must match
+`DATABASE_PASSWORD` in `load_env.py`.)
 
-## Prerequisites
+**c) Mosquitto passwords** — the service-tier script seeds
+`/mosquitto_files_<site>/etc/mosquitto/` from
+`service_containers/deployment_config/etc_mosquitto/` on first run, then asks
+you to edit `pw.backup` (it refuses to start while the defaults say
+`changeme`):
 
-- Clean **Debian** host; run the installer as **root** (SSH keys recommended).
-- DNS **A** records (and `auth.` for streaming) for app, service, and streaming hostnames pointing at this host's public IP.
-- Cloudflare Turnstile keys (prompted interactively in phase `40_generate_secrets`).
+```
+performance:XXXXXXXXXXXXX
+admin:XXXXXXXXXXXXX
+```
 
-## Pre-install configuration
+These must match `MQTT_PASSWORD` / `MQTT_ADMIN_PASSWORD` in `load_env.py`.
+The broker hashes this file into its real password file at container start.
 
-Customize these **before** running `./install_single_host.sh --all`. The installer invokes the run scripts below; you do not run them as separate install steps.
+### 2. Bring up the service tier
 
-### Service tier — `service_containers/`
+```sh
+cd service_containers
+./run_docker_compose_dev.sh      # or run_docker_compose_prod.sh
+```
 
-Infrastructure stack: Postgres + Mosquitto. Edit the marked block at the top of [`service_containers/run_docker_compose_dev.sh`](service_containers/run_docker_compose_dev.sh) and [`run_docker_compose_prod.sh`](service_containers/run_docker_compose_prod.sh):
+This creates the external network `upstage-network-<site>`, the host data
+dirs (`/postgres_data_<site>`, `/mosquitto_files_<site>`), and starts
+Postgres + Mosquitto. Site-specific settings (hostname, exposed WS port,
+optional certbot for the MQTT hostname) are variables at the top of the
+script.
 
-| Variable | Dev | Prod |
-|----------|-----|------|
-| `BASE_SITE` | your root domain | same |
-| `SITE` | `dev` | `prod` |
-| `SSL` | `mqtt-dev.<domain>` | empty (TLS via nginx) |
-| `MOSQUITTO_EXPOSED_WS_PORT` | `9001` | `9002` |
-| `HARDCODED_HOSTNAME` | `dev.<domain>` | `<domain>` |
-| `PG_DATA_DIR` | `/postgres_data_dev` | `/postgres_data_prod` |
-| `MQ_DATA_DIR` | `/mosquitto_files_dev` | `/mosquitto_files_prod` |
+### 3. Bring up the app tier
 
-Starts `postgres_container_${SITE}` and `mosquitto_container_${SITE}` on Docker network `upstage-network-${SITE}`.
+```sh
+cd app_containers
+./run_docker_compose_dev.sh      # or run_docker_compose_prod.sh
+```
 
-### App tier — `app_containers/`
+This builds the image (sources baked in, dependencies from `uv.lock`),
+creates `/app_code_<site>/uploads`, runs the one-shot migration container
+(`alembic upgrade heads` — creates the entire schema from empty), then starts
+the API and the two workers. The API is now on `http://127.0.0.1:9090`
+(dev) / `:9091` (prod).
 
-Application stack: FastAPI, event archive, stats. Edit the top of [`app_containers/run_docker_compose_dev.sh`](app_containers/run_docker_compose_dev.sh) and [`run_docker_compose_prod.sh`](app_containers/run_docker_compose_prod.sh):
+### 4. First login
 
-| Variable | Dev | Prod |
-|----------|-----|------|
-| `SITE` | `dev` | `prod` |
-| `HARDCODED_HOSTNAME` | `dev.<domain>` | `<domain>` |
-| `APP_PORT` | `9090` | `9091` |
-| `APP_USER` / `APP_GROUP` | `1000` | `1000` |
+Migrations seed a default super admin: **username `admin`, password
+`Secret@123`** (`users/db_migrations/eb504467a5d7_create_default_super_admin.py`).
+**Log in and change this password immediately.**
 
-Compose services ([`app_containers/docker-compose.yaml`](app_containers/docker-compose.yaml)):
+Optional demo data (a "Demo Stage" plus demo media):
 
-| Service | Role |
-|---------|------|
-| `upstage_db_migrate` | One-shot Alembic `upgrade heads` |
-| `upstage_backend` | FastAPI via [`scripts/start_upstage.sh`](scripts/start_upstage.sh) |
-| `upstage_event_archive` | MQTT → Postgres event persistence |
-| `upstage_stats` | Connection statistics |
+```sh
+./initial_scripts/post_install/scaffold_base_media.sh
+```
 
-Uploaded media is bind-mounted at `/app_code_<site>/uploads`.
+### 5. Front it with nginx
 
-### Backend secrets
+See the TLS section above and the frontend README for the static-file side.
 
-Phase `40_generate_secrets` runs [`initial_scripts/environments/generate_environments_script.sh`](initial_scripts/environments/generate_environments_script.sh) and [`scripts/generate_cipher_key.sh`](scripts/generate_cipher_key.sh), producing:
+---
 
-- [`src/upstage_backend/global_config/load_env.py`](src/upstage_backend/global_config/load_env.py) (gitignored; from [`env_app_template.py`](initial_scripts/environments/env_app_template.py))
-- [`container_scripts/mqtt_server/pw.txt`](container_scripts/mqtt_server/pw.txt)
-- [`service_containers/run_docker_compose.sh`](service_containers/run_docker_compose.sh) (generated password exports)
+## Developing
 
-Key variables in `load_env.py`: `HOSTNAME`, `DATABASE_*`, `MQTT_*`, `SECRET_KEY`, `CIPHER_KEY`, `CLOUDFLARE_CAPTCHA_SECRETKEY`, `STRIPE_*`, `ENV_TYPE`, JWT settings.
-
-### Frontend env (sibling repo)
-
-Before phase `90_frontend`, prepare `env_backup_dev` or `env_backup_prod` in [`upstage_frontend`](../upstage_frontend/) — see the [frontend README](../upstage_frontend/README.md).
-
-## What the installer runs
-
-| Phase | Does |
-|-------|------|
-| `10_os` | Docker, UFW base, logrotate |
-| `20_collect_domains` | Writes `state.env` |
-| `30_prepare_svc_app_layout` | Creates host data directories |
-| `50_certificates` | nginx + certbot per hostname |
-| `40_generate_secrets` | Backend secrets + cipher key |
-| `45_sync_load_env` | Mosquitto files, app tree → `/app_code` |
-| `80_streaming_jitsi` | Jitsi install (interactive) |
-| `51_nginx_render_full` | Combined nginx site from templates |
-| `60_compose_svc` | Service Docker stack (`service_containers/`) |
-| `75_docker_firewall` | UFW + [`initial_scripts/setup-docker-ports.sh`](initial_scripts/setup-docker-ports.sh) |
-| `70_compose_app` | App Docker stack (`app_containers/`) |
-| `90_frontend` | Frontend env + `run_front_end_*.sh --build` |
-
-If you omit streaming/Jitsi, skip phase `80_streaming_jitsi` and adjust DNS expectations accordingly.
-
-## Further reading
-
-- [`DEVELOPER_GUIDE.md`](DEVELOPER_GUIDE.md) — architecture, module map, event archive
-- [`API.md`](API.md) — GraphQL examples
-- [`installation/README.md`](installation/README.md) — installer phases, `--phase`, troubleshooting
-- [`migration_scripts/`](migration_scripts/) — optional data migration
-- [`initial_scripts/post_install/`](initial_scripts/post_install/) — demo scaffold, Jitsi cert cron
-
-## Local protections (git hooks)
-
-This repo uses [pre-commit](https://pre-commit.com/) to run a small
-suite of local protections against the same checks that run in CI.
-They exist so problems are caught at the developer's machine — before
-they hit `main` — and so a `git push --no-verify` bypass is still
-caught server-side by `.github/workflows/ci.yml`.
-
-The frontend repo (`../upstage_frontend`) uses Husky for the same
-purpose; the two configurations are deliberately symmetrical.
-
-### One-time install
+Host setup (Python ≥ 3.12):
 
 ```sh
 pip install -e .[dev]
-pre-commit install --install-hooks
+pre-commit install        # installs pre-commit, commit-msg and pre-push hooks
 ```
 
-The `default_install_hook_types` line in `.pre-commit-config.yaml`
-picks up `commit-msg` and `pre-push` automatically — no extra
-`--hook-type` flags needed.
+| Task | Command |
+|---|---|
+| Lint + format | `ruff check .` / `ruff format .` (the only linter/formatter) |
+| Fast tests (no DB) | `pytest tests/unit/` |
+| Full local gate (pre-push) | `scripts/verify.sh` — ruff + unit tests + `pip-audit` |
+| All host-runnable tests | `pytest tests/` (unit + sqlite-bound suites) |
 
-### What runs and when
+The `src/upstage_backend/**/tests/` integration suites write through the live
+app into the configured Postgres. They require `UPSTAGE_TESTS_ALLOW_REAL_DB=1`
+(leftover fixtures are swept at teardown) and a reachable database — run them
+inside a container on the compose network. Off-network they skip with an
+explanatory message; without the opt-in they refuse to run at all. Note that
+some of them depend on data created by earlier suites, so run the whole
+`src/upstage_backend` tree, not single files. CI runs the full suite with
+throwaway Postgres/Mosquitto services.
 
-| Hook         | What it does                                                                                                                                | Typical time |
-| ------------ | ------------------------------------------------------------------------------------------------------------------------------------------- | ------------ |
-| `pre-commit` | Standard hygiene (`trailing-whitespace`, `end-of-file-fixer`, `check-yaml`/`-toml`, `detect-private-key`, `mixed-line-ending`) + `ruff --fix` + `ruff-format`, scoped to staged files. | < 5 s        |
-| `commit-msg` | Light gate: rejects empty / `wip` / `fixup!` subjects shorter than 10 characters. Trailers like `Co-authored-by:` are intentionally ignored. | instant      |
-| `pre-push`   | `scripts/verify.sh`: `ruff check .` + `ruff format --check .` + `pytest tests/unit/` + `pip-audit --strict`.                                 | ~10 s        |
+### Migrations
 
-The `pre-push` hook is byte-for-byte identical to `scripts/verify.sh`
-and to the CI `verify` job, so a clean local push is a strong signal
-that CI's verify build will pass.
+- Hand-written Alembic revisions; **no autogenerate**.
+- Each module keeps its own chain under
+  `src/upstage_backend/<module>/db_migrations/` (9 locations wired in
+  `scripts/alembic.ini`), so the project intentionally has **multiple heads**
+  — always upgrade with `alembic -c ./scripts/alembic.ini upgrade heads`
+  (plural), which is exactly what the `upstage_db_migrate` container does.
+- New revision:
+  `alembic -c ./scripts/alembic.ini revision -m "..." --version-path=src/upstage_backend/<module>/db_migrations`
+  (`create-migration.sh` is a commented-out cheatsheet of these commands, not
+  a runnable tool).
 
-The full pytest suite (which needs Postgres and Mosquitto) runs **only
-in CI's `tests` job**, where the GitHub Actions `services:` block
-brings up the dependencies. Locally, only `tests/unit/` is run on
-push — that directory carries `tests/unit/conftest.py` no-op overrides
-of the root conftest's autouse `client` and `db_engine` fixtures, so
-it is actually runnable without the docker stack.
+### GraphQL
 
-### Manual run
+Single combined schema mounted at `/api/studio_graphql` (HTTP + WebSocket).
+[API.md](API.md) documents the envelope and common operations. CORS is open
+outside production; with `ENV_TYPE="Production"` it is locked to `HOSTNAME`.
 
-```sh
-./scripts/verify.sh           # full pre-push gate (ruff + tests/unit + pip-audit)
-ruff check . && ruff format --check .
-pytest tests/unit/            # DB-free smoke
-pip-audit --strict            # honours [tool.pip-audit] ignore-vulns
-```
+---
 
-### Vulnerability allowlist
+## Repository map (selected)
 
-`pip-audit` exits non-zero on any finding — there is no severity
-threshold. When upstream has no patched version available and the
-team has explicitly accepted the risk, add the advisory ID to the
-`[tool.pip-audit] ignore-vulns` list in `pyproject.toml` with a
-trailing comment naming the reviewer and the date of acceptance:
+| Path | Purpose |
+|---|---|
+| `src/upstage_backend/<module>/` | Feature modules (assets, stages, users, authentication, studio_management, performance_config, upstage_options, licenses, payments, mails) — each with `db_models/`, `db_migrations/`, `http/`, `services/`, `tests/` |
+| `src/upstage_backend/event_archive/` | MQTT→Postgres archiver (replay source); tunables via `EVENT_ARCHIVE_*` env vars |
+| `src/upstage_backend/upstage_stats/` | Live player/audience counters |
+| `scripts/` | Service entrypoints, `verify.sh`, backup + poster-backfill utilities, dev tools |
+| `migration_scripts/` | One-off data importers for legacy databases |
+| `service_containers/`, `app_containers/` | The two compose tiers (see above) |
+| `initial_scripts/` | Env templates, nginx template references, post-install scaffold |
+| `installation/` | Legacy single-host installer — superseded by the compose flow above |
 
-```toml
-[tool.pip-audit]
-ignore-vulns = [
-    "GHSA-xxxx-xxxx-xxxx",  # accepted 2026-05-27 by alice; no upstream fix
-]
-```
+## Behaviour note
 
-### Bypassing for emergencies
+Admin/Super-admin roles gate the Studio admin panels only. **Player controls
+on a live stage are granted per stage** — to the stage owner and to users on
+the stage's player/editor access lists (Stage Management → General). An admin
+who is neither joins as audience. This is intentional; see the frontend
+README for details.
 
-```sh
-git commit --no-verify -m "hotfix: ..."
-git push --no-verify
-```
+## License
 
-Use sparingly. CI still runs the full verify suite plus the full
-pytest with services on the pushed branch and on the PR, so a bypass
-only delays the failure — it does not hide it.
-
-### Adding a new check
-
-1. Add a one-liner to [scripts/verify.sh](scripts/verify.sh) so it can
-   be run standalone.
-2. Mirror it in [.github/workflows/ci.yml](.github/workflows/ci.yml)
-   under the `verify` job so the local gate and the server-side gate
-   stay in lockstep.
-3. If the check is fast enough to run on every commit (not just every
-   push), add it to [.pre-commit-config.yaml](.pre-commit-config.yaml)
-   under the appropriate `repo:` block.
+GPL-3.0 (see [LICENSE](LICENSE)).

@@ -24,7 +24,7 @@ flowchart LR
 
   subgraph backend ["FastAPI + Ariadne"]
     HTTP["HTTP server<br/>uvicorn :3000"]
-    GQL["GraphQL /api/graphql<br/>(authentication, stages,<br/>media, licenses, payments)"]
+    GQL["GraphQL /api/studio_graphql<br/>(authentication, stages,<br/>media, licenses, payments)"]
     HTTP --> GQL
   end
 
@@ -157,7 +157,7 @@ Every folder under `upstage_backend/src/` is a bounded context. They all expose 
 
 ### 4.1 GraphQL endpoint
 
-Exposed at `/api/graphql` on the backend, with the schema composed in [`upstage_backend/src/upstage_backend/studio_management/http/graphql.py`](upstage_backend/src/upstage_backend/studio_management/http/graphql.py). It contains one root `Query`, one root `Mutation`, and shared type definitions like `Stage`, `Event`, `Performance`, `Asset`, `User`, `Scene`, and `License`.
+Exposed at `/api/studio_graphql` on the backend, with the schema composed in [`upstage_backend/src/upstage_backend/studio_management/http/graphql.py`](upstage_backend/src/upstage_backend/studio_management/http/graphql.py). It contains one root `Query`, one root `Mutation`, and shared type definitions like `Stage`, `Event`, `Performance`, `Asset`, `User`, `Scene`, and `License`.
 
 Representative mutations (see [`upstage_backend/src/upstage_backend/studio_management/http/graphql.py`](upstage_backend/src/upstage_backend/studio_management/http/graphql.py) lines 632-690):
 
@@ -356,9 +356,9 @@ mqtt.sendMessage(TOPICS.BACKGROUND, {
 
 ### 4.3 HTTP
 
-- `POST /api/graphql` — the sole GraphQL endpoint. The middleware in [`upstage_backend/src/upstage_backend/main.py`](upstage_backend/src/upstage_backend/main.py) lines 56-64 sets `Cache-Control: private, no-store, must-revalidate` on every `/api/*` response so proxies and browsers never cache authenticated responses.
+- `POST /api/studio_graphql` — the sole GraphQL endpoint. The middleware in [`upstage_backend/src/upstage_backend/main.py`](upstage_backend/src/upstage_backend/main.py) lines 56-64 sets `Cache-Control: private, no-store, must-revalidate` on every `/api/*` response so proxies and browsers never cache authenticated responses.
 - CORS allows any origin in non-production, locked down to the configured `HOSTNAME` in production (lines 26-34).
-- Uploaded media are served statically from the `uploads/` volume (see [`docker-compose-dev.yaml`](upstage_backend/app_containers/docker-compose-dev.yaml) line 63).
+- Uploaded media are served statically from the `uploads/` volume (see [`docker-compose.yaml`](upstage_backend/app_containers/docker-compose.yaml) line 63).
 
 ## 5. How key flows work
 
@@ -738,7 +738,7 @@ Prereqs: Docker + docker compose, a `.env` file with the database and MQTT crede
 ```bash
 # From the repo root:
 cd prod_copy/upstage_backend/app_containers
-docker compose -f docker-compose-dev.yaml up -d
+docker compose -f docker-compose.yaml up -d
 # Three app containers plus whatever you run for Postgres and MQTT
 cd ../../upstage_frontend
 npm ci && npm run dev     # Vite dev server against the backend
@@ -763,7 +763,7 @@ Quick reference for common tasks.
 | Add a new GraphQL query/mutation | Schema SDL in the relevant module's `http/graphql.py`, resolver wiring in `http/schema.py`, business logic in `services/*.py`; then expose via [`studio_management/http/graphql.py`](upstage_backend/src/upstage_backend/studio_management/http/graphql.py) if it's not already |
 | Add a column to `events` | Extend [`upstage_backend/src/upstage_backend/event_archive/db_models/event.py`](upstage_backend/src/upstage_backend/event_archive/db_models/event.py), create an alembic migration in [`event_archive/db_migrations/`](upstage_backend/src/upstage_backend/event_archive/db_migrations/), update [`event_archive/writer.py`](upstage_backend/src/upstage_backend/event_archive/writer.py) to set it, update the GraphQL `Event` type |
 | Debug "stage looks blank" | Check `events.payload` in Postgres for the stage (`topic LIKE '%/<fileLocation>/%' AND performance_id IS NULL`); if zero rows, inspect the `event_archive` container logs for subscriber errors; confirm MQTT broker reachable |
-| Add a new backend service | Copy the `upstage_event_archive_dev` stanza in [`docker-compose-dev.yaml`](upstage_backend/app_containers/docker-compose-dev.yaml) |
+| Add a new backend service | Copy the `upstage_event_archive_dev` stanza in [`docker-compose.yaml`](upstage_backend/app_containers/docker-compose.yaml) |
 | Change what's served as static assets | `uploads/` volume in the backend container; served via the reverse proxy |
 | Add a role or permission | [`utils/constants.ts`](upstage_frontend/src/utils/constants.ts) `ROLES` + [`global_config/decorators/authenticated.py`](upstage_backend/src/upstage_backend/global_config/decorators/authenticated.py) |
 

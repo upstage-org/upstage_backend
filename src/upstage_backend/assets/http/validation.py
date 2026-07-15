@@ -19,13 +19,21 @@ class LinkInput(BaseModel):
     effect: bool
 
 
+class StageAssignmentInput(BaseModel):
+    # One stage this media is assigned to, with its per-assignment exit
+    # (removal) animation. None means the default: "vanish" / 1000 ms.
+    stageId: int
+    exitAnimation: Optional[str] = None
+    exitSpeed: Optional[conint(ge=0, le=600000)] = None
+
+
 class SaveMediaInput(BaseModel):
     id: Optional[int] = None
     name: constr(min_length=1)
     mediaType: constr(min_length=1)
     copyrightLevel: conint(ge=0)
     owner: Optional[str] = None
-    stageIds: conlist(int)
+    stageAssignments: List[StageAssignmentInput]
     userIds: Optional[List[int]] = []
     tags: Optional[List[str]] = []
     w: confloat(ge=0)

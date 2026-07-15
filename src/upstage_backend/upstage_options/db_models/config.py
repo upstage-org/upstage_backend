@@ -1,6 +1,6 @@
 # -*- coding: iso8859-15 -*-
 
-from sqlalchemy import Column, DateTime, String, BigInteger, Text
+from sqlalchemy import Column, DateTime, String, BigInteger, Integer, Text
 from datetime import datetime
 from upstage_backend.global_config.db_models.base import BaseModel
 
@@ -11,7 +11,7 @@ class ConfigModel(BaseModel):
     """
 
     __tablename__ = "config"
-    id = Column(BigInteger, primary_key=True)
+    id = Column(BigInteger().with_variant(Integer, "sqlite"), primary_key=True)
     name = Column(String, nullable=False)
     value = Column(Text, nullable=True)
     created_on = Column(DateTime, nullable=False, default=datetime.now())

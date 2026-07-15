@@ -23,6 +23,15 @@ import pytest
 
 REAL_DB_OPT_IN = "UPSTAGE_TESTS_ALLOW_REAL_DB"
 
+# The src-tree integration tests call get_session() directly (outside any
+# HTTP request), which strict db-context mode forbids. The e2e container
+# runs with STRICT_DB_CONTEXT=0; mirror that for every pytest session so
+# the suite behaves identically on the host. (The tests/ subtree conftests
+# set it too; setdefault keeps any explicit operator override in force.)
+os.environ.setdefault("STRICT_DB_CONTEXT", "0")
+
+_SRC_TESTS_PATH_FRAGMENT = f"{os.sep}src{os.sep}upstage_backend{os.sep}"
+
 
 def _collected_src_integration_tests(request):
     """
@@ -33,9 +42,45 @@ def _collected_src_integration_tests(request):
     """
     for item in request.session.items:
         path = str(getattr(item, "fspath", "") or "")
-        if f"{os.sep}src{os.sep}upstage_backend{os.sep}" in path:
+        if _SRC_TESTS_PATH_FRAGMENT in path:
             return True
     return False
+
+
+def pytest_collection_modifyitems(session, config, items):
+    """
+    When the real-DB opt-in is set but the configured database is
+    unreachable (e.g. running on the host, outside the compose network),
+    skip the src-tree integration tests with a clear reason instead of
+    letting every one of them error. The sqlite-bound `tests/` suites are
+    unaffected. Without the opt-in the hard pytest.exit safety guard in
+    _guard_against_real_db still applies.
+    """
+    if os.environ.get(REAL_DB_OPT_IN) != "1":
+        return
+    src_items = [item for item in items if _SRC_TESTS_PATH_FRAGMENT in str(item.fspath)]
+    if not src_items:
+        return
+
+    from upstage_backend.global_config import env
+
+    if env.DATABASE_URL.startswith("sqlite"):
+        return
+    try:
+        from sqlalchemy import create_engine
+
+        probe = create_engine(env.DATABASE_URL, connect_args={"connect_timeout": 3})
+        with probe.connect():
+            pass
+        probe.dispose()
+    except Exception:
+        location = env.DATABASE_URL.rsplit("@", 1)[-1]
+        marker = pytest.mark.skip(
+            reason=f"configured database ({location}) is unreachable from this host; "
+            "src-tree integration tests need it (run inside the compose network)"
+        )
+        for item in src_items:
+            item.add_marker(marker)
 
 
 def _guard_against_real_db(request):
@@ -143,22 +188,35 @@ def db_engine(request):
     engine = create_engine(env.DATABASE_URL)
     yield engine
     start_time = time.time()
-    if not env.DATABASE_URL.startswith("sqlite") and _collected_src_integration_tests(request):
+    # Sweep + terminate only when a real-Postgres integration session actually
+    # ran; a sqlite-only session (tests/unit, tests/event_archive_tests) must
+    # not reach out to the configured Postgres at teardown — off the compose
+    # network that host is not even resolvable.
+    ran_real_db_integration = not env.DATABASE_URL.startswith(
+        "sqlite"
+    ) and _collected_src_integration_tests(request)
+    if ran_real_db_integration:
         _sweep_test_fixtures(engine)
     engine.dispose()
-    with create_engine(
-        env.DATABASE_URL.rsplit("/", 1)[0], isolation_level="AUTOCOMMIT"
-    ).connect() as connection:
-        connection.execute(
-            text(
-                f"""
-            SELECT pg_terminate_backend(pg_stat_activity.pid)
-            FROM pg_stat_activity
-            WHERE pg_stat_activity.datname = '{env.DATABASE_NAME}'
-            AND pid <> pg_backend_pid();
-        """
+    if not ran_real_db_integration:
+        return
+    from sqlalchemy.exc import OperationalError
+
+    try:
+        with create_engine(
+            env.DATABASE_URL.rsplit("/", 1)[0], isolation_level="AUTOCOMMIT"
+        ).connect() as connection:
+            connection.execute(
+                text(
+                    f"""
+                SELECT pg_terminate_backend(pg_stat_activity.pid)
+                FROM pg_stat_activity
+                WHERE pg_stat_activity.datname = '{env.DATABASE_NAME}'
+                AND pid <> pg_backend_pid();
+            """
+                )
             )
-        )
-        # connection.execute(text(f"DROP DATABASE {env.DATABASE_NAME}"))
+    except OperationalError:
+        logger.warning("Database unreachable at teardown; skipped terminating leftover backends")
     end_time = time.time()
     logger.info(f"Time taken to drop all tables: {end_time - start_time} seconds")

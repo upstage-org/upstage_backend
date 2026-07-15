@@ -54,7 +54,7 @@ class TestSaveMediaDuplicateKey:
                         "owner": "",
                         "urls": [key],
                         "copyrightLevel": 0,
-                        "stageIds": [],
+                        "stageAssignments": [],
                         "userIds": [],
                         "tags": [],
                         "w": 16,

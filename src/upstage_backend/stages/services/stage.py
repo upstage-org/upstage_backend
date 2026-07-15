@@ -143,13 +143,27 @@ class StageService:
             "edges": [
                 {
                     **stage,
-                    "assets": [asset.child_asset.to_dict() for asset in stage["assets"]],
+                    "assets": [
+                        convert_keys_to_camel_case(self._asset_with_exit_settings(asset))
+                        for asset in stage["assets"]
+                    ],
                     "players": stats_map.get(stage.get("fileLocation"), {}).get("players", 0),
                     "audiences": stats_map.get(stage.get("fileLocation"), {}).get("audiences", 0),
                 }
                 for stage in paginated_stages
             ],
             "totalCount": total_count,
+        }
+
+    @staticmethod
+    def _asset_with_exit_settings(parent_stage):
+        """Flatten one stage assignment: the asset dict plus this stage's
+        per-assignment exit settings. Every caller camelizes the result
+        (directly or via the surrounding stage dict)."""
+        return {
+            **parent_stage.child_asset.to_dict(),
+            "exitAnimation": parent_stage.exit_animation,
+            "exitSpeed": parent_stage.exit_speed,
         }
 
     def get_stage_list(self, info, input: StageStreamInput):
@@ -187,7 +201,7 @@ class StageService:
             convert_keys_to_camel_case(
                 {
                     **stage.to_dict(),
-                    "assets": [asset.child_asset.to_dict() for asset in stage.assets],
+                    "assets": [self._asset_with_exit_settings(asset) for asset in stage.assets],
                     "scenes": self.stage_operation_service.get_scene_list(input, stage.id),
                     "events": self.stage_operation_service.get_event_list(input, stage),
                     "cover": stage.cover,
@@ -229,7 +243,7 @@ class StageService:
         return convert_keys_to_camel_case(
             {
                 **stage.to_dict(),
-                "assets": [asset.child_asset.to_dict() for asset in stage.assets],
+                "assets": [self._asset_with_exit_settings(asset) for asset in stage.assets],
                 "cover": stage.cover,
                 "visibility": stage.visibility,
                 "status": stage.status,
@@ -273,7 +287,14 @@ class StageService:
         session.flush()
 
         self.update_stage_attribute(stage.id, "cover", input.cover, session)
-        self.update_stage_attribute(stage.id, "visibility", str(input.visibility).lower(), session)
+        # visibility must be stringified only when actually supplied:
+        # str(None) is the truthy string "none", which used to overwrite the
+        # attribute (and "none" != "true" reads as hidden) on every mutation
+        # that omitted the field.
+        if input.visibility is not None:
+            self.update_stage_attribute(
+                stage.id, "visibility", str(input.visibility).lower(), session
+            )
         self.update_stage_attribute(stage.id, "description", input.description, session)
         self.update_stage_attribute(stage.id, "status", input.status, session)
         self.update_stage_attribute(stage.id, "playerAccess", input.playerAccess, session)
@@ -316,7 +337,12 @@ class StageService:
         stage.owner_id = input.owner if hasattr(input, "owner") and input.owner else stage.owner_id
 
         self.update_stage_attribute(stage.id, "cover", input.cover, session)
-        self.update_stage_attribute(stage.id, "visibility", str(input.visibility).lower(), session)
+        # Same guard as create_stage: partial updates (e.g. the Customisation
+        # tab saves only id+config) must not clobber visibility with "none".
+        if input.visibility is not None:
+            self.update_stage_attribute(
+                stage.id, "visibility", str(input.visibility).lower(), session
+            )
         self.update_stage_attribute(stage.id, "description", input.description, session)
         self.update_stage_attribute(stage.id, "status", input.status, session)
         self.update_stage_attribute(stage.id, "playerAccess", input.playerAccess, session)
@@ -423,6 +449,8 @@ class StageService:
                 ParentStageModel(
                     stage_id=new_stage.id,
                     child_asset_id=parent_stage.child_asset_id,
+                    exit_animation=parent_stage.exit_animation,
+                    exit_speed=parent_stage.exit_speed,
                 )
             )
 

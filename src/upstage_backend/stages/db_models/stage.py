@@ -15,7 +15,7 @@ class StageModel(BaseModel):
     """
 
     __tablename__ = "stage"
-    id = Column(BigInteger, primary_key=True)
+    id = Column(BigInteger().with_variant(Integer, "sqlite"), primary_key=True)
     name = Column(String, nullable=False)
     description = Column(Text, nullable=True)
     owner_id = Column(Integer, ForeignKey("upstage_user.id"), nullable=False, default=0)
@@ -23,9 +23,7 @@ class StageModel(BaseModel):
     created_on = Column(DateTime, nullable=False, default=datetime.now)
     last_access = Column(DateTime, nullable=True)
     owner = relationship("UserModel", foreign_keys=[owner_id])
-    attributes = relationship(
-        lambda: StageAttributeModel, lazy="dynamic", back_populates="stage"
-    )
+    attributes = relationship(lambda: StageAttributeModel, lazy="dynamic", back_populates="stage")
     assets = relationship("ParentStageModel", lazy="dynamic", back_populates="stage")
 
     @hybrid_property
@@ -37,9 +35,7 @@ class StageModel(BaseModel):
 
     @hybrid_property
     def visibility(self):
-        attribute = self.attributes.filter(
-            StageAttributeModel.name == "visibility"
-        ).first()
+        attribute = self.attributes.filter(StageAttributeModel.name == "visibility").first()
 
         if attribute:
             return attribute.description == "true"
@@ -61,9 +57,7 @@ class StageModel(BaseModel):
         # null even when the attribute row exists, because get_stage_by_id only
         # merges hybrid properties (cover/visibility/status) into the response
         # dict and stage.to_dict() doesn't see attribute-table rows.
-        attribute = self.attributes.filter(
-            StageAttributeModel.name == "playerAccess"
-        ).first()
+        attribute = self.attributes.filter(StageAttributeModel.name == "playerAccess").first()
         if attribute:
             return attribute.description
         return None

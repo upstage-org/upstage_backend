@@ -37,6 +37,10 @@ from upstage_backend.assets.http.validation import (
 )
 from upstage_backend.stages.db_models.stage import StageModel
 from upstage_backend.stages.db_models.parent_stage import ParentStageModel
+from upstage_backend.stages.services.assignment import (
+    make_parent_stage,
+    snapshot_exit_settings,
+)
 from upstage_backend.users.db_models.user import ADMIN, PLAYER, SUPER_ADMIN, UserModel
 from upstage_backend.files.file_handling import FileHandling
 from upstage_backend.files.video_poster import extract_first_frame
@@ -394,13 +398,22 @@ class AssetService:
 
             asset.description = json.dumps(attributes)
             local_db_session.flush()
-        if not len(input.stageIds):
-            asset.stages.delete()
 
-        if len(input.stageIds):
-            asset.stages.delete()
-            for id in input.stageIds:
-                asset.stages.append(ParentStageModel(stage_id=id, child_asset_id=asset.id))
+        # Rebuild the stage assignments. Exit settings live per assignment;
+        # explicit values win, otherwise a pair that survives the rebuild
+        # keeps the settings it already had.
+        snapshot = snapshot_exit_settings(local_db_session, asset_id=asset.id)
+        asset.stages.delete()
+        for assignment in input.stageAssignments:
+            asset.stages.append(
+                make_parent_stage(
+                    assignment.stageId,
+                    asset.id,
+                    snapshot,
+                    assignment.exitAnimation,
+                    assignment.exitSpeed,
+                )
+            )
 
     def change_owner(self, owner: str, local_db_session, asset: AssetModel):
         if owner:
@@ -420,7 +433,16 @@ class AssetService:
         local_db_session.flush()
 
     def process_file_location(self, input, local_db_session, asset):
-        file_location = input["urls"][0] if "urls" in input else input.urls[0]
+        # Called with a SaveMediaInput (saveMedia) or a plain dict (updateMedia).
+        urls = input["urls"] if isinstance(input, dict) else input.urls
+        if not urls:
+            # Saving an attribute-only edit (voice/link/note) resends no
+            # frames; keep the existing file. A brand-new asset has no file
+            # to fall back to and the column is NOT NULL.
+            if not asset.file_location:
+                raise GraphQLError("A media file is required")
+            return asset.file_location
+        file_location = urls[0]
         if "?" in file_location:
             file_location = file_location[: file_location.index("?")]
         if file_location != asset.file_location and "/" not in file_location:
@@ -617,7 +639,14 @@ class AssetService:
             "sign": sign,
             "permission": permission,
             "privilege": self.resolve_privilege(user.id if user else None, asset),
-            "stages": [convert_keys_to_camel_case(item.stage.to_dict()) for item in asset.stages],
+            "stages": [
+                {
+                    **convert_keys_to_camel_case(item.stage.to_dict()),
+                    "exitAnimation": item.exit_animation,
+                    "exitSpeed": item.exit_speed,
+                }
+                for item in asset.stages
+            ],
             "permissions": [
                 convert_keys_to_camel_case(permission.to_dict())
                 for permission in self.resolve_permissions(asset.id)

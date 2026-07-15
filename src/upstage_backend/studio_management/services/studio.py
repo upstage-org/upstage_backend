@@ -29,6 +29,10 @@ from upstage_backend.mails.templates.templates import (
 )
 from upstage_backend.stages.services.stage_operation import StageOperationService
 from upstage_backend.stages.db_models.parent_stage import ParentStageModel
+from upstage_backend.stages.services.assignment import (
+    make_parent_stage,
+    snapshot_exit_settings,
+)
 from upstage_backend.stages.db_models.stage import StageModel
 from upstage_backend.assets.db_models.asset import AssetModel
 from upstage_backend.performance_config.db_models.scene import SceneModel
@@ -126,9 +130,7 @@ class StudioService:
 
         users = session.query(UserModel).filter(UserModel.email.in_(emails)).all()
 
-        self.stage_operation_service.assign_user_to_default_stage(
-            [user.id for user in users]
-        )
+        self.stage_operation_service.assign_user_to_default_stage([user.id for user in users])
 
         return convert_keys_to_camel_case({"users": [user.to_dict() for user in users]})
 
@@ -322,9 +324,7 @@ class StudioService:
                 send(
                     [asset.owner.email],
                     f"{display_user(user)} wants to use your media {asset.name}",
-                    request_permission_for_media(
-                        user, asset, note if note else "", studio_url
-                    ),
+                    request_permission_for_media(user, asset, note if note else "", studio_url),
                 )
             )
             asyncio.create_task(
@@ -365,15 +365,10 @@ class StudioService:
 
     async def confirm_permission(self, user: UserModel, id: int, approved: bool):
         session = get_session()
-        asset_usage = (
-            session.query(AssetUsageModel).filter(AssetUsageModel.id == id).first()
-        )
+        asset_usage = session.query(AssetUsageModel).filter(AssetUsageModel.id == id).first()
         if not asset_usage:
             raise GraphQLError("Asset not found!")
-        if (
-            user.role not in [SUPER_ADMIN, ADMIN]
-            and user.id != asset_usage.asset.owner_id
-        ):
+        if user.role not in [SUPER_ADMIN, ADMIN] and user.id != asset_usage.asset.owner_id:
             raise GraphQLError("You are not authorized to perform this action!")
 
         asset_id = asset_usage.asset_id
@@ -411,16 +406,13 @@ class StudioService:
         )
         session.flush()
         permissions = (
-            session.query(AssetUsageModel)
-            .filter(AssetUsageModel.asset_id == asset_id)
-            .all()
+            session.query(AssetUsageModel).filter(AssetUsageModel.asset_id == asset_id).all()
         )
 
         return convert_keys_to_camel_case(
             {
                 "permissions": [
-                    convert_keys_to_camel_case(permission.to_dict())
-                    for permission in permissions
+                    convert_keys_to_camel_case(permission.to_dict()) for permission in permissions
                 ],
                 "success": True,
             },
@@ -443,9 +435,7 @@ class StudioService:
         without a full refetch if it wants to.
         """
         session = get_session()
-        asset_usage = (
-            session.query(AssetUsageModel).filter(AssetUsageModel.id == id).first()
-        )
+        asset_usage = session.query(AssetUsageModel).filter(AssetUsageModel.id == id).first()
         if not asset_usage:
             raise GraphQLError("Notification not found!")
 
@@ -481,28 +471,27 @@ class StudioService:
         session.flush()
         return convert_keys_to_camel_case(asset_usage.to_dict())
 
-    def quick_assign_mutation(
-        self, user: UserModel, stage_ids: list[int], asset_id: int
-    ):
+    def quick_assign_mutation(self, user: UserModel, stage_ids: list[int], asset_id: int):
         session = get_session()
-        session.query(ParentStageModel).filter(
-            ParentStageModel.child_asset_id == asset_id
-        ).delete()
+        asset = session.query(AssetModel).filter(AssetModel.id == asset_id).first()
+        if not asset:
+            raise GraphQLError("Asset not found!")
+
+        wanted_ids = [int(stage_id) for stage_id in stage_ids]
+        found_ids = {
+            row.id
+            for row in session.query(StageModel.id).filter(StageModel.id.in_(wanted_ids)).all()
+        }
+        if any(stage_id not in found_ids for stage_id in wanted_ids):
+            raise GraphQLError("Stage not found!")
+
+        snapshot = snapshot_exit_settings(session, asset_id=asset_id)
+        session.query(ParentStageModel).filter(ParentStageModel.child_asset_id == asset_id).delete()
         session.flush()
 
-        for stage_id in stage_ids:
-            asset = session.query(AssetModel).filter(AssetModel.id == asset_id).first()
-            if not asset:
-                raise GraphQLError("Asset not found!")
-
-            stage = session.query(StageModel).filter(StageModel.id == stage_id).first()
-            if not stage:
-                raise GraphQLError("Stage not found!")
-
-            asset.stages.append(
-                ParentStageModel(stage_id=stage_id, child_asset_id=asset_id)
-            )
-            session.flush()
+        for stage_id in wanted_ids:
+            asset.stages.append(make_parent_stage(stage_id, asset_id, snapshot))
+        session.flush()
         return {"success": True}
 
     def get_users(self, active: bool):
@@ -521,9 +510,7 @@ class StudioService:
             convert_keys_to_camel_case(
                 {
                     **stage.to_dict(),
-                    "permission": self.stage_operation_service.resolve_permission(
-                        user.id, stage
-                    ),
+                    "permission": self.stage_operation_service.resolve_permission(user.id, stage),
                 }
             )
             for stage in session.query(StageModel).order_by(StageModel.name.asc()).all()

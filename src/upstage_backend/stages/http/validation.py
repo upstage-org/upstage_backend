@@ -5,9 +5,7 @@ from pydantic import BaseModel, Field, conint
 
 
 class DuplicatePerformanceTrimInput(BaseModel):
-    sourcePerformanceId: int = Field(
-        ..., description="Performance to copy events and chats from"
-    )
+    sourcePerformanceId: int = Field(..., description="Performance to copy events and chats from")
     name: str = Field(..., description="Name for the new performance archive")
     description: str | None = Field(
         None, description="Optional description; copies source when omitted"
@@ -15,8 +13,7 @@ class DuplicatePerformanceTrimInput(BaseModel):
     minPauseSeconds: float = Field(
         ...,
         gt=0,
-        description="Gaps longer than this (seconds) are shortened so only this "
-        "much pause remains",
+        description="Gaps longer than this (seconds) are shortened so only this much pause remains",
     )
 
 
@@ -72,14 +69,23 @@ class UpdateMediaInput(BaseModel):
     base64: Optional[str] = Field(None, description="Base64 encoded media")
     copyrightLevel: Optional[int] = Field(None, description="Copyright level")
     playerAccess: Optional[str] = Field(None, description="Player access information")
-    uploadedFrames: Optional[list[str]] = Field(
-        [], description="List of uploaded frames"
-    )
+    uploadedFrames: Optional[list[str]] = Field([], description="List of uploaded frames")
 
 
 class AssignStagesInput(BaseModel):
     id: int = Field(..., description="ID of the stage")
     stageIds: Optional[list[int]] = Field([], description="List of stage IDs")
+
+
+class UpdateStageAssignmentInput(BaseModel):
+    stageId: int = Field(..., description="ID of the stage")
+    assetId: int = Field(..., description="ID of the assigned media")
+    exitAnimation: Optional[str] = Field(
+        None, description="Exit animation type; None = default (vanish)"
+    )
+    exitSpeed: Optional[int] = Field(
+        None, ge=0, le=600000, description="Exit animation duration in ms; None = default"
+    )
 
 
 class SceneInput(BaseModel):
@@ -92,17 +98,13 @@ class SceneInput(BaseModel):
 class PerformanceInput(BaseModel):
     id: int = Field(..., description="ID of the performance")
     name: str = Field(..., description="Name of the performance")
-    description: Optional[str] = Field(
-        None, description="Description of the performance"
-    )
+    description: Optional[str] = Field(None, description="Description of the performance")
 
 
 class RecordInput(BaseModel):
     stageId: int = Field(..., description="ID of the stage")
     name: str = Field(..., description="Name of the performance")
-    description: Optional[str] = Field(
-        None, description="Description of the performance"
-    )
+    description: Optional[str] = Field(None, description="Description of the performance")
 
 
 class SearchStageInput(BaseModel):
