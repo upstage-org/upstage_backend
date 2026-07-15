@@ -1,11 +1,33 @@
 # -*- coding: iso8859-15 -*-
+"""Seed a new installation with the Demo Stage.
+
+Manifest-driven: everything comes from dashboard/demo/seed/demo_stage_seed.json
+(a sanitized capture of the live upstage.live Demo Stage) plus the media files
+shipped alongside it under dashboard/demo/, which are copied into the uploads
+volume with their original hashed names — the scene payload and the seeded
+board events reference those names via /resources/... URLs.
+
+The stage MUST be named exactly "Demo Stage": StageOperationService.
+assign_user_to_default_stage looks it up by that name to grant every newly
+created user player access, and silently no-ops otherwise.
+
+Run paths:
+  - Automatically on new installations (zero stages) via scripts/run_bootstrap
+    inside the one-shot upstage_db_migrate container, after alembic.
+  - Manually (ungated) via scripts/run_scaffold_load.
+
+Every step is idempotent, so a manual re-run tops up whatever is missing
+(assets dedupe by file_location; the stage, scene and board events are
+skipped when they already exist).
+"""
+
 import os
 
 from upstage_backend.global_config import logger
 
 import json
 import shutil
-from PIL import Image
+import time
 
 from upstage_backend.assets.db_models.asset_type import AssetTypeModel
 from upstage_backend.assets.db_models.asset import AssetModel
@@ -24,6 +46,8 @@ from upstage_backend.assets.db_models.asset import AssetModel
 # resurrect this bug.
 from upstage_backend.assets.db_models.asset_license import AssetLicenseModel  # noqa: F401
 from upstage_backend.assets.db_models.media_tag import MediaTagModel  # noqa: F401
+from upstage_backend.event_archive.db_models.event import EventModel
+from upstage_backend.performance_config.db_models.scene import SceneModel
 from upstage_backend.stages.db_models.stage import StageModel
 from upstage_backend.stages.db_models.stage_attribute import StageAttributeModel
 from upstage_backend.stages.db_models.parent_stage import ParentStageModel
@@ -37,288 +61,275 @@ from upstage_backend.global_config.env import (
 )
 from upstage_backend.global_config.database import ScopedSession
 
-
-class bcolors:
-    HEADER = "\033[95m"
-    OKBLUE = "\033[94m"
-    OKCYAN = "\033[96m"
-    OKGREEN = "\033[92m"
-    WARNING = "\033[93m"
-    FAIL = "\033[91m"
-    ENDC = "\033[0m"
-    BOLD = "\033[1m"
-    UNDERLINE = "\033[4m"
+SEED_FILE = os.path.join("seed", "demo_stage_seed.json")
 
 
-def scan_demo_folder():
-    for type in os.listdir(DEMO_MEDIA_FOLDER):
-        if "." not in type:
-            for media in os.listdir("{}/{}".format(DEMO_MEDIA_FOLDER, type)):
-                yield type, media
+def load_seed():
+    with open(os.path.join(DEMO_MEDIA_FOLDER, SEED_FILE)) as f:
+        return json.load(f)
 
 
-upload_assets_folder = "{}".format(UPLOAD_USER_CONTENT_FOLDER)
+def copy_file(rel_path):
+    """Copy one shipped demo file into the uploads volume, preserving its
+    upload-relative path (and hashed name). Idempotent overwrite."""
+    src = os.path.join(DEMO_MEDIA_FOLDER, rel_path)
+    dest = os.path.join(UPLOAD_USER_CONTENT_FOLDER, rel_path)
+    os.makedirs(os.path.dirname(dest), exist_ok=True)
+    shutil.copyfile(src, dest)
+    return os.path.getsize(src)
 
 
-def copy_file(src_path, dest_path, type):
-    if not os.path.exists(os.path.join(upload_assets_folder, type)):
-        os.makedirs(os.path.join(upload_assets_folder, type))
-    shutil.copyfile(src_path, os.path.join(upload_assets_folder, dest_path))
-
-
-def detect_size(type, path):
-    if type == "video":
-        size = path.split(".")[0].split("_")[-1].split("x")
-        if len(size) == 2:
-            return down_size(size)
-        else:
-            logger.warning(
-                '❌ Please put the video dimension in the stream name, otherwise stream will have square frame. For example "Demo stream_800x600.mp4". Current name: {}{}{}'.format(
-                    bcolors.FAIL, path, bcolors.ENDC
-                )
-            )
-            return 100, 100
-    else:
-        with Image.open(path) as img:
-            return down_size(img.size)
-
-
-def down_size(size):
-    w = int(size[0])
-    h = int(size[1])
-    if w > h:
-        h = 100 * h / w
-        w = 100
-    else:
-        w = 100 * w / h
-        h = 100
-    return w, h
-
-
-def find_existing_demo_asset(session, type, path, owner_id):
-    """
-    If this scaffold was run before, the same on-disk paths and names are reused.
-    Avoid duplicate Asset rows and duplicate file copies.
-    """
-    asset_type = (
-        session.query(AssetTypeModel).filter(AssetTypeModel.name == type).first()
-    )
+def get_or_create_asset_type(session, name):
+    asset_type = session.query(AssetTypeModel).filter(AssetTypeModel.name == name).first()
     if not asset_type:
-        return None
+        asset_type = AssetTypeModel(name=name, file_location="")
+        session.add(asset_type)
+        session.flush()
+    return asset_type
 
-    if "." in path:
-        dest_path = os.path.join(type, path)
-        return (
-            session.query(AssetModel)
-            .filter(
-                AssetModel.owner_id == owner_id,
-                AssetModel.asset_type_id == asset_type.id,
-                AssetModel.file_location == dest_path,
+
+def create_asset(session, owner_id, spec):
+    """Create (or reuse) one manifest asset. Files are always (re)copied so
+    the uploads volume is complete even when the row already existed."""
+    size = copy_file(spec["file_location"])
+    for extra in spec.get("extra_files", []):
+        size += copy_file(extra)
+
+    # Dedupe by file_location alone: a re-run (or a re-seed after the demo
+    # stage was deleted) must reuse the original asset rows so archived
+    # performances keep pointing at valid assets.
+    asset = (
+        session.query(AssetModel).filter(AssetModel.file_location == spec["file_location"]).first()
+    )
+    if asset:
+        logger.warning(
+            '⏩ Reusing existing demo {} "{}" (asset id={})'.format(
+                spec["type"], spec["name"], asset.id
             )
-            .first()
         )
+        return asset
 
+    asset = AssetModel(
+        name=spec["name"],
+        asset_type=get_or_create_asset_type(session, spec["type"]),
+        owner_id=owner_id,
+        file_location=spec["file_location"],
+        description=json.dumps(spec["description"]),
+        size=size,
+    )
+    session.add(asset)
+    session.flush()
+    logger.warning('✅ Created {} "{}"'.format(spec["type"], spec["name"]))
+    return asset
+
+
+def create_demo_media(session, owner_id, seed):
+    """Create the predetermined media set: the stage-assigned assets plus the
+    default media that ships loaded-but-unassigned (e.g. the Chart backdrop
+    the Demo scene's background uses).
+
+    Returns [(asset_id, exit_animation, exit_speed), ...] for stage assignment.
+    """
+    media = []
+    for spec in seed["assets"]:
+        asset = create_asset(session, owner_id, spec)
+        media.append((asset.id, spec.get("exit_animation"), spec.get("exit_speed")))
+    for spec in seed.get("unassigned_assets", []):
+        create_asset(session, owner_id, spec)
+    return media
+
+
+def create_demo_stage(session, owner_id, media, seed):
+    """Create the Demo Stage with its attributes and media assignments.
+    Returns the stage (existing or new); when it already exists nothing is
+    touched — the scene/event seeders below have their own skip guards."""
+    spec = seed["stage"]
     existing = (
-        session.query(AssetModel)
+        session.query(StageModel)
         .filter(
-            AssetModel.owner_id == owner_id,
-            AssetModel.asset_type_id == asset_type.id,
-            AssetModel.name == path,
+            (StageModel.name == spec["name"]) | (StageModel.file_location == spec["file_location"])
         )
         .first()
     )
-    if not existing or not existing.description:
-        return None
-    try:
-        if json.loads(existing.description).get("multi"):
-            return existing
-    except (TypeError, json.JSONDecodeError):
-        pass
-    return None
-
-
-def create_media(session, type, path, owner_id, created_media_ids):
-    existing = find_existing_demo_asset(session, type, path, owner_id)
     if existing:
-        created_media_ids.append(existing.id)
         logger.warning(
-            "⏩ Reusing existing demo {} {} (asset id={})".format(
-                type, path, existing.id
+            '⏩ Stage "{}" (file_location="{}") already exists; not recreating.'.format(
+                existing.name, existing.file_location
             )
         )
-        return
+        return existing
 
-    asset_type = (
-        session.query(AssetTypeModel).filter(AssetTypeModel.name == type).first()
-    )
-    if not asset_type:
-        asset_type = AssetTypeModel(name=type, file_location="")
-        session.add(asset_type)
-        session.flush()
-
-    asset = AssetModel(asset_type=asset_type, owner_id=owner_id, file_location="")
-    attributes = {}
-    size = 0
-    if "." in path:
-        asset.name = os.path.basename(path).split(".")[0]
-        src_path = os.path.join(DEMO_MEDIA_FOLDER, type, path)
-        dest_path = os.path.join(type, path)
-        logger.warning(src_path, dest_path)
-        copy_file(src_path, dest_path, type)
-        asset.file_location = dest_path
-        size += os.path.getsize(src_path)
-        if type != "audio" and path[0] != ".":
-            attributes["w"], attributes["h"] = detect_size(type, src_path)
-    else:
-        attributes["multi"] = True
-        asset.name = path
-        for frame in os.listdir(os.path.join(DEMO_MEDIA_FOLDER, type, path)):
-            src_path = os.path.join(DEMO_MEDIA_FOLDER, type, path, frame)
-            dest_path = os.path.join(type, "{}_{}".format(path, frame))
-            copy_file(src_path, dest_path, type)
-            size += os.path.getsize(src_path)
-            if not asset.file_location:
-                asset.file_location = dest_path
-                attributes["frames"] = []
-                attributes["w"], attributes["h"] = detect_size(type, src_path)
-            attributes["frames"].append(dest_path)
-
-    asset.description = json.dumps(attributes)
-    asset.size = size
-    session.add(asset)
-    session.flush()
-    created_media_ids.append(asset.id)
-    logger.warning(
-        "✅ Created{} {} {}".format(
-            " multi-frame" if "multi" in attributes else "", type, path
-        )
-    )
-
-
-def create_demo_media(session, owner_id, created_media_ids):
-    for type, path in scan_demo_folder():
-        create_media(session, type, path, owner_id, created_media_ids)
-
-
-def next_demo_stage_name(session):
-    """Return 'Demo Stage', 'Demo Stage 2', ... not already used as a stage name."""
-    base = "Demo Stage"
-    if session.query(StageModel).filter(StageModel.name == base).first() is None:
-        return base
-    n = 2
-    while True:
-        candidate = f"{base} {n}"
-        if (
-            session.query(StageModel).filter(StageModel.name == candidate).first()
-            is None
-        ):
-            return candidate
-        n += 1
-
-
-def create_demo_stage(session, owner_id, created_media_ids):
-    # file_location is the live/MQ topic namespace (see StageService / sweep_stage). Every
-    # stage must have a distinct value or they share one channel and mirror each other.
-    # Historically this script used file_location="demo" always and checked name=="Demo"
-    # (wrong — the display name is "Demo Stage"), so re-runs duplicated the topic key.
-    stage_name = next_demo_stage_name(session)
-    file_location = StageService().get_short_name(stage_name, session)
+    # file_location is the live/MQ topic namespace (see StageService /
+    # sweep_stage); it must be unique. The seed asks for "demo" — fall back to
+    # a generated slug only if something else already claimed it (possible
+    # because the name check above matches on EITHER name or slug).
+    file_location = spec["file_location"]
+    if session.query(StageModel).filter(StageModel.file_location == file_location).first():
+        file_location = StageService().get_short_name(spec["name"], session)
 
     stage = StageModel(
-        name=stage_name,
+        name=spec["name"],
         owner_id=owner_id,
-        description="This is a demo stage to help you learn how to use and customise UpStage for your own performances.",
+        description=spec["description"],
         file_location=file_location,
     )
-    status = StageAttributeModel(name="status", description="live", stage=stage)
-    stage.attributes.append(status)
-
-    visibility = StageAttributeModel(name="visibility", description="true", stage=stage)
-    stage.attributes.append(visibility)
-
-    cover_src = os.path.join(DEMO_MEDIA_FOLDER, "demo-stage-cover.jpg")
-    cover_path = os.path.join("media", "demo-stage-cover.jpg")
-    copy_file(cover_src, cover_path, "media")
-    cover = StageAttributeModel(name="cover", description=cover_path, stage=stage)
-    stage.attributes.append(cover)
-
-    all_users = [x.id for x in session.query(UserModel.id).all()]
-    accesses = [[], all_users]
-    player_access = StageAttributeModel(
-        name="playerAccess", description=json.dumps(accesses), stage=stage
-    )
-    stage.attributes.append(player_access)
+    # StageService.create/update also mirrors description into an attribute
+    # row; seed the same shape so a later Save doesn't change anything.
+    attributes = dict(spec["attributes"])
+    attributes["description"] = spec["description"]
+    for name, value in attributes.items():
+        stage.attributes.append(StageAttributeModel(name=name, description=value))
 
     session.add(stage)
     session.flush()
-    for media_id in created_media_ids:
-        session.add(ParentStageModel(stage_id=stage.id, child_asset_id=media_id))
+    for asset_id, exit_animation, exit_speed in media:
+        session.add(
+            ParentStageModel(
+                stage_id=stage.id,
+                child_asset_id=asset_id,
+                exit_animation=exit_animation,
+                exit_speed=exit_speed,
+            )
+        )
     session.flush()
     logger.warning(
         '✅ Created demo stage "{}" (file_location="{}" for live topics)'.format(
-            stage_name, file_location
+            stage.name, file_location
         )
     )
+    return stage
 
 
-def create_demo_users(session):
-    admin_username = "admin"
-    guest_username = "guest"
-    admin_email = "support@upstage.live"
-    guest_email = "guest@upstage.live"
-    test_user_password = "12345678"
-
-    if (
-        session.query(UserModel).filter(UserModel.username == admin_username).first()
-        or session.query(UserModel).filter(UserModel.email == admin_email).first()
-    ):
-        logger.warning(
-            '⏩ An admin user with email "{}" already exists.'.format(admin_email)
+def create_demo_scene(session, stage, owner_id, seed):
+    if session.query(SceneModel).filter(SceneModel.stage_id == stage.id).first():
+        logger.warning("⏩ Stage already has scenes; not seeding the demo scene.")
+        return
+    spec = seed["scene"]
+    session.add(
+        SceneModel(
+            name=spec["name"],
+            scene_order=spec.get("scene_order", 1),
+            scene_preview=spec.get("scene_preview"),
+            payload=json.dumps(spec["payload"]),
+            active=spec.get("active", True),
+            owner_id=owner_id,
+            stage_id=stage.id,
         )
-    else:
-        admin = UserModel()
-        admin.username = admin_username
-        admin.password = encrypt(test_user_password)
-        admin.email = admin_email
-        admin.role = ADMIN
-        admin.active = True
-        session.add(admin)
-        logger.warning(
-            '✅ Created admin account with credentials: "{}" and password "{}"'.format(
-                admin_username, test_user_password
-            )
-        )
+    )
+    session.flush()
+    logger.warning('✅ Created demo scene "{}"'.format(spec["name"]))
 
-    if (
-        session.query(UserModel).filter(UserModel.username == guest_username).first()
-        or session.query(UserModel).filter(UserModel.email == guest_email).first()
-    ):
-        logger.warning(
-            '⏩ A guest user with email "{}" already exists.'.format(guest_username)
+
+def seed_board_events(session, stage, seed):
+    """Put the initial objects on the board. Board state is materialised by
+    replaying live events (get_event_list matches topic %/<slug>/% with any
+    prefix), so plain event rows with a fixed prefix work on any install."""
+    existing = (
+        session.query(EventModel)
+        .filter(
+            EventModel.performance_id == None,  # noqa: E711  (SQLAlchemy column NULL comparison)
+            EventModel.topic.like("%/{}/%".format(stage.file_location)),
         )
-    else:
-        guest = UserModel()
-        guest.username = guest_username
-        guest.password = encrypt(test_user_password)
-        guest.email = guest_email
-        guest.role = GUEST
-        guest.active = True
-        session.add(guest)
-        logger.warning(
-            '✅ Created guest account with credentials: "{}" and password "{}"'.format(
-                guest_username, test_user_password
+        .first()
+    )
+    if existing:
+        logger.warning("⏩ Stage already has live events; not seeding the board.")
+        return
+    timestamp = time.time()
+    for offset, event in enumerate(seed["board_events"]):
+        session.add(
+            EventModel(
+                topic="upstage/{}/{}".format(stage.file_location, event["topic_suffix"]),
+                # Tiny increasing offsets keep replay order deterministic.
+                mqtt_timestamp=timestamp + offset * 0.001,
+                performance_id=None,
+                payload=event["payload"],
             )
         )
     session.flush()
+    logger.warning(
+        "✅ Seeded {} board object(s) onto the demo stage".format(len(seed["board_events"]))
+    )
+
+
+DEFAULT_SCAFFOLD_PASSWORD = "12345678"
+
+
+def get_or_create_user(session, username, email, role, password=None):
+    existing = (
+        session.query(UserModel)
+        .filter((UserModel.username == username) | (UserModel.email == email))
+        .first()
+    )
+    if existing:
+        logger.warning('⏩ A user "{}" / "{}" already exists.'.format(username, email))
+        return existing
+
+    password = password or DEFAULT_SCAFFOLD_PASSWORD
+    user = UserModel()
+    user.username = username
+    user.password = encrypt(password)
+    user.email = email
+    user.role = role
+    user.active = True
+    session.add(user)
+    session.flush()
+    logger.warning(
+        '✅ Created account with credentials: "{}" and password "{}"'.format(username, password)
+    )
+    return user
+
+
+def create_demo_users(session):
+    """Create the default logins: admin, guest, and the Demo1 player used in
+    demos/workshops (its password is the one publicly documented in the
+    upstage.live foyer text). Returns the Demo1 user so it can be granted
+    player access on the Demo Stage."""
+    get_or_create_user(session, "admin", "support@upstage.live", ADMIN)
+    get_or_create_user(session, "guest", "guest@upstage.live", GUEST)
+    return get_or_create_user(
+        session, "Demo1", "demo1@upstage.org.nz", GUEST, password="DemoUpStage"
+    )
+
+
+def grant_player_access(session, stage, users):
+    """Append the given users to the stage's playerAccess player list
+    (index 0 — same contract as assign_user_to_default_stage, inlined here
+    because the scaffold owns its own session). Idempotent."""
+    attribute = stage.attributes.filter(StageAttributeModel.name == "playerAccess").first()
+    if not attribute or not attribute.description:
+        return
+    try:
+        accesses = json.loads(attribute.description)
+    except (TypeError, json.JSONDecodeError):
+        return
+    if not isinstance(accesses, list) or not accesses or not isinstance(accesses[0], list):
+        return
+    changed = False
+    for user in users:
+        user_id = str(user.id)
+        if user_id not in accesses[0]:
+            accesses[0].append(user_id)
+            changed = True
+    if changed:
+        attribute.description = json.dumps(accesses)
+        session.flush()
+        logger.warning(
+            '✅ Granted player access on "{}" to: {}'.format(
+                stage.name, ", ".join(u.username for u in users)
+            )
+        )
 
 
 def save_config(session, name, value):
+    """Fill in a default ONLY when the key is missing. Existing values are
+    operator configuration (foyer text, T&Cs, ...) that a re-run — manual or
+    --force — must never clobber."""
     config = session.query(ConfigModel).filter(ConfigModel.name == name).first()
     if config:
-        config.value = value
-    else:
-        config = ConfigModel(name=name, value=value)
-        session.add(config)
+        logger.warning('⏩ Config "{}" already set; keeping existing value.'.format(name))
+        return
+    session.add(ConfigModel(name=name, value=value))
     session.flush()
 
 
@@ -344,14 +355,21 @@ def scaffold_system_configuration(session):
 
 
 def main():
-    created_media_ids = []
+    seed = load_seed()
     with ScopedSession() as s:
+        # Users first, so the admin lookup below finds the account this very
+        # run created on a fresh database.
+        demo_player = create_demo_users(s)
         owner = s.query(UserModel).filter(UserModel.username == "admin").first()
         owner_id = owner.id if owner else 0
 
-        create_demo_media(s, owner_id, created_media_ids)
-        create_demo_stage(s, owner_id, created_media_ids)
-        create_demo_users(s)
+        media = create_demo_media(s, owner_id, seed)
+        stage = create_demo_stage(s, owner_id, media, seed)
+        create_demo_scene(s, stage, owner_id, seed)
+        seed_board_events(s, stage, seed)
+        # Users created via the API get this from assign_user_to_default_stage;
+        # scaffold-created logins need it granted here.
+        grant_player_access(s, stage, [demo_player])
         scaffold_foyer(s)
         scaffold_system_configuration(s)
 
