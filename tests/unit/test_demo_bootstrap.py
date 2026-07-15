@@ -160,13 +160,44 @@ def test_no_session_state_leaks_into_scene_or_events():
     assert _walk_keys(seed["board_events"], banned) == []
 
 
-def test_board_events_place_the_expected_objects():
-    events = _seed()["board_events"]
-    assert [e["payload"]["type"] for e in events] == ["placeObjectOnStage"] * 2
-    assert {e["payload"]["object"]["name"] for e in events} == {
-        "penguin",
-        "UpStage logo",
-    }
+def test_board_events_recreate_the_current_demo_look():
+    # The seeded live events reproduce the captured stage state: the cover
+    # backdrop, then the welcome text, the logo and the penguin, in scene
+    # z-order.
+    seed = _seed()
+    events = seed["board_events"]
+    assert [e["payload"]["type"] for e in events] == ["changeBackground"] + [
+        "placeObjectOnStage"
+    ] * 3
+
+    background = events[0]["payload"]["background"]
+    rel = background["src"].removeprefix("/resources/")
+    assert rel in {a["file_location"] for a in _all_assets(seed)}
+
+    objects = [e["payload"]["object"] for e in events[1:]]
+    assert [o["type"] for o in objects] == ["text", "prop", "avatar"]
+    assert {o.get("name") for o in objects} == {None, "UpStage logo", "penguin"}
+    # The welcome text was captured mid-edit; it must not ship stuck in
+    # editing mode.
+    assert all(not o.get("editing") for o in objects)
+
+
+def test_board_events_mirror_the_active_scene():
+    # The board events and the seeded scene are two routes to the same look
+    # (replayed live events vs. a player switching to the scene); keep them
+    # in lockstep so a re-capture can't update one and forget the other.
+    seed = _seed()
+    scene_objects = seed["scene"]["payload"]["board"]["objects"]
+    event_objects = [
+        e["payload"]["object"]
+        for e in seed["board_events"]
+        if e["payload"]["type"] == "placeObjectOnStage"
+    ]
+    assert [o["id"] for o in event_objects] == [o["id"] for o in scene_objects]
+    assert (
+        seed["board_events"][0]["payload"]["background"]["src"]
+        == seed["scene"]["payload"]["background"]["src"]
+    )
 
 
 def test_video_asset_ships_its_poster():

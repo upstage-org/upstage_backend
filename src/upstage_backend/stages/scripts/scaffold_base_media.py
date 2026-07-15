@@ -2,7 +2,7 @@
 """Seed a new installation with the Demo Stage.
 
 Manifest-driven: everything comes from dashboard/demo/seed/demo_stage_seed.json
-(a sanitized capture of the live upstage.live Demo Stage) plus the media files
+(a sanitized capture of the reference Demo Stage) plus the media files
 shipped alongside it under dashboard/demo/, which are copied into the uploads
 volume with their original hashed names — the scene payload and the seeded
 board events reference those names via /resources/... URLs.
