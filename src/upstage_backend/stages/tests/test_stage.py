@@ -105,6 +105,74 @@ class TestStageController:
         assert "errors" not in response
         return response
 
+    def search_stages(self, client, headers, name):
+        query = """
+            query stages($input: SearchStageInput) {
+                stages(input: $input) {
+                    totalCount
+                    edges {
+                        id
+                        name
+                        fileLocation
+                    }
+                }
+            }
+        """
+        response = client.post(
+            "/api/studio_graphql",
+            json={"query": query, "variables": {"input": {"name": name}}},
+            headers=headers,
+        )
+        assert response.status_code == 200
+        assert "errors" not in response.json()
+        return response.json()["data"]["stages"]["edges"]
+
+    async def test_03_search_stage_by_name_or_url(self, client):
+        data = await test_AuthenticationController.test_02_login_successfully(client)
+        headers = {
+            "Authorization": f"Bearer {data['data']['login']['access_token']}",
+            JWT_HEADER_NAME: data["data"]["login"]["refresh_token"],
+        }
+
+        variables = {
+            "input": {
+                "fileLocation": "presentation29april",
+                "status": "active",
+                "visibility": True,
+                "cover": "http://example.com/cover.jpg",
+                "name": "Teater InterAkt presentation",
+                "description": "Stage whose name differs from its URL slug",
+                "playerAccess": "public",
+                "config": None,
+            }
+        }
+        query = """
+            mutation createStage($input: StageInput!) {
+                createStage(input: $input) {
+                    id
+                }
+            }
+        """
+        response = client.post(
+            "/api/studio_graphql",
+            json={"query": query, "variables": variables},
+            headers=headers,
+        )
+        assert response.status_code == 200
+        assert "errors" not in response.json()
+        stage_id = response.json()["data"]["createStage"]["id"]
+
+        # Name fragment that does not occur in the URL slug.
+        by_name = self.search_stages(client, headers, "Teater InterAkt")
+        assert any(edge["id"] == stage_id for edge in by_name)
+
+        # URL fragment that does not occur in the name.
+        by_url = self.search_stages(client, headers, "29april")
+        assert any(edge["id"] == stage_id for edge in by_url)
+
+        no_match = self.search_stages(client, headers, "zzz-no-such-stage")
+        assert not any(edge["id"] == stage_id for edge in no_match)
+
     # async def test_03_update_stage_failed(self, client):
     #     data = await test_AuthenticationController.test_02_login_successfully(client)
     #     response = self.update_stage(client, 1000, data)

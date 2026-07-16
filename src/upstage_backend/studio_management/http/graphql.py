@@ -617,6 +617,15 @@ type_defs = gql("""
         Dormant
     }
 
+    # What happens to a deleted user's content. Both paths delete their
+    # stages, scenes and non-reusable media; REASSIGN_TO_ADMIN additionally
+    # hands their avatars, props and backdrops to the canonical admin
+    # account instead of deleting them.
+    enum UserContentAction {
+        REASSIGN_TO_ADMIN
+        DELETE_ALL
+    }
+
     enum StageSortEnum {
         ID_ASC
         ID_DESC
@@ -639,7 +648,7 @@ type_defs = gql("""
     type Mutation {
         batchUserCreation(users: [BatchUserInput]!): BatchUserCreationPayload
         updateUser(input: UpdateUserInput!): User
-        deleteUser(id: ID!): CommonResponse
+        deleteUser(id: ID!, contentAction: UserContentAction = REASSIGN_TO_ADMIN): CommonResponse
         uploadFile(base64: String!, filename: String!): File!
         saveMedia(input: SaveMediaInput!): SaveMediaPayload!
         updateMediaStatus(input: UpdateMediaStatusInput): CommonResponse

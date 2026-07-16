@@ -5,7 +5,7 @@ from datetime import datetime
 from graphql import GraphQLError
 import jwt
 from requests import Request
-from sqlalchemy import and_, nulls_last, exists
+from sqlalchemy import and_, nulls_last, exists, or_
 from upstage_backend.global_config import get_session
 from upstage_backend.global_config.env import ALGORITHM, SECRET_KEY
 from upstage_backend.global_config.helpers.bearer import parse_bearer_token
@@ -63,7 +63,12 @@ class StageService:
         )
 
         if input.name:
-            query = query.filter(StageModel.name.ilike(f"%{input.name}%"))
+            # The studio search box matches either the stage name or its URL
+            # slug — names and file locations frequently differ.
+            pattern = f"%{input.name}%"
+            query = query.filter(
+                or_(StageModel.name.ilike(pattern), StageModel.file_location.ilike(pattern))
+            )
 
         if input.owners:
             query = query.filter(UserModel.username.in_(input.owners))

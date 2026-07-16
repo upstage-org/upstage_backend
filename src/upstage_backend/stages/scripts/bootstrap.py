@@ -19,8 +19,15 @@ def is_new_installation(session) -> bool:
 def bootstrap(force: bool = False) -> bool:
     """Seed the demo scaffold on a new installation. Returns True when the
     scaffold ran, False when it was skipped because stages already exist.
-    `force` bypasses the gate (used for controlled re-seeding in dev)."""
+    `force` bypasses the gate (used for controlled re-seeding in dev).
+
+    The canonical admin account and the deleted-media placeholder asset are
+    guaranteed on EVERY run, gate or no gate: user deletion depends on both
+    (reassignment target / substitution asset), so established installs must
+    be topped up too."""
     with ScopedSession() as session:
+        admin = scaffold_base_media.ensure_admin_user(session)
+        scaffold_base_media.ensure_placeholder_asset(session, admin.id)
         new_installation = is_new_installation(session)
     if not new_installation and not force:
         logger.warning("⏩ Stages already exist; skipping the demo-stage scaffold.")
