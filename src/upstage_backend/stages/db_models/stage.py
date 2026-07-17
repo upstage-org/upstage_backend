@@ -24,7 +24,16 @@ class StageModel(BaseModel):
     last_access = Column(DateTime, nullable=True)
     owner = relationship("UserModel", foreign_keys=[owner_id])
     attributes = relationship(lambda: StageAttributeModel, lazy="dynamic", back_populates="stage")
-    assets = relationship("ParentStageModel", lazy="dynamic", back_populates="stage")
+    # Ordered by parent_stage PK: assignMedia recreates the rows in the
+    # order the client sent, so PK order IS the saved media order (drives
+    # the on-stage toolbar ordering; without an explicit ORDER BY Postgres
+    # may return updated rows in arbitrary order).
+    assets = relationship(
+        "ParentStageModel",
+        lazy="dynamic",
+        back_populates="stage",
+        order_by="ParentStageModel.id",
+    )
 
     @hybrid_property
     def cover(self):
