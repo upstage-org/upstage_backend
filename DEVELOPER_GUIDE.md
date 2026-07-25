@@ -67,11 +67,11 @@ That makes `upstage_backend` importable from any directory, so `uvicorn upstage_
 
 ### 3.1. Compose services
 
-The backend compose file ([`app_containers/docker-compose.yaml`](upstage_backend/app_containers/docker-compose.yaml), templated per site via the `${SITE}` env var) declares one one-shot migration service plus three long-running app services on a shared network. The one-shot runs Alembic to heads, then exits; the three app services `depends_on` it with `service_completed_successfully`, so on a fresh DB nobody tries to write to a not-yet-migrated table:
+The backend compose file ([`app_containers/docker-compose.yaml`](upstage_backend/app_containers/docker-compose.yaml), templated per site via the `${SITE}` env var) declares one one-shot migration service plus three long-running app services on a shared network. The one-shot runs Alembic to head (single consolidated chain in `alembic/versions/`, root `alembic.ini`), then exits; the three app services `depends_on` it with `service_completed_successfully`, so on a fresh DB nobody tries to write to a not-yet-migrated table:
 
 ```upstage_backend/app_containers/docker-compose.yaml
 services:
-  upstage_db_migrate:        # one-shot: alembic upgrade heads, exit 0
+  upstage_db_migrate:        # one-shot: alembic upgrade head, exit 0
   upstage_backend:           # FastAPI; runs ./scripts/start_upstage.sh
   upstage_event_archive:     # MQTT→Postgres; runs ./scripts/run_event_archive.sh
   upstage_stats:             # connection-stats aggregator; runs ./scripts/run_upstage_stats.sh
@@ -751,7 +751,7 @@ Useful scripts:
 - [`upstage_backend/scripts/start_upstage.sh`](upstage_backend/scripts/start_upstage.sh) — uvicorn launcher.
 - [`upstage_backend/scripts/run_event_archive.py`](upstage_backend/scripts/run_event_archive.py) — async archive worker.
 - [`upstage_backend/scripts/run_upstage_stats.py`](upstage_backend/scripts/run_upstage_stats.py) — stats aggregator.
-- [`upstage_backend/create-migration.sh`](upstage_backend/create-migration.sh) — alembic revision helper; migrations live per-module in `*/db_migrations/`.
+- Migrations live in [`upstage_backend/alembic/versions/`](upstage_backend/alembic/versions/) (single chain, root `alembic.ini`); new revision: `alembic -c ./alembic.ini revision -m "..."` — see README §Migrations.
 
 ## 10. Where to look for what
 
@@ -761,7 +761,7 @@ Quick reference for common tasks.
 |---|---|
 | Add a new MQTT interaction | Add a constant to [`utils/constants.ts`](upstage_frontend/src/utils/constants.ts), dispatch/handle in [`store/modules/stage/index.ts`](upstage_frontend/src/store/modules/stage/index.ts); nothing to change server-side because the archive persists any new topic matching `PERFORMANCE_TOPIC_RULE` |
 | Add a new GraphQL query/mutation | Schema SDL in the relevant module's `http/graphql.py`, resolver wiring in `http/schema.py`, business logic in `services/*.py`; then expose via [`studio_management/http/graphql.py`](upstage_backend/src/upstage_backend/studio_management/http/graphql.py) if it's not already |
-| Add a column to `events` | Extend [`upstage_backend/src/upstage_backend/event_archive/db_models/event.py`](upstage_backend/src/upstage_backend/event_archive/db_models/event.py), create an alembic migration in [`event_archive/db_migrations/`](upstage_backend/src/upstage_backend/event_archive/db_migrations/), update [`event_archive/writer.py`](upstage_backend/src/upstage_backend/event_archive/writer.py) to set it, update the GraphQL `Event` type |
+| Add a column to `events` | Extend [`upstage_backend/src/upstage_backend/event_archive/db_models/event.py`](upstage_backend/src/upstage_backend/event_archive/db_models/event.py), create an alembic migration in [`alembic/versions/`](upstage_backend/alembic/versions/), update [`event_archive/writer.py`](upstage_backend/src/upstage_backend/event_archive/writer.py) to set it, update the GraphQL `Event` type |
 | Debug "stage looks blank" | Check `events.payload` in Postgres for the stage (`topic LIKE '%/<fileLocation>/%' AND performance_id IS NULL`); if zero rows, inspect the `event_archive` container logs for subscriber errors; confirm MQTT broker reachable |
 | Add a new backend service | Copy the `upstage_event_archive_dev` stanza in [`docker-compose.yaml`](upstage_backend/app_containers/docker-compose.yaml) |
 | Change what's served as static assets | `uploads/` volume in the backend container; served via the reverse proxy |

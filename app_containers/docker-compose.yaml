@@ -64,7 +64,7 @@ x-common-build: &common_build |
 
   # Bake in sources (replaces former /app_code_${SITE} bind mounts).
   COPY --chown=appuser:appuser pyproject.toml uv.lock* ./
-  COPY --chown=appuser:appuser pytest.ini conftest.py ./
+  COPY --chown=appuser:appuser pytest.ini conftest.py alembic.ini ./
   COPY --chown=appuser:appuser src ./src
   COPY --chown=appuser:appuser scripts ./scripts
   COPY --chown=appuser:appuser alembic ./alembic
@@ -86,7 +86,7 @@ x-common-build: &common_build |
 # ====================== Services ======================
 services:
   # One-shot migration + install-bootstrap runner. Exits 0 once Alembic is at
-  # heads and, on a NEW installation only (zero stages in the DB), the demo
+  # head and, on a NEW installation only (zero stages in the DB), the demo
   # scaffold has seeded the Demo Stage (media, scene, board, default logins) —
   # see scripts/run_bootstrap.py. On established installs the bootstrap is a
   # no-op skip. The three
@@ -112,7 +112,7 @@ services:
       /bin/bash -c "
       cd /usr/app &&
       export HARDCODED_HOSTNAME=${HARDCODED_HOSTNAME} &&
-      python -m alembic -c ./scripts/alembic.ini upgrade heads &&
+      python -m alembic -c ./alembic.ini upgrade head &&
       python -m scripts.run_bootstrap"
     restart: "no"
     networks:

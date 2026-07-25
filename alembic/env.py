@@ -1,8 +1,6 @@
 # -*- coding: iso8859-15 -*-
-import os
-
 from logging.config import fileConfig
-from dotenv import dotenv_values
+
 from sqlalchemy import engine_from_config, pool, text
 from upstage_backend.global_config import DATABASE_URL
 
@@ -16,14 +14,6 @@ config = context.config
 # This line sets up loggers basically.
 if config.config_file_name is not None:
     fileConfig(config.config_file_name)
-
-# add database config from .env
-loaded_env = dotenv_values(".env")
-
-
-def get_env(key, default=None):
-    return loaded_env.get(key) or os.getenv(key, default)
-
 
 config.set_main_option("sqlalchemy.url", DATABASE_URL)
 

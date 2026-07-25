@@ -1,4 +1,4 @@
-#!/bin/bash 
+#!/bin/bash
 # Make sure the setup-os.sh has been executed before this script.
 export DEBIAN_FRONTEND=noninteractive
 
@@ -67,7 +67,7 @@ case $machinetype in
            if [[ $? -ne 0 ]]; then
                echo "Certbot failed. Please wait a bit for your new DNS entries to propagate through the internet, and then retry."
                exit 1
-           fi 
+           fi
            sed "s/YOUR_DOMAIN_NAME/$dname/g" ./initial_scripts/nginx_templates/nginx_template_for_svc_machines.conf >/etc/nginx/sites-available/$dname.conf
            mkdir -p /postgresql_data/var
            mkdir -p /postgresql_data/data
@@ -75,7 +75,7 @@ case $machinetype in
            mkdir -p /mosquitto_files/etc/mosquitto/cron
            mkdir -p /mosquitto_files/var/lib/mosquitto
            ./initial_scripts/environments/generate_environments_script.sh
-           
+
            chmod +x ./scripts/generate_cipher_key.sh
            ./scripts/generate_cipher_key.sh
 
@@ -88,9 +88,9 @@ case $machinetype in
            cp ./container_scripts/mqtt_server/pw.txt /mosquitto_files/etc/mosquitto/pw.backup
            cp ./container_scripts/mqtt_server/local_mosquitto.conf /mosquitto_files/etc/mosquitto/conf.d/local_mosquitto.conf
            cp ./container_scripts/mqtt_server/add_mqtt_cert_crontab.sh /mosquitto_files/etc/mosquitto/cron/add_mqtt_cert_crontab.sh
-           cd ./service_containers && ./run_docker_compose.sh 
+           cd ./service_containers && ./run_docker_compose.sh
 
-           # Mosquitto inbound websocket port. Mosquitto is password-protected. 
+           # Mosquitto inbound websocket port. Mosquitto is password-protected.
            # The websocket needs to be open to the world, since the front end attaches to it.
            # The TCP port is private, only used by our app server.
            ufw allow 9002/any
@@ -103,13 +103,14 @@ Completed service container setup."
            if [[ $? -ne 0 ]]; then
                echo "Certbot failed. Please wait a bit for your new DNS entries to propagate through the internet, and then retry."
                exit 1
-           fi 
+           fi
            sed "s/YOUR_DOMAIN_NAME/$dname/g" ./initial_scripts/nginx_templates/nginx_template_for_app_machines.conf >/etc/nginx/sites-available/$dname.conf
            mkdir -p /frontend_code
            mkdir -p /app_code/demo
            mkdir -p /app_code/uploads
            cp -r ./src /app_code
            cp -r ./alembic /app_code
+           cp ./alembic.ini /app_code
            cp -r ./scripts /app_code
            cp -r ./dashboard/demo /app_code
            cp -r ./requirements.txt /app_code
@@ -126,9 +127,9 @@ Note that on Digital Ocean, the third IP in the 'hostname -I' command: ${arr[2]}
            echo "ufw allow from $APP_HOST proto any to any port 1884 " >> $run_these_ufw_commands
 
            read -p "
-Please log into your service machine in another shell, and copy your load_env.py file generated on your service machine (most likely here: /root/upstage_backend/src/global_config ) to /app_code/src/global_config on this machine. 
+Please log into your service machine in another shell, and copy your load_env.py file generated on your service machine (most likely here: /root/upstage_backend/src/global_config ) to /app_code/src/global_config on this machine.
 
-You can do so by running 'scp' to copy the file down to your local machine, then using scp to copy it up to the app machine: 
+You can do so by running 'scp' to copy the file down to your local machine, then using scp to copy it up to the app machine:
 
 On your own machine, in a shell window, run these, something like this:
 
@@ -141,12 +142,12 @@ Once this is done, press enter to continue: " ready
 
            read -p "
 Run the contents of this script over on the service machine:
-           `cat $run_these_ufw_commands` 
+           `cat $run_these_ufw_commands`
            Press enter when finished: " ready
-           cd ./app_containers && ./run_docker_compose.sh 
+           cd ./app_containers && ./run_docker_compose.sh
                 ;;
 
-        
+
         3) IFS='.' read -ra parts <<< "$dname"
            sed -i "s/^127.0.1.1.*$/127.0.1.1 ${dname} auth.${dname} ${parts[0]} auth.${parts[0]}/" /etc/hosts
            export DEBIAN_FRONTEND=dialog
@@ -162,7 +163,7 @@ Run the contents of this script over on the service machine:
            if [[ $? -ne 0 ]]; then
                echo "Certbot failed. Please wait a bit for your new DNS entries to propagate through the internet, and then retry."
                exit 1
-           fi 
+           fi
            # Prosody, a Jitsi component, needs 'auth' even if users won't be logging into your stream.
            sed "s/YOUR_DOMAIN_NAME/$dname/g" ./initial_scripts/nginx_templates/nginx_template_for_streaming_machines.conf >/etc/nginx/sites-available/$dname.conf
            ufw allow 10000/udp          # Used by Jitsi-videobridge to run an internal test when connection id bad.
@@ -177,9 +178,9 @@ Run the contents of this script over on the service machine:
 	   echo "deb http://deb.debian.org/debian bookworm main" > /etc/apt/sources.list.d/bookworm.list && \
            apt-get update && \
            apt-get install -y openjdk-17-jre-headless
-           read -p "In the next two prompts, Jitsi will ask for your full domain name (not the 'auth.' domain). 
+           read -p "In the next two prompts, Jitsi will ask for your full domain name (not the 'auth.' domain).
 
-It will then ask you about SSL keys. Choose 'I want to use my own certificate'. 
+It will then ask you about SSL keys. Choose 'I want to use my own certificate'.
 
 Jitsi will prompt you for the location of the existing SSL keys. These are the responses:
 
