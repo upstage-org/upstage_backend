@@ -52,7 +52,7 @@ from upstage_backend.stages.db_models.stage import StageModel
 from upstage_backend.stages.db_models.stage_attribute import StageAttributeModel
 from upstage_backend.stages.db_models.parent_stage import ParentStageModel
 from upstage_backend.stages.services.stage import StageService
-from upstage_backend.users.db_models.user import UserModel, ADMIN, GUEST
+from upstage_backend.users.db_models.user import UserModel, GUEST, SUPER_ADMIN
 from upstage_backend.upstage_options.db_models.config import ConfigModel
 from upstage_backend.global_config.helpers.fernet_crypto import encrypt
 from upstage_backend.global_config.env import (
@@ -254,6 +254,100 @@ def seed_board_events(session, stage, seed):
 
 DEFAULT_SCAFFOLD_PASSWORD = "12345678"
 
+# The canonical admin account. Guaranteed to exist on every install (created
+# by ensure_admin_user, run unconditionally from bootstrap): it is the
+# reassignment target when a deleted user's media is kept, and it owns the
+# deleted-media placeholder asset.
+CANONICAL_ADMIN_USERNAME = "admin"
+CANONICAL_ADMIN_EMAIL = "support@upstage.live"
+CANONICAL_ADMIN_PASSWORD = "Secret@123"
+
+# Stand-in shown wherever a deleted user's media is still referenced by a
+# surviving stage, scene or recording. The stable file_location is the
+# substitution target StudioService.delete_user rewrites payloads to.
+PLACEHOLDER_FILE_LOCATION = "prop/upstage_deleted_media_placeholder.svg"
+PLACEHOLDER_SPEC = {
+    "name": "Deleted media placeholder",
+    "type": "prop",
+    "file_location": PLACEHOLDER_FILE_LOCATION,
+    "description": {
+        "multi": False,
+        "frames": [],
+        "w": 100.0,
+        "h": 100.0,
+        "note": "Automatic stand-in for media that was deleted with its owner's account.",
+    },
+}
+
+
+def ensure_admin_user(session):
+    """Return the canonical admin, creating it when missing. Matches by
+    username ONLY (never email): an operator may have changed the admin's
+    email, and a foreign account holding one of the legacy admin emails must
+    not be mistaken for it. An existing row is never modified — operators own
+    its password and role."""
+    existing = (
+        session.query(UserModel).filter(UserModel.username == CANONICAL_ADMIN_USERNAME).first()
+    )
+    if existing:
+        return existing
+    # Not get_or_create_user: that helper also matches by email, and a foreign
+    # account holding the canonical email must not be adopted as the admin.
+    user = UserModel()
+    user.username = CANONICAL_ADMIN_USERNAME
+    user.password = encrypt(CANONICAL_ADMIN_PASSWORD)
+    user.email = CANONICAL_ADMIN_EMAIL
+    user.role = SUPER_ADMIN
+    user.active = True
+    session.add(user)
+    session.flush()
+    logger.warning(
+        '✅ Created the canonical admin account "{}" with the default password.'.format(
+            CANONICAL_ADMIN_USERNAME
+        )
+    )
+    return user
+
+
+def ensure_placeholder_asset(session, owner_id):
+    """Create (or reuse) the deleted-media placeholder asset, copying the
+    shipped SVG into the uploads volume when it is missing there. Unlike
+    create_asset this must run at request time too (StudioService.delete_user
+    calls it), where dashboard/demo may not be shipped — so a failed copy is
+    tolerated as long as the asset row already exists."""
+    asset = (
+        session.query(AssetModel)
+        .filter(AssetModel.file_location == PLACEHOLDER_FILE_LOCATION)
+        .first()
+    )
+    dest = os.path.join(UPLOAD_USER_CONTENT_FOLDER, PLACEHOLDER_FILE_LOCATION)
+    if not os.path.exists(dest):
+        try:
+            copy_file(PLACEHOLDER_FILE_LOCATION)
+        except OSError:
+            if asset:
+                logger.warning(
+                    "⚠️ Placeholder file missing from uploads and demo media "
+                    "unavailable; keeping the existing asset row."
+                )
+                return asset
+            raise
+    if asset:
+        return asset
+
+    asset = AssetModel(
+        name=PLACEHOLDER_SPEC["name"],
+        asset_type=get_or_create_asset_type(session, PLACEHOLDER_SPEC["type"]),
+        owner_id=owner_id,
+        file_location=PLACEHOLDER_FILE_LOCATION,
+        description=json.dumps(PLACEHOLDER_SPEC["description"]),
+        size=os.path.getsize(dest),
+    )
+    session.add(asset)
+    session.flush()
+    logger.warning('✅ Created the "{}" asset'.format(PLACEHOLDER_SPEC["name"]))
+    return asset
+
 
 def get_or_create_user(session, username, email, role, password=None):
     existing = (
@@ -284,7 +378,7 @@ def create_demo_users(session):
     """Create the default logins: admin, guest, and the Demo1/Demo2/Demo3
     players referenced by the demo scene info and the docs (their shared
     password is the one publicly documented in the upstage.live foyer text)."""
-    get_or_create_user(session, "admin", "support@upstage.live", ADMIN)
+    ensure_admin_user(session)
     get_or_create_user(session, "guest", "guest@upstage.live", GUEST)
     for n in (1, 2, 3):
         get_or_create_user(
@@ -363,9 +457,10 @@ def main():
         # Users first, so the admin lookup below finds the account this very
         # run created on a fresh database.
         create_demo_users(s)
-        owner = s.query(UserModel).filter(UserModel.username == "admin").first()
+        owner = s.query(UserModel).filter(UserModel.username == CANONICAL_ADMIN_USERNAME).first()
         owner_id = owner.id if owner else 0
 
+        ensure_placeholder_asset(s, owner_id)
         media = create_demo_media(s, owner_id, seed)
         stage = create_demo_stage(s, owner_id, media, seed)
         create_demo_scene(s, stage, owner_id, seed)

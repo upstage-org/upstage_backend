@@ -47,9 +47,7 @@ def admin_players(_, __, **kwargs):
 @query.field("getAllStages")
 @authenticated()
 def stages(_, info):
-    return StudioService().stages(
-        UserModel(**info.context["request"].state.current_user)
-    )
+    return StudioService().stages(UserModel(**info.context["request"].state.current_user))
 
 
 @query.field("users")
@@ -72,9 +70,11 @@ async def update_user(_, __, input: UpdateUserInput, studio_service=StudioServic
 
 @mutation.field("deleteUser")
 @authenticated(allowed_roles=[SUPER_ADMIN, ADMIN])
-def delete_user(_, info, id: int):
+def delete_user(_, info, id: int, contentAction: str = "REASSIGN_TO_ADMIN"):
     return StudioService().delete_user(
-        id, UserModel(**info.context["request"].state.current_user)
+        id,
+        UserModel(**info.context["request"].state.current_user),
+        contentAction,
     )
 
 

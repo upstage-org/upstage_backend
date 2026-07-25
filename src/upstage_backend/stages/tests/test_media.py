@@ -43,9 +43,7 @@ class TestMediaController:
         stage = await test_StageController.test_01_create_stage(client)
         await test_AssetController.test_03_save_media_successfully(client)
         assets = get_session().query(AssetModel).all()
-        response = await self.assign_media(
-            client, stage["id"], [asset.id for asset in assets]
-        )
+        response = await self.assign_media(client, stage["id"], [asset.id for asset in assets])
 
         assert "data" in response.json()
         assert "assignMedia" in response.json()["data"]
@@ -148,9 +146,7 @@ class TestMediaController:
     async def test_05_delete_media(self, client):
         headers = test_AuthenticationController.get_headers(client, SUPER_ADMIN)
         asset = get_session().query(AssetModel).first()
-        self.update_media(
-            client, headers, asset.id, f"image/test{random.randint(1, 1000)}.png"
-        )
+        self.update_media(client, headers, asset.id, f"image/test{random.randint(1, 1000)}.png")
 
         response = self.delete_media_request(client, headers, asset)
         assert response.json()["data"]["deleteMediaOnStage"]["success"] is True
@@ -207,7 +203,37 @@ class TestMediaController:
         stage2 = await test_StageController.test_01_create_stage(client)
         asset = get_session().query(AssetModel).first()
 
-        response = await self.assign_stages(
-            client, headers, [stage["id"], stage2["id"]], asset.id
-        )
+        response = await self.assign_stages(client, headers, [stage["id"], stage2["id"]], asset.id)
         assert response.json()["data"]["assignStages"]["id"] is not None
+
+    async def test_08_assign_media_round_trips_order(self, client):
+        """assignMedia recreates the parent_stage rows in the order the client
+        sent, and stage.assets must return them in that same order — it drives
+        the media ordering in the on-stage toolbars (Stage Management > Media
+        reorder feature)."""
+        from upstage_backend.stages.db_models.stage import StageModel
+
+        stage = await test_StageController.test_01_create_stage(client)
+        session = get_session()
+
+        # Ensure at least two assets so a reversed order is distinguishable.
+        template = session.query(AssetModel).first()
+        extra = AssetModel(
+            name="reorder extra",
+            asset_type_id=template.asset_type_id,
+            owner_id=template.owner_id,
+            file_location=f"test/reorder-extra-{random.randint(0, 10**9)}.png",
+            size=1,
+        )
+        session.add(extra)
+        session.commit()
+
+        ids = [asset.id for asset in session.query(AssetModel).order_by(AssetModel.id).all()]
+        assert len(ids) >= 2
+        reordered = list(reversed(ids))
+
+        response = await self.assign_media(client, stage["id"], reordered)
+        assert "errors" not in response.json()
+
+        stage_row = session.query(StageModel).filter_by(id=stage["id"]).first()
+        assert [row.child_asset_id for row in stage_row.assets] == reordered

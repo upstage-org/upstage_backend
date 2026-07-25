@@ -70,9 +70,7 @@ def extract_first_frame(video_path: str) -> str | None:
     upload success on it.
     """
     if not os.path.isfile(video_path):
-        logger.warning(
-            "video_poster: source not found, skipping: {}", video_path
-        )
+        logger.warning("video_poster: source not found, skipping: {}", video_path)
         return None
 
     out_path = poster_path_for(video_path)
@@ -136,9 +134,7 @@ def extract_first_frame(video_path: str) -> str | None:
                 pass
         return None
     except Exception:
-        logger.exception(
-            "video_poster: ffmpeg invocation failed for {}", video_path
-        )
+        logger.exception("video_poster: ffmpeg invocation failed for {}", video_path)
         return None
 
     if proc.returncode != 0 or not os.path.exists(out_path):
@@ -179,8 +175,8 @@ def backfill_video_posters(root: str | None = None) -> dict:
 
     Shared by:
       * ``scripts/backfill_video_posters.py`` (manual CLI invocation)
-      * the Alembic backfill migration (runs automatically on
-        ``alembic upgrade``)
+      * formerly an Alembic backfill migration (removed in the
+        2026-07 migration consolidation)
 
     Idempotent and best-effort. Designed to be safe to call from a
     migration: a missing ``root`` or an absent ffmpeg only logs and
@@ -206,9 +202,7 @@ def backfill_video_posters(root: str | None = None) -> dict:
         # doesn't exist yet, so there's nothing to backfill. Don't
         # error out — that would block ``alembic upgrade`` for no
         # reason.
-        logger.info(
-            "video_poster: backfill root not found, skipping: {}", root
-        )
+        logger.info("video_poster: backfill root not found, skipping: {}", root)
         return counts
 
     for video_path in iter_video_files(root):
@@ -221,7 +215,5 @@ def backfill_video_posters(root: str | None = None) -> dict:
         else:
             counts["failed"] += 1
 
-    logger.info(
-        "video_poster: backfill complete root={} {}", root, counts
-    )
+    logger.info("video_poster: backfill complete root={} {}", root, counts)
     return counts

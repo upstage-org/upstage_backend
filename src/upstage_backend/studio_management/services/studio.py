@@ -6,10 +6,12 @@ from datetime import datetime
 import json
 from typing import List
 
-from sqlalchemy import and_, or_, nulls_last
+from sqlalchemy import Text, and_, cast, or_, nulls_last
 
 from upstage_backend.assets.db_models.asset_usage import AssetUsageModel
+from upstage_backend.assets.services.asset import AssetService
 from upstage_backend.authentication.db_models.user_session import UserSessionModel
+from upstage_backend.event_archive.db_models.event import EventModel
 from upstage_backend.global_config.helpers.object import convert_keys_to_camel_case
 from upstage_backend.global_config import get_session
 from upstage_backend.global_config.env import (
@@ -34,8 +36,17 @@ from upstage_backend.stages.services.assignment import (
     snapshot_exit_settings,
 )
 from upstage_backend.stages.db_models.stage import StageModel
+from upstage_backend.stages.db_models.stage_attribute import StageAttributeModel
+from upstage_backend.stages.services.stage import StageService
+from upstage_backend.stages.scripts.scaffold_base_media import (
+    CANONICAL_ADMIN_USERNAME,
+    PLACEHOLDER_FILE_LOCATION,
+    ensure_admin_user,
+    ensure_placeholder_asset,
+)
 from upstage_backend.assets.db_models.asset import AssetModel
 from upstage_backend.performance_config.db_models.scene import SceneModel
+from upstage_backend.users.db_models.one_time_totp import OneTimeTOTPModel
 
 from upstage_backend.studio_management.http.validation import (
     BatchUserInput,
@@ -241,29 +252,207 @@ class StudioService:
         if not value and user.active:
             user.deactivated_on = datetime.now()
 
-    def delete_user(self, id: int, current_user: UserModel):
+    # Media types worth keeping when a deleted user's content is reassigned;
+    # everything else (audio, video, streams, ...) is deleted on both paths.
+    KEEP_MEDIA_TYPES_ON_REASSIGN = {"avatar", "prop", "backdrop"}
+    # Types whose payload references must NOT be rewritten to the image
+    # placeholder: an <audio>/<video>/stream element cannot render it.
+    NON_SUBSTITUTABLE_MEDIA_TYPES = {"audio", "video", "stream"}
+
+    def delete_user(
+        self, id: int, current_user: UserModel, content_action: str = "REASSIGN_TO_ADMIN"
+    ):
         session = get_session()
-        user = session.query(UserModel).filter(UserModel.id == id).first()
+        user = session.query(UserModel).filter(UserModel.id == int(id)).first()
         if not user:
             raise GraphQLError("User not found!")
+        if user.username == CANONICAL_ADMIN_USERNAME:
+            raise GraphQLError("The default admin account cannot be deleted.")
+        if user.id == int(current_user.id):
+            raise GraphQLError("You cannot delete your own account.")
 
-        session.query(UserSessionModel).filter(UserSessionModel.user_id == id).delete()
+        admin_user = ensure_admin_user(session)
 
-        session.query(SceneModel).filter(SceneModel.owner_id == id).update(
-            {SceneModel.owner_id: current_user.id}
-        )
+        self._cleanup_user_references(session, user.id)
 
-        session.query(StageModel).filter(StageModel.owner_id == id).update(
-            {StageModel.owner_id: current_user.id}
-        )
-        session.query(AssetModel).filter(AssetModel.owner_id == id).update(
-            {AssetModel.owner_id: current_user.id}
+        keep_types = set() if content_action == "DELETE_ALL" else self.KEEP_MEDIA_TYPES_ON_REASSIGN
+        deleted_stages, deleted_assets, kept_assets = self._delete_user_content(
+            session, user, admin_user, current_user, keep_types
         )
 
         session.delete(user)
-        return convert_keys_to_camel_case(
-            {"success": True, "message": "User deleted successfully!"}
+        session.flush()
+        message = "User deleted: {} stage(s) and {} media item(s) removed".format(
+            deleted_stages, deleted_assets
         )
+        if kept_assets:
+            message += ", {} media item(s) reassigned to admin".format(kept_assets)
+        return convert_keys_to_camel_case({"success": True, "message": message + "."})
+
+    def _cleanup_user_references(self, session, user_id: int):
+        """Remove rows and embedded references that would dangle (or block the
+        delete outright — the TOTP FK) once the user row is gone."""
+        session.query(UserSessionModel).filter(UserSessionModel.user_id == user_id).delete(
+            synchronize_session=False
+        )
+        session.query(OneTimeTOTPModel).filter(OneTimeTOTPModel.user_id == user_id).delete(
+            synchronize_session=False
+        )
+        session.query(AssetUsageModel).filter(AssetUsageModel.user_id == user_id).delete(
+            synchronize_session=False
+        )
+        # playerAccess attributes hold [[player_ids], [audience_ids]] with the
+        # ids stored as strings.
+        token = str(user_id)
+        attributes = (
+            session.query(StageAttributeModel)
+            .filter(
+                StageAttributeModel.name == "playerAccess",
+                StageAttributeModel.description.contains('"{}"'.format(token)),
+            )
+            .all()
+        )
+        for attribute in attributes:
+            try:
+                accesses = json.loads(attribute.description)
+            except (TypeError, ValueError):
+                continue
+            if not isinstance(accesses, list):
+                continue
+            cleaned = [
+                [entry for entry in group if entry != token] if isinstance(group, list) else group
+                for group in accesses
+            ]
+            if cleaned != accesses:
+                attribute.description = json.dumps(cleaned)
+        session.flush()
+
+    def _delete_user_content(self, session, user, admin_user, current_user, keep_types):
+        """Delete the user's stages and media. Media whose type is in
+        keep_types is reassigned to the canonical admin instead. Deleted
+        visual media still referenced by surviving stages, scenes or
+        recordings is swapped for the placeholder asset."""
+        placeholder = ensure_placeholder_asset(session, admin_user.id)
+
+        stage_service = StageService()
+        stages = session.query(StageModel).filter(StageModel.owner_id == user.id).all()
+        for stage in stages:
+            # delete_stage cascades attributes, media links, scenes,
+            # performances and their recorded events — but not the live/chat
+            # event rows, which are tied to the stage only by topic.
+            session.query(EventModel).filter(
+                EventModel.performance_id.is_(None),
+                EventModel.topic.like("%/{}/%".format(stage.file_location)),
+            ).delete(synchronize_session=False)
+            stage_service.delete_stage(current_user, stage.id)
+        deleted_stages = len(stages)
+
+        # Their saved scenes on surviving (other people's) stages go too.
+        session.query(SceneModel).filter(SceneModel.owner_id == user.id).delete(
+            synchronize_session=False
+        )
+
+        asset_service = AssetService()
+        assets = (
+            session.query(AssetModel)
+            .filter(
+                AssetModel.owner_id == user.id,
+                AssetModel.file_location != PLACEHOLDER_FILE_LOCATION,
+            )
+            .all()
+        )
+        deleted_assets = kept_assets = 0
+        for asset in assets:
+            type_name = asset.asset_type.name if asset.asset_type else ""
+            if type_name in keep_types:
+                asset.owner_id = admin_user.id
+                kept_assets += 1
+                continue
+            if type_name not in self.NON_SUBSTITUTABLE_MEDIA_TYPES:
+                self._substitute_placeholder(session, asset, placeholder)
+            asset_service.cleanup_assets(session, asset)
+            session.delete(asset)
+            session.flush()
+            deleted_assets += 1
+        session.flush()
+        return deleted_stages, deleted_assets, kept_assets
+
+    def _substitute_placeholder(self, session, asset: AssetModel, placeholder: AssetModel):
+        """Point every surviving reference to a doomed visual asset at the
+        placeholder: stage assignments (parent_stage rows), scene payloads and
+        event payloads (recordings and remaining live boards) — the latter two
+        reference media by file URL inside free-form JSON."""
+        for link in (
+            session.query(ParentStageModel)
+            .filter(ParentStageModel.child_asset_id == asset.id)
+            .all()
+        ):
+            already_there = (
+                session.query(ParentStageModel)
+                .filter(
+                    ParentStageModel.stage_id == link.stage_id,
+                    ParentStageModel.child_asset_id == placeholder.id,
+                )
+                .first()
+            )
+            if already_there:
+                session.delete(link)
+            else:
+                link.child_asset_id = placeholder.id
+        session.flush()
+
+        tokens = self._substitution_tokens(session, asset)
+        if not tokens:
+            return
+
+        scene_filters = [SceneModel.payload.contains(token) for token in tokens]
+        for scene in session.query(SceneModel).filter(or_(*scene_filters)).all():
+            payload = scene.payload
+            for token in tokens:
+                payload = payload.replace(token, placeholder.file_location)
+            scene.payload = payload
+
+        event_filters = [
+            cast(EventModel.payload, Text).like("%{}%".format(token)) for token in tokens
+        ]
+        for event in session.query(EventModel).filter(or_(*event_filters)).all():
+            serialized = json.dumps(event.payload)
+            for token in tokens:
+                serialized = serialized.replace(token, placeholder.file_location)
+            # Reassign (not mutate in place) so SQLAlchemy sees the change.
+            event.payload = json.loads(serialized)
+        session.flush()
+
+    def _substitution_tokens(self, session, asset: AssetModel):
+        """The URL fragments payloads may reference this asset by: its
+        file_location plus any frame files no surviving asset still uses.
+        Tokens without a '/' (stream keys are short user-chosen strings) are
+        excluded — string-replacing them across payloads is unsafe."""
+        tokens = []
+        if "/" in (asset.file_location or ""):
+            tokens.append(asset.file_location)
+        try:
+            attributes = json.loads(asset.description) if asset.description else {}
+        except (TypeError, ValueError):
+            attributes = {}
+        for frame in attributes.get("frames") or []:
+            frame = frame.split("?")[0]
+            if "/" not in frame or frame in tokens:
+                continue
+            still_used = (
+                session.query(AssetModel)
+                .filter(
+                    AssetModel.id != asset.id,
+                    or_(
+                        AssetModel.file_location == frame,
+                        AssetModel.description.contains(frame),
+                    ),
+                )
+                .first()
+            )
+            if not still_used:
+                tokens.append(frame)
+        return tokens
 
     def change_password(self, input: ChangePasswordInput):
         session = get_session()

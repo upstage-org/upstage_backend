@@ -30,7 +30,7 @@ Deployment is two docker-compose tiers on one shared external network
 | Tier | Directory | Services |
 |---|---|---|
 | Service tier | `service_containers/` | `postgres_container_<site>` (Postgres), `mosquitto_container_<site>` (MQTT broker) |
-| App tier | `app_containers/` | `upstage_db_migrate` (one-shot: `alembic upgrade heads`), `upstage_backend` (API), `upstage_event_archive`, `upstage_stats` |
+| App tier | `app_containers/` | `upstage_db_migrate` (one-shot: `alembic upgrade head`), `upstage_backend` (API), `upstage_event_archive`, `upstage_stats` |
 
 Application code and the Python venv are **baked into the image at build
 time** (no source bind mounts). The three long-running app services wait for
@@ -188,14 +188,14 @@ cd app_containers
 
 This builds the image (sources baked in, dependencies from `uv.lock`),
 creates `/app_code_<site>/uploads`, runs the one-shot migration container
-(`alembic upgrade heads` — creates the entire schema from empty), then starts
+(`alembic upgrade head` — creates the entire schema from empty), then starts
 the API and the two workers. The API is now on `http://127.0.0.1:9090`
 (dev) / `:9091` (prod).
 
 ### 4. First login
 
 Migrations seed a default super admin: **username `admin`, password
-`Secret@123`** (`users/db_migrations/eb504467a5d7_create_default_super_admin.py`).
+`Secret@123`** (`alembic/versions/baseline001_consolidated_schema_and_seeds.py`).
 **Log in and change this password immediately.**
 
 Optional demo data (a "Demo Stage" plus demo media):
@@ -238,15 +238,18 @@ throwaway Postgres/Mosquitto services.
 ### Migrations
 
 - Hand-written Alembic revisions; **no autogenerate**.
-- Each module keeps its own chain under
-  `src/upstage_backend/<module>/db_migrations/` (9 locations wired in
-  `scripts/alembic.ini`), so the project intentionally has **multiple heads**
-  — always upgrade with `alembic -c ./scripts/alembic.ini upgrade heads`
-  (plural), which is exactly what the `upstage_db_migrate` container does.
-- New revision:
-  `alembic -c ./scripts/alembic.ini revision -m "..." --version-path=src/upstage_backend/<module>/db_migrations`
-  (`create-migration.sh` is a commented-out cheatsheet of these commands, not
-  a runnable tool).
+- One consolidated chain with a **single head**: all revisions live in
+  `alembic/versions/`, wired by the repo-root `alembic.ini`. Upgrade with
+  `alembic -c ./alembic.ini upgrade head`, which is exactly what the
+  `upstage_db_migrate` container does.
+- New revision: `alembic -c ./alembic.ini revision -m "..."`.
+- History note (2026-07): the previous 41 revisions (9 per-module
+  `db_migrations/` dirs, two heads) were squashed into
+  `baseline001_consolidated_schema_and_seeds.py`, which creates the full
+  schema and the install seeds (default admin, asset types, system config).
+  Databases created before the consolidation cannot upgrade through the
+  removed revisions — restore from a dump taken at/after the consolidation
+  instead (existing dev/prod DBs were stamped/replaced accordingly).
 
 ### GraphQL
 
@@ -260,7 +263,7 @@ outside production; with `ENV_TYPE="Production"` it is locked to `HOSTNAME`.
 
 | Path | Purpose |
 |---|---|
-| `src/upstage_backend/<module>/` | Feature modules (assets, stages, users, authentication, studio_management, performance_config, upstage_options, licenses, payments, mails) — each with `db_models/`, `db_migrations/`, `http/`, `services/`, `tests/` |
+| `src/upstage_backend/<module>/` | Feature modules (assets, stages, users, authentication, studio_management, performance_config, upstage_options, licenses, payments, mails) — each with `db_models/`, `http/`, `services/`, `tests/` (migrations live centrally in `alembic/versions/`) |
 | `src/upstage_backend/event_archive/` | MQTT→Postgres archiver (replay source); tunables via `EVENT_ARCHIVE_*` env vars |
 | `src/upstage_backend/upstage_stats/` | Live player/audience counters |
 | `scripts/` | Service entrypoints, `verify.sh`, backup + poster-backfill utilities, dev tools |

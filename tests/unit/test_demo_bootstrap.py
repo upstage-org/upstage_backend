@@ -63,11 +63,29 @@ class _ScopedSession:
         return False
 
 
+class _StubAdmin:
+    id = 1
+
+
 def _run(monkeypatch, stage_count, force=False):
     ran = []
+    ensured = []
     monkeypatch.setattr(bootstrap_module, "ScopedSession", _ScopedSession(stage_count))
     monkeypatch.setattr(bootstrap_module.scaffold_base_media, "main", lambda: ran.append(True))
+    monkeypatch.setattr(
+        bootstrap_module.scaffold_base_media,
+        "ensure_admin_user",
+        lambda session: (ensured.append("admin"), _StubAdmin())[1],
+    )
+    monkeypatch.setattr(
+        bootstrap_module.scaffold_base_media,
+        "ensure_placeholder_asset",
+        lambda session, owner_id: ensured.append("placeholder"),
+    )
     result = bootstrap(force=force)
+    # Admin + placeholder are topped up on EVERY run, gate or no gate —
+    # user deletion depends on both existing on established installs.
+    assert ensured == ["admin", "placeholder"]
     return result, bool(ran)
 
 

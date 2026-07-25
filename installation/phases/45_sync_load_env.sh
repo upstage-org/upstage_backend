@@ -23,6 +23,7 @@ cp ./container_scripts/mqtt_server/add_mqtt_cert_crontab.sh /mosquitto_files/etc
 # App tree (case 2)
 cp -r ./src /app_code
 cp -r ./alembic /app_code
+cp ./alembic.ini /app_code
 cp -r ./scripts /app_code
 cp -r ./dashboard/demo /app_code
 cp -r ./requirements.txt /app_code

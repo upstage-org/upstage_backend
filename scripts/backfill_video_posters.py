@@ -4,10 +4,10 @@
 
 Manual CLI wrapper around
 ``upstage_backend.files.video_poster.backfill_video_posters``. The
-same function also runs automatically as part of the Alembic
-migration ``backfill_video_posters`` on ``alembic upgrade``, so this
+same function formerly also ran as an Alembic backfill migration
+(removed in the 2026-07 migration consolidation), so this
 script is now primarily for:
-    * dev boxes where you skipped the migration but want posters,
+    * boxes that never ran the old backfill but want posters,
     * one-off recovery after restoring uploads from backup, or
     * running it again after manually copying new videos into the
       upload folder out-of-band.
@@ -38,10 +38,7 @@ def main() -> int:
     parser.add_argument(
         "--root",
         default=UPLOAD_USER_CONTENT_FOLDER,
-        help=(
-            "Upload root to scan. Defaults to UPLOAD_USER_CONTENT_FOLDER "
-            "from the environment."
-        ),
+        help=("Upload root to scan. Defaults to UPLOAD_USER_CONTENT_FOLDER from the environment."),
     )
     args = parser.parse_args()
 
