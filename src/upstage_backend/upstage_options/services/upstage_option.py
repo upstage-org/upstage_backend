@@ -4,6 +4,7 @@ from upstage_backend.global_config.env import CLIENT_MAX_BODY_SIZE
 
 from upstage_backend.global_config.helpers.object import convert_keys_to_camel_case
 from upstage_backend.global_config import get_session
+from upstage_backend.global_config.logger import logger
 from upstage_backend.mails.helpers.mail import send
 from upstage_backend.upstage_options.db_models.config import ConfigModel
 from upstage_backend.upstage_options.http.validation import (
@@ -121,10 +122,19 @@ class SettingService:
         return convert_keys_to_camel_case(config)
 
     async def send_email(self, input: SystemEmailInput):
-        await send(
-            input.recipients.split(","),
-            input.subject,
-            input.body,
-            input.bcc.split(",") if input.bcc else [],
-        )
+        try:
+            await send(
+                input.recipients.split(","),
+                input.subject,
+                input.body,
+                input.bcc.split(",") if input.bcc else [],
+            )
+        except Exception:
+            logger.exception(
+                "sendSystemEmail failed: subject={!r} recipients={!r} bcc={!r}",
+                input.subject,
+                input.recipients,
+                input.bcc,
+            )
+            raise
         return {"success": True}

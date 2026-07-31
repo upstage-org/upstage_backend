@@ -115,6 +115,7 @@ async def send_email(_, info, input):
             input["subject"],
             input["body"],
             bcc_list,
+            honor_to=True,
         )
     except Exception:
         logger.exception("Studio sendEmail: SMTP send failed")

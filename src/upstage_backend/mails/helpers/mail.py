@@ -25,8 +25,16 @@ from upstage_backend.global_config.env import (
 from upstage_backend.upstage_options.db_models.config import ConfigModel
 
 
-async def send(to, subject, content, bcc=[], cc=[], filenames=[]):
-    msg = create_email(to=to, subject=subject, html=content, cc=cc, bcc=bcc, filenames=filenames)
+async def send(to, subject, content, bcc=[], cc=[], filenames=[], honor_to=False):
+    msg = create_email(
+        to=to,
+        subject=subject,
+        html=content,
+        cc=cc,
+        bcc=bcc,
+        filenames=filenames,
+        honor_to=honor_to,
+    )
     await send_async(msg=msg)
 
 
@@ -69,13 +77,30 @@ async def send_async(msg, user=EMAIL_HOST_LOGIN, password=EMAIL_HOST_PASSWORD):
         use_tls=implicit_tls,
         tls_context=tls_context if implicit_tls else None,
     )
-    await smtp.connect()
-    if not implicit_tls and EMAIL_USE_TLS:
-        await smtp.starttls(tls_context)
-    if user:
-        await smtp.login(user, password)
-    await smtp.send_message(msg, recipients=recipients)
-    await smtp.quit()
+    try:
+        await smtp.connect()
+        if not implicit_tls and EMAIL_USE_TLS:
+            await smtp.starttls(tls_context)
+        if user:
+            await smtp.login(user, password)
+        await smtp.send_message(msg, recipients=recipients)
+        logger.info(
+            "Email sent: subject={!r} envelope_recipients={}",
+            msg["Subject"],
+            recipients,
+        )
+    except Exception:
+        logger.exception(
+            "Email send failed: subject={!r} envelope_recipients={}",
+            msg["Subject"],
+            recipients,
+        )
+        raise
+    finally:
+        try:
+            await smtp.quit()
+        except Exception:
+            smtp.close()
 
 
 def create_email(
@@ -86,6 +111,7 @@ def create_email(
     cc=[],
     bcc=[],
     sender=EMAIL_HOST_FROM,
+    honor_to=False,
 ):
     """
     Create an email
@@ -132,7 +158,18 @@ def create_email(
     else:
         bcc = [x for x in bcc if x not in ("", None) and len(bcc) > 1]
 
-    if subject != "Welcome to UpStage!":
+    if honor_to:
+        # Studio email portal: honor the caller's To/Bcc split (per-recipient
+        # BCC switch). Support admins are still implicitly Bcc'd; the From
+        # address is always added to To below.
+        cc = []
+        support = [x for x in SUPPORT_EMAILS if x] if SUPPORT_EMAILS else []
+        bcc = support + [
+            x for x in bcc if x != EMAIL_HOST_FROM and x not in support and x not in to
+        ]
+        if bcc:
+            msg["Bcc"] = ", ".join(bcc)
+    elif subject != "Welcome to UpStage!":
         # Privacy: every real recipient is Bcc'd so recipients never see each
         # other's addresses. Only the configured From address appears in the
         # To header, and Cc is never populated.
