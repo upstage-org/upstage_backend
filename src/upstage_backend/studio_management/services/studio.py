@@ -18,7 +18,7 @@ from upstage_backend.global_config.env import (
     UPLOAD_USER_CONTENT_FOLDER,
     HOSTNAME,
 )
-from upstage_backend.global_config.helpers.fernet_crypto import encrypt, decrypt
+from upstage_backend.global_config.helpers.password import hash_password, verify_password
 from upstage_backend.mails.helpers.mail import send
 from upstage_backend.mails.templates.templates import (
     display_user,
@@ -134,7 +134,7 @@ class StudioService:
                 email=user["email"],
                 active=True,
                 role=PLAYER,
-                password=encrypt(user["password"]),
+                password=hash_password(user["password"]),
             )
             session.add(user)
         session.flush()
@@ -217,7 +217,7 @@ class StudioService:
 
     async def _update_user_fields(self, user: UserModel, input: UpdateUserInput):
         if input.password:
-            user.password = encrypt(input.password)
+            user.password = hash_password(input.password)
         if input.email:
             user.email = input.email
         if input.binName:
@@ -460,10 +460,10 @@ class StudioService:
         if not user:
             raise GraphQLError("User not found!")
 
-        if decrypt(user.password) != input.oldPassword:
+        if not verify_password(user.password, input.oldPassword):
             raise GraphQLError("Old password is incorrect!")
 
-        user.password = encrypt(input.newPassword)
+        user.password = hash_password(input.newPassword)
         session.flush()
         return convert_keys_to_camel_case(
             {"success": True, "message": "Password changed successfully!"}

@@ -10,7 +10,7 @@ import json
 from sqlalchemy import create_engine, text
 from sqlalchemy.exc import SQLAlchemyError
 
-from upstage_backend.global_config.helpers.fernet_crypto import encrypt
+from upstage_backend.global_config.helpers.password import hash_password
 
 # Disable SQLAlchemy engine logging for less verbosity
 def get_new_table_columns(new_engine, table_name):
@@ -108,7 +108,7 @@ def update_upstage_user_passwords(new_engine, new_password):
     with new_engine.connect() as conn:
         with conn.begin() as transaction:
             try:
-                conn.execute(update_sql, {"new_password": encrypt(new_password)})
+                conn.execute(update_sql, {"new_password": hash_password(new_password)})
                 logger.info(f"All 'upstage_user' passwords have been updated to '{new_password}'.")
             except SQLAlchemyError as e:
                 logger.info(f"Error updating passwords in 'upstage_user': {e}", file=sys.stderr)
@@ -116,18 +116,18 @@ def update_upstage_user_passwords(new_engine, new_password):
 def update_asset_names(engine):
     """
     Updates all asset names from 'stream' to 'video' in the 'assets' table.
-    
+
     Args:
         engine: SQLAlchemy engine instance for database connection
-    
+
     Returns:
         dict: Success message with number of affected rows
-    
+
     Raises:
         HTTPException: If database operation fails
     """
     update_sql = text("UPDATE asset_type SET name = :new_name , file_location = :new_name WHERE name = :old_name")
-    
+
     try:
         with engine.connect() as conn:
             with conn.begin() as transaction:
@@ -137,11 +137,11 @@ def update_asset_names(engine):
                 )
                 affected_rows = result.rowcount
                 transaction.commit()
-                
+
         logger.info( f"Successfully updated {affected_rows} assets from 'stream' to 'video'")
-    
+
     except SQLAlchemyError as e:
-        logger.info(f"Error updating asset type in 'upstage_user': {e}", file=sys.stderr) 
+        logger.info(f"Error updating asset type in 'upstage_user': {e}", file=sys.stderr)
 
 def update_sequences(new_engine, tables):
     """
@@ -174,7 +174,7 @@ def main():
         "jwt_no_list",
         "upstage_user",
         "admin_one_time_totp_qr_url",
-        "asset", 
+        "asset",
         "stage",
         "asset_usage",
         "scene",
@@ -185,16 +185,16 @@ def main():
         "stage_attribute",
         "events",
     ]
-    
+
     # Clear all data in the specified tables in the new database.
     clear_tables(new_engine, tables_to_migrate)
-    
+
     # Migrate each table.
     for table in tables_to_migrate:
         migrate_table(old_engine, new_engine, table)
 
     update_sequences(new_engine, tables_to_migrate)
-    
+
     update_upstage_user_passwords(new_engine, new_password)
 
     update_asset_names(new_engine)

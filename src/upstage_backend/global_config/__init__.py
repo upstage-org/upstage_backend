@@ -15,8 +15,8 @@ from upstage_backend.global_config.schema import config_graphql_endpoints
 from upstage_backend.global_config.db_models.base import BaseModel
 from upstage_backend.global_config.decorators.authenticated import authenticated
 from upstage_backend.global_config.helpers import (
-    encrypt,
-    decrypt,
+    hash_password,
+    verify_password,
     snake_to_camel,
     convert_keys_to_camel_case,
     camel_to_snake,
@@ -24,8 +24,8 @@ from upstage_backend.global_config.helpers import (
 from upstage_backend.global_config.logger import logger
 
 __all__ = [
-    "encrypt",
-    "decrypt",
+    "hash_password",
+    "verify_password",
     "snake_to_camel",
     "convert_keys_to_camel_case",
     "db",  # noqa: F405  (re-exported from .env via star import above)

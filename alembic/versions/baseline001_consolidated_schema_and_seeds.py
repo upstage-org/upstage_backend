@@ -30,7 +30,7 @@ from alembic import op
 from sqlalchemy import Boolean, Integer, String, Text, TIMESTAMP
 from sqlalchemy.sql import column, table
 
-from upstage_backend.global_config.helpers.fernet_crypto import encrypt
+from upstage_backend.global_config.helpers.password import hash_password
 from upstage_backend.users.db_models.user import SUPER_ADMIN
 
 # revision identifiers, used by Alembic.
@@ -131,7 +131,7 @@ def upgrade() -> None:
                 {
                     "username": "admin",
                     "email": "support@upstage.live",
-                    "password": encrypt("Secret@123"),
+                    "password": hash_password("Secret@123"),
                     "role": SUPER_ADMIN,
                     "active": True,
                     "created_on": datetime.now(),

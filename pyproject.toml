@@ -13,6 +13,7 @@ dependencies = [
     "aiomqtt",
     "aiosmtplib",
     "alembic",
+    "argon2-cffi",
     "ariadne",
     "arrow",
     "asyncpg",
@@ -90,9 +91,8 @@ extend-exclude = [
     "dist",
     ".venv",
     # `{REPLACE_*}` template that is sed-substituted by
-    # `initial_scripts/environments/generate_environments_script.sh`. Until
-    # then it isn't valid Python (e.g. `CIPHER_KEY = {REPLACE_CIPHER_KEY}`),
-    # so ruff would always flag F821 on the placeholder names.
+    # `initial_scripts/environments/generate_environments_script.sh`;
+    # not meant to pass lint until the placeholders are filled in.
     "initial_scripts/environments/env_app_template.py",
 ]
 

@@ -76,9 +76,6 @@ case $machinetype in
            mkdir -p /mosquitto_files/var/lib/mosquitto
            ./initial_scripts/environments/generate_environments_script.sh
 
-           chmod +x ./scripts/generate_cipher_key.sh
-           ./scripts/generate_cipher_key.sh
-
 	   # Let's encrypt renewal hook to update mosquitto certs as well.
 	   # This runs in this server, not in the mosquitto container.
 	   cp ./container_scripts/mqtt_server/mosquitto_renewal.sh /etc/letsencrypt/renewal-hooks/deploy/mosquitto_renewal.sh

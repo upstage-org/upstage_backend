@@ -8,7 +8,7 @@ set -a
 # These have to be set in both dev and prod scripts for SSL support and cert update deploy hook.
 #
 # Check/change the values of these variables before running.
-# 
+#
 
 BASE_SITE=upstage.live
 SITES=("dev","prod")
@@ -32,7 +32,7 @@ MQ_DATA_DIR=/mosquitto_files_${SITE}
 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-# Set this in your environment: export POSTGRES_PASSWORD_DEV=NNNNN for example.
+# Set this in your environment: export POSTGRES_PASSWORD_PROD=NNNNN for example.
 var="POSTGRES_PASSWORD_${SITE^^}"
 POSTGRES_PASSWORD="${!var}"
 : "${POSTGRES_PASSWORD:?$var is not set or is empty}" || exit 1

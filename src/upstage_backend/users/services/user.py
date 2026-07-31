@@ -57,11 +57,11 @@ class UserService:
         if existing_user:
             raise GraphQLError("User already exists")
 
-        from upstage_backend.global_config.helpers.fernet_crypto import encrypt
+        from upstage_backend.global_config.helpers.password import hash_password
 
         session = get_session()
         user = UserModel()
-        user.password = encrypt(data["password"])
+        user.password = hash_password(data["password"])
         user.role = PLAYER if not user.role else user.role
         user.active = True if user.role == SUPER_ADMIN else False
         user.email = data.get("email", "")
@@ -200,8 +200,8 @@ class UserService:
         if not user:
             raise GraphQLError("Invalid token")
 
-        from upstage_backend.global_config.helpers.fernet_crypto import encrypt
+        from upstage_backend.global_config.helpers.password import hash_password
 
-        user.password = encrypt(input["password"])
+        user.password = hash_password(input["password"])
         session.delete(otp)
         return {"success": True, "message": "Password reset successfully."}

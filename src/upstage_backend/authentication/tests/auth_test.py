@@ -5,7 +5,7 @@ import random
 from upstage_backend.global_config.database import ScopedSession
 from upstage_backend.global_config.env import JWT_HEADER_NAME
 import pytest
-from upstage_backend.global_config.helpers.fernet_crypto import encrypt
+from upstage_backend.global_config.helpers.password import hash_password
 from upstage_backend.users.db_models.user import PLAYER, SUPER_ADMIN, UserModel
 from faker import Faker
 
@@ -39,9 +39,7 @@ class TestAuthenticationController:
     """
 
     async def test_01_login_with_invalid_credentials(self, client):
-        variables = {
-            "payload": {"username": Faker().email(), "password": "testpassword"}
-        }
+        variables = {"payload": {"username": Faker().email(), "password": "testpassword"}}
         response = client.post(
             "/api/studio_graphql",
             json={"query": self.login_query, "variables": variables},
@@ -49,16 +47,13 @@ class TestAuthenticationController:
         assert response.status_code == 200
         data = response.json()
         assert "errors" in data
-        assert (
-            data["errors"][0]["message"]
-            == "Incorrect username or password. Please try again."
-        )
+        assert data["errors"][0]["message"] == "Incorrect username or password. Please try again."
 
     async def test_02_login_successfully(self, client):
         email = f"{random.randint(1, 1000)}{Faker().email()}"
         user = UserModel(
             username=email,
-            password=encrypt("testpassword"),
+            password=hash_password("testpassword"),
             email=email,
             active=True,
             role=SUPER_ADMIN,
@@ -82,7 +77,7 @@ class TestAuthenticationController:
         email = f"{random.randint(1, 1000)}{Faker().email()}"
         user = UserModel(
             username=email,
-            password=encrypt("testpassword"),
+            password=hash_password("testpassword"),
             email=email,
             active=True,
             role=PLAYER,
@@ -106,7 +101,7 @@ class TestAuthenticationController:
         email = f"{random.randint(1, 1000)}{Faker().email()}"
         user = UserModel(
             username=email,
-            password=encrypt("testpassword"),
+            password=hash_password("testpassword"),
             email=email,
             active=True,
             role=SUPER_ADMIN,
@@ -153,7 +148,7 @@ class TestAuthenticationController:
         email = f"{random.randint(1, 1000)}{Faker().email()}"
         user = UserModel(
             username=email,
-            password=encrypt("testpassword"),
+            password=hash_password("testpassword"),
             email=email,
             active=True,
             role=SUPER_ADMIN,
@@ -177,9 +172,7 @@ class TestAuthenticationController:
             logout
         }
         """
-        response = client.post(
-            "/api/studio_graphql", json={"query": query}, headers=headers
-        )
+        response = client.post("/api/studio_graphql", json={"query": query}, headers=headers)
         assert response.status_code == 200
         data = response.json()
         assert "errors" not in data
@@ -197,9 +190,7 @@ class TestAuthenticationController:
             logout
         }
         """
-        response = client.post(
-            "/api/studio_graphql", json={"query": query}, headers=headers
-        )
+        response = client.post("/api/studio_graphql", json={"query": query}, headers=headers)
         assert response.status_code == 200
         data = response.json()
         assert "errors" in data
@@ -209,7 +200,7 @@ class TestAuthenticationController:
         email = f"{random.randint(1, 1000)}{Faker().email()}"
         user = UserModel(
             username=email,
-            password=encrypt("testpassword"),
+            password=hash_password("testpassword"),
             email=email,
             active=True,
             role=role,

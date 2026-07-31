@@ -108,7 +108,6 @@ MQTT_PORT = 1883
 CLOUDFLARE_CAPTCHA_SECRETKEY = "XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX"
 CLOUDFLARE_CAPTCHA_VERIFY_ENDPOINT = "https://challenges.cloudflare.com/turnstile/v0/siteverify"
 SECRET_KEY = "XXXX"   # JWT signing key: openssl rand -hex 48
-CIPHER_KEY = b"XXXX"  # Fernet key (bytes!): python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key())"
 
 CLIENT_MAX_BODY_SIZE = 500 * 1024 * 1024
 
@@ -197,6 +196,11 @@ the API and the two workers. The API is now on `http://127.0.0.1:9090`
 Migrations seed a default super admin: **username `admin`, password
 `Secret@123`** (`alembic/versions/baseline001_consolidated_schema_and_seeds.py`).
 **Log in and change this password immediately.**
+
+Passwords are stored as argon2 hashes. Installs upgrading from the old
+Fernet scheme must convert existing rows once with
+`migration_scripts/fernet_to_argon2.py` (pass the retired `CIPHER_KEY`
+via `--key`) before deploying this version.
 
 Optional demo data (a "Demo Stage" plus demo media):
 

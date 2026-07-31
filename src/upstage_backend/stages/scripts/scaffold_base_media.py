@@ -54,7 +54,7 @@ from upstage_backend.stages.db_models.parent_stage import ParentStageModel
 from upstage_backend.stages.services.stage import StageService
 from upstage_backend.users.db_models.user import UserModel, GUEST, SUPER_ADMIN
 from upstage_backend.upstage_options.db_models.config import ConfigModel
-from upstage_backend.global_config.helpers.fernet_crypto import encrypt
+from upstage_backend.global_config.helpers.password import hash_password
 from upstage_backend.global_config.env import (
     UPLOAD_USER_CONTENT_FOLDER,
     DEMO_MEDIA_FOLDER,
@@ -295,7 +295,7 @@ def ensure_admin_user(session):
     # account holding the canonical email must not be adopted as the admin.
     user = UserModel()
     user.username = CANONICAL_ADMIN_USERNAME
-    user.password = encrypt(CANONICAL_ADMIN_PASSWORD)
+    user.password = hash_password(CANONICAL_ADMIN_PASSWORD)
     user.email = CANONICAL_ADMIN_EMAIL
     user.role = SUPER_ADMIN
     user.active = True
@@ -362,7 +362,7 @@ def get_or_create_user(session, username, email, role, password=None):
     password = password or DEFAULT_SCAFFOLD_PASSWORD
     user = UserModel()
     user.username = username
-    user.password = encrypt(password)
+    user.password = hash_password(password)
     user.email = email
     user.role = role
     user.active = True

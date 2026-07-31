@@ -29,7 +29,7 @@ Scripts in this directory orchestrate a **clean Debian install** of UpStage when
 
 ## Secrets flow
 
-Phase `40_generate_secrets` runs `initial_scripts/environments/generate_environments_script.sh` and `scripts/generate_cipher_key.sh`, which produce:
+Phase `40_generate_secrets` runs `initial_scripts/environments/generate_environments_script.sh`, which produces:
 
 - `src/upstage_backend/global_config/load_env.py`
 - `container_scripts/mqtt_server/pw.txt`
@@ -65,7 +65,7 @@ Run a single step (after preparing earlier steps), for example:
 2. `20_collect_domains` — writes `state.env` (app / svc / streaming hostnames, LE email, `prod` or `dev`).
 3. `30_prepare_svc_app_layout` — creates `/postgresql_data`, `/mosquitto_files`, `/app_code` dirs.
 4. `50_certificates` — nginx + certbot; obtains **separate** certificates per hostname (paths match the nginx templates).
-5. `40_generate_secrets` — `generate_environments_script.sh` + `generate_cipher_key.sh` (interactive).
+5. `40_generate_secrets` — `generate_environments_script.sh` (interactive).
 6. `45_sync_load_env` — mosquitto files, copy app tree to `/app_code`, `sed` on `load_env.py` for `{APP_HOST}`.
 7. `80_streaming_jitsi` — Jitsi repo, JDK 17, Prosody cert copies, **interactive** `apt-get install jitsi-meet` (own certificate paths from Let's Encrypt).
 8. `51_nginx_render_full` — builds **one** combined site from the three nginx templates (`lib/render_nginx.sh`), fixes `:80` catch-all conflicts by using explicit `server_name`s.

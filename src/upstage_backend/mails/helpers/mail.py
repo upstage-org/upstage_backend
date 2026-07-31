@@ -25,9 +25,7 @@ from upstage_backend.upstage_options.db_models.config import ConfigModel
 
 
 async def send(to, subject, content, bcc=[], cc=[], filenames=[]):
-    msg = create_email(
-        to=to, subject=subject, html=content, cc=cc, bcc=bcc, filenames=filenames
-    )
+    msg = create_email(to=to, subject=subject, html=content, cc=cc, bcc=bcc, filenames=filenames)
     await send_async(msg=msg)
 
 
@@ -131,6 +129,11 @@ def create_email(
     else:
         cc = []
         bcc = []
+
+    if not to:
+        # Everyone real is in Bcc; show the configured From address in To
+        # instead of an empty header.
+        to = [EMAIL_HOST_FROM]
 
     msg["Subject"] = subject
     msg["message-id"] = make_msgid(domain=DOMAIN)

@@ -14,7 +14,7 @@ from upstage_backend.users.db_models.user import (
     UserModel,
 )
 from upstage_backend.users.services.user import UserService
-from upstage_backend.global_config.helpers.fernet_crypto import decrypt
+from upstage_backend.global_config.helpers.password import verify_password
 from upstage_backend.global_config.env import (
     ENV_TYPE,
     JWT_ACCESS_TOKEN_MINUTES,
@@ -48,9 +48,7 @@ class AuthenticationService:
         )
         refresh_token = self.create_token(
             {"user_id": user.id, "type": "refresh"},
-            timedelta(
-                days=int(JWT_REFRESH_TOKEN_DAYS) if user.role == SUPER_ADMIN else 1
-            ),
+            timedelta(days=int(JWT_REFRESH_TOKEN_DAYS) if user.role == SUPER_ADMIN else 1),
         )
 
         user_session = UserSessionModel(
@@ -69,9 +67,7 @@ class AuthenticationService:
         db.add(user_session)
         db.flush()
 
-        db.query(UserModel).filter(UserModel.id == user.id).update(
-            {"last_login": datetime.now()}
-        )
+        db.query(UserModel).filter(UserModel.id == user.id).update({"last_login": datetime.now()})
 
         title_prefix = "" if ENV_TYPE == "Production" else "DEV "
         default_title = title_prefix + "Upstage"
@@ -109,19 +105,14 @@ class AuthenticationService:
         return username
 
     def validate_password(self, enter_password: str, user: UserModel):
-        try:
-            if decrypt(user.password) != enter_password:
-                raise GraphQLError("Incorrect username or password. Please try again.")
-        except Exception:
+        if not verify_password(user.password, enter_password):
             raise GraphQLError("Incorrect username or password. Please try again.")
         if not user.active:
             raise GraphQLError(
                 "Your account has been successfully created but not approved yet.<br/>Please wait for approval or contact UpStage Admin for support!"
             )
 
-    def create_token(
-        self, data: dict, exp=timedelta(minutes=int(JWT_ACCESS_TOKEN_MINUTES))
-    ):
+    def create_token(self, data: dict, exp=timedelta(minutes=int(JWT_ACCESS_TOKEN_MINUTES))):
         to_encode = data.copy()
         expire = datetime.now() + exp
         to_encode.update({"exp": expire})
@@ -136,9 +127,7 @@ class AuthenticationService:
         access_token = bearer_token[1]
         db = get_request_session()
         user_session = (
-            db.query(UserSessionModel)
-            .filter(UserSessionModel.access_token == access_token)
-            .first()
+            db.query(UserSessionModel).filter(UserSessionModel.access_token == access_token).first()
         )
         if not user_session:
             raise GraphQLError("Invalid access token")
@@ -170,9 +159,7 @@ class AuthenticationService:
 
         refresh_token = self.create_token(
             {"user_id": user.id, "type": "refresh"},
-            timedelta(
-                days=int(JWT_REFRESH_TOKEN_DAYS) if user.role == SUPER_ADMIN else 1
-            ),
+            timedelta(days=int(JWT_REFRESH_TOKEN_DAYS) if user.role == SUPER_ADMIN else 1),
         )
 
         db.query(UserSessionModel).filter(
@@ -191,9 +178,7 @@ class AuthenticationService:
         db.add(user_session)
         db.flush()
 
-        db.query(UserModel).filter(UserModel.id == user.id).update(
-            {"last_login": datetime.now()}
-        )
+        db.query(UserModel).filter(UserModel.id == user.id).update({"last_login": datetime.now()})
 
         return {"access_token": access_token, "refresh_token": refresh_token}
 

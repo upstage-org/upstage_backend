@@ -24,7 +24,7 @@ from upstage_backend.global_config.env import (
     JWT_HEADER_NAME,
     UPLOAD_USER_CONTENT_FOLDER,
 )
-from upstage_backend.global_config.helpers.fernet_crypto import encrypt
+from upstage_backend.global_config.helpers.password import hash_password
 from upstage_backend.performance_config.db_models.performance import PerformanceModel
 from upstage_backend.performance_config.db_models.scene import SceneModel
 from upstage_backend.stages.db_models.parent_stage import ParentStageModel
@@ -95,7 +95,7 @@ def make_user(client, role=PLAYER):
     email = "deluser{}@example.com".format(random.randint(1, 10**9))
     user = UserModel(
         username=email,
-        password=encrypt("testpassword"),
+        password=hash_password("testpassword"),
         email=email,
         active=True,
         role=role,

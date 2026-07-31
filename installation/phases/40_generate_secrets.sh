@@ -13,10 +13,6 @@ cd "$BACKEND"
 echo "Running initial_scripts/environments/generate_environments_script.sh (interactive)..."
 bash initial_scripts/environments/generate_environments_script.sh
 
-chmod +x ./scripts/generate_cipher_key.sh
-echo "Running scripts/generate_cipher_key.sh ..."
-bash ./scripts/generate_cipher_key.sh
-
 GEN="$BACKEND/service_containers/run_docker_compose.sh"
 if [[ ! -f "$GEN" ]]; then
   echo "Expected generated file missing: $GEN" >&2

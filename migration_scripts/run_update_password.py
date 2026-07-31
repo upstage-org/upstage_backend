@@ -1,7 +1,7 @@
 import sys
 from sqlalchemy import text
 from upstage_backend.global_config import logger
-from upstage_backend.global_config.helpers.fernet_crypto import encrypt
+from upstage_backend.global_config.helpers.password import hash_password
 from upstage_backend.global_config.env import DATABASE_HOST, DATABASE_NAME, DATABASE_PASSWORD, DATABASE_PORT, DATABASE_USER
 
 from sqlalchemy import create_engine, text
@@ -23,7 +23,7 @@ def update_upstage_user_passwords():
     with new_engine.connect() as conn:
         with conn.begin() as transaction:
             try:
-                conn.execute(update_sql, {"new_password": encrypt(new_password)})
+                conn.execute(update_sql, {"new_password": hash_password(new_password)})
                 logger.warning(f"All 'upstage_user' passwords have been updated to '{new_password}'.")
             except SQLAlchemyError as e:
                 logger.warning(f"Error updating passwords in 'upstage_user': {e}", file=sys.stderr)
