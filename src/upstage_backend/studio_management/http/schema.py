@@ -103,7 +103,10 @@ async def send_email(_, info, input):
         raise GraphQLError("You do not have permission to send email from the studio.")
 
     to_list = _split_email_list(input.get("recipients"))
-    if not to_list:
+    bcc_list = _split_email_list(input.get("bcc"))
+    # All-BCC sends are valid: the UI defaults recipients to BCC, and
+    # create_email always puts EMAIL_HOST_FROM in the To header.
+    if not to_list and not bcc_list:
         raise GraphQLError("At least one recipient is required.")
 
     try:
@@ -111,7 +114,7 @@ async def send_email(_, info, input):
             to_list,
             input["subject"],
             input["body"],
-            _split_email_list(input.get("bcc")),
+            bcc_list,
         )
     except Exception:
         logger.exception("Studio sendEmail: SMTP send failed")

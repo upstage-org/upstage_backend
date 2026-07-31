@@ -4,12 +4,13 @@ import os
 from email.mime.application import MIMEApplication
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
-from email.utils import formatdate, make_msgid
+from email.utils import formatdate, getaddresses, make_msgid
 import re
 import ssl
 import aiosmtplib
 
 from upstage_backend.global_config import ScopedSession
+from upstage_backend.global_config.logger import logger
 from upstage_backend.global_config.env import (
     DOMAIN,
     EMAIL_HOST,
@@ -37,6 +38,26 @@ async def send_async(msg, user=EMAIL_HOST_LOGIN, password=EMAIL_HOST_PASSWORD):
     if not EMAIL_HOST:
         raise RuntimeError("EMAIL_HOST is not configured")
 
+    # Envelope recipients are passed explicitly and the Bcc header is removed
+    # before the message goes on the wire, so Bcc addresses can never leak to
+    # other recipients regardless of library behavior.
+    recipients = [
+        addr
+        for _, addr in getaddresses(
+            msg.get_all("To", []) + msg.get_all("Cc", []) + msg.get_all("Bcc", [])
+        )
+        if addr
+    ]
+    del msg["Bcc"]
+
+    logger.info(
+        "Outbound email: subject={!r} from={!r} to={!r} envelope_recipients={}",
+        msg["Subject"],
+        msg["From"],
+        msg["To"],
+        recipients,
+    )
+
     host = EMAIL_HOST
     port = int(EMAIL_PORT)
     tls_context = ssl.create_default_context()
@@ -53,7 +74,7 @@ async def send_async(msg, user=EMAIL_HOST_LOGIN, password=EMAIL_HOST_PASSWORD):
         await smtp.starttls(tls_context)
     if user:
         await smtp.login(user, password)
-    await smtp.send_message(msg)
+    await smtp.send_message(msg, recipients=recipients)
     await smtp.quit()
 
 
@@ -112,28 +133,29 @@ def create_email(
         bcc = [x for x in bcc if x not in ("", None) and len(bcc) > 1]
 
     if subject != "Welcome to UpStage!":
-        if to and SUPPORT_EMAILS:
-            to = list(set(to).difference(set(SUPPORT_EMAILS)))
-        if cc and SUPPORT_EMAILS:
-            cc = list(set(cc).difference(set(SUPPORT_EMAILS)))
-        if bcc and SUPPORT_EMAILS:
-            bcc = list(set(bcc).difference(set(SUPPORT_EMAILS)))
+        # Privacy: every real recipient is Bcc'd so recipients never see each
+        # other's addresses. Only the configured From address appears in the
+        # To header, and Cc is never populated.
+        for addr in to + cc:
+            if addr != EMAIL_HOST_FROM and addr not in bcc:
+                bcc = bcc + [addr]
+        to = []
+        cc = []
 
+        # Support admins are implicitly Bcc'd on all emails; the From address
+        # is already in To, so keep it out of Bcc.
+        support = [x for x in SUPPORT_EMAILS if x] if SUPPORT_EMAILS else []
+        bcc = support + [x for x in bcc if x != EMAIL_HOST_FROM and x not in support]
         if bcc:
-            if SUPPORT_EMAILS:
-                msg["Bcc"] = ", ".join(SUPPORT_EMAILS) + "," + ", ".join(bcc)
-        else:
-            if SUPPORT_EMAILS:
-                msg["Bcc"] = ", ".join(SUPPORT_EMAILS)
-
+            msg["Bcc"] = ", ".join(bcc)
     else:
         cc = []
         bcc = []
 
-    if not to:
-        # Everyone real is in Bcc; show the configured From address in To
-        # instead of an empty header.
-        to = [EMAIL_HOST_FROM]
+    # The configured From address is always a To recipient, so the To header
+    # is never empty even when everyone real is in Bcc.
+    if EMAIL_HOST_FROM and EMAIL_HOST_FROM not in to:
+        to = [EMAIL_HOST_FROM] + to
 
     msg["Subject"] = subject
     msg["message-id"] = make_msgid(domain=DOMAIN)
