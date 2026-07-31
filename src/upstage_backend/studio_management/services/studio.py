@@ -78,6 +78,7 @@ class StudioService:
             query = query.filter(
                 or_(
                     UserModel.username.ilike(f"%{params['usernameLike']}%"),
+                    UserModel.email.ilike(f"%{params['usernameLike']}%"),
                     UserModel.display_name.ilike(f"%{params['usernameLike']}%"),
                     UserModel.last_name.ilike(f"%{params['usernameLike']}%"),
                     UserModel.first_name.ilike(f"%{params['usernameLike']}%"),
