@@ -124,7 +124,9 @@ def create_email(
         )
         if subject_prefix:
             subject = f"{subject_prefix.value}: {subject}"
-    msg.preamble = subject
+    # The MIME preamble is emitted as raw ASCII by the generator, so it must
+    # never contain the (possibly non-ASCII) subject.
+    msg.preamble = "This is a multi-part message in MIME format."
 
     # Remove empty strings. Not sure how they get here.
     # Remove support admins if they've been listed as recipients.
