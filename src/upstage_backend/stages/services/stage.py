@@ -572,6 +572,10 @@ class StageService:
         return {"result": attribute.description}
 
     def update_last_access(self, id: int):
+        try:
+            id = int(id)
+        except (TypeError, ValueError):
+            raise GraphQLError("Stage not found")
         session = get_session()
         stage = session.query(StageModel).filter(StageModel.id == id).first()
         if not stage:

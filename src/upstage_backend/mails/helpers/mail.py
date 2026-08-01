@@ -1,4 +1,3 @@
-# -*- coding: iso8859-15 -*-
 import os
 
 from email.mime.application import MIMEApplication
@@ -205,8 +204,8 @@ def create_email(
     that it can be read.
     """
     msg_alternative = MIMEMultipart("alternative")
-    msg_alternative.attach(MIMEText(remove_html(html), "plain", "latin-1"))
-    msg_alternative.attach(MIMEText(html, "html", "latin-1"))
+    msg_alternative.attach(MIMEText(remove_html(html), "plain", "utf-8"))
+    msg_alternative.attach(MIMEText(html, "html", "utf-8"))
     """
     Attach plain and HTML variations of the body to main message content.
     """
