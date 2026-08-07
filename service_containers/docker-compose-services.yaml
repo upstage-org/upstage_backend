@@ -41,6 +41,34 @@ services:
       mosquitto -c /etc/mosquitto/mosquitto.conf"
     restart: no
 
+  db_backup:
+    # Same image as the server, so pg_dump always matches the server version.
+    image: postgres:latest
+    container_name: backup_container_${SITE}
+    # Only started when COMPOSE_PROFILES=backup, which the prod run script sets.
+    profiles: ["backup"]
+    user: "999:999"
+    depends_on:
+      - postgres
+    environment:
+      SITE: ${SITE}
+      TZ: ${BACKUP_TZ:-UTC}
+      PGHOST: postgres
+      PGUSER: postgres
+      PGDATABASE: upstage
+      PGPASSWORD: ${POSTGRES_PASSWORD}
+      BACKUP_KEEP_DAYS: ${BACKUP_KEEP_DAYS:-14}
+      BACKUP_AT_HOUR: ${BACKUP_AT_HOUR:-3}
+    volumes:
+      # Defaults keep this file valid for the dev script, which does not enable
+      # the backup profile and so never creates this container.
+      - ${BACKUP_DIR:-/mnt/backups}:/backups:z
+      - ./backup_db.sh:/backup_db.sh:ro
+    networks:
+      - upstage-network
+    entrypoint: ["/bin/sh", "/backup_db.sh"]
+    restart: unless-stopped
+
 networks:
   upstage-network:
     name: upstage-network-${SITE}

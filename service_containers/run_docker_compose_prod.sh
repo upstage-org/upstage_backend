@@ -30,6 +30,15 @@ HARDCODED_HOSTNAME=upstage.live
 PG_DATA_DIR=/postgres_data_${SITE}
 MQ_DATA_DIR=/mosquitto_files_${SITE}
 
+# Daily database backup. COMPOSE_PROFILES is what switches the db_backup
+# service on: it is inherited by every docker compose call below, and the dev
+# script does not set it, so dev starts no backup container.
+BACKUP_DIR=/mnt/backups/${SITE}
+BACKUP_KEEP_DAYS=14
+BACKUP_AT_HOUR=3
+BACKUP_TZ=Pacific/Auckland
+COMPOSE_PROFILES=backup
+
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 # Set this in your environment: export POSTGRES_PASSWORD_PROD=NNNNN for example.
@@ -79,6 +88,12 @@ if [ ! -d "${PG_DATA_DIR}" ]; then
 fi
 sudo chown -R 999:999 ${PG_DATA_DIR}
 
+if [ ! -d "${BACKUP_DIR}" ]; then
+    echo "First time backup setup..."
+    sudo mkdir -p ${BACKUP_DIR}
+fi
+sudo chown -R 999:999 ${BACKUP_DIR}
+
 NETWORK="upstage-network-${SITE}"
 if ! docker network inspect "${NETWORK}" >/dev/null 2>&1; then
     docker network create "${NETWORK}"
@@ -88,6 +103,9 @@ docker compose -f ${DOCKERFILE} -p ${SERVICES} down --remove-orphans
 #docker compose rm -f
 docker compose -f ${DOCKERFILE} -p ${SERVICES} up -d
 docker compose -f ${DOCKERFILE} -p ${SERVICES} ps
+
+echo "Daily database backups: ${BACKUP_DIR} (keeping ${BACKUP_KEEP_DAYS} days, running at ${BACKUP_AT_HOUR}:00 ${BACKUP_TZ})"
+echo "Check the last result with: cat ${BACKUP_DIR}/status.txt"
 
 counter=0
 firstrun_fail=`docker logs postgres_container_${SITE} 2>&1 | grep -i "initdb\|could not change permissions\|No such container"`
