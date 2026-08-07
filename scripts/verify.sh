@@ -25,6 +25,28 @@
 # `set -e` aborts on the first failure.
 set -e
 
+# Prefer this checkout's own virtualenv over whatever happens to be
+# active in the caller's shell. The tools below are invoked by bare name,
+# so without this they resolve through the inherited PATH — and a
+# developer with an unrelated venv activated (or a second checkout's venv
+# on PATH) silently verifies the WRONG tree. That is not hypothetical:
+# a push from this repo once ran the sibling `upstage_dev` sources and
+# failed on a dependency missing from that environment, with nothing in
+# the output pointing at the real cause.
+#
+# `VIRTUAL_ENV` is realigned too, so pip-audit audits the environment it
+# is actually running against instead of warning about the mismatch.
+#
+# No-op in CI: the `verify` job installs into the runner's own
+# interpreter and never creates `.venv`, so the guard is skipped and CI
+# stays byte-for-byte the same gate as the local hook.
+REPO_ROOT=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
+if [ -x "$REPO_ROOT/.venv/bin/python" ]; then
+    PATH="$REPO_ROOT/.venv/bin:$PATH"
+    VIRTUAL_ENV="$REPO_ROOT/.venv"
+    export PATH VIRTUAL_ENV
+fi
+
 ruff check .
 pytest tests/unit/ -p no:cacheprovider
 # `--skip-editable` excludes our own `upstage-backend` (0.0.0) editable
