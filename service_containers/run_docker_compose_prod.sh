@@ -34,6 +34,10 @@ MQ_DATA_DIR=/mosquitto_files_${SITE}
 # service on: it is inherited by every docker compose call below, and the dev
 # script does not set it, so dev starts no backup container.
 BACKUP_DIR=/mnt/backups/${SITE}
+# Uploaded assets are copied (overwriting, never pruned) from the app's uploads
+# directory into ASSETS_BACKUP_DIR. Prod only: the dev script sets neither.
+ASSETS_SRC=/app_code_${SITE}/uploads
+ASSETS_BACKUP_DIR=/mnt/assets
 BACKUP_KEEP_DAYS=14
 BACKUP_AT_HOUR=3
 BACKUP_TZ=Pacific/Auckland
@@ -94,6 +98,15 @@ if [ ! -d "${BACKUP_DIR}" ]; then
 fi
 sudo chown -R 999:999 ${BACKUP_DIR}
 
+# Only the top level is chowned: the copy below it is written by the backup
+# container itself, and a recursive chown of a multi-GB tree on every deploy is
+# pure wasted I/O.
+if [ ! -d "${ASSETS_BACKUP_DIR}" ]; then
+    echo "First time asset backup setup..."
+    sudo mkdir -p ${ASSETS_BACKUP_DIR}
+fi
+sudo chown 999:999 ${ASSETS_BACKUP_DIR}
+
 NETWORK="upstage-network-${SITE}"
 if ! docker network inspect "${NETWORK}" >/dev/null 2>&1; then
     docker network create "${NETWORK}"
@@ -105,6 +118,7 @@ docker compose -f ${DOCKERFILE} -p ${SERVICES} up -d
 docker compose -f ${DOCKERFILE} -p ${SERVICES} ps
 
 echo "Daily database backups: ${BACKUP_DIR} (keeping ${BACKUP_KEEP_DAYS} days, running at ${BACKUP_AT_HOUR}:00 ${BACKUP_TZ})"
+echo "Daily asset copy: ${ASSETS_SRC} -> ${ASSETS_BACKUP_DIR}"
 echo "Check the last result with: cat ${BACKUP_DIR}/status.txt"
 
 counter=0

@@ -63,6 +63,9 @@ services:
       # Defaults keep this file valid for the dev script, which does not enable
       # the backup profile and so never creates this container.
       - ${BACKUP_DIR:-/mnt/backups}:/backups:z
+      # Uploaded assets: read-only at the source, copied into ASSETS_BACKUP_DIR.
+      - ${ASSETS_SRC:-/app_code_prod/uploads}:/assets_src:ro
+      - ${ASSETS_BACKUP_DIR:-/mnt/assets}:/assets_backup:z
       - ./backup_db.sh:/backup_db.sh:ro
     networks:
       - upstage-network
