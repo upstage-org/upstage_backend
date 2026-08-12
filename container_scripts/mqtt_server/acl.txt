@@ -1,0 +1,73 @@
+# Mosquitto ACL — topic authorisation for the two broker accounts.
+#
+# ⚠️ PER-SITE FILE. Like pw.backup next to it, this is a template: the
+# namespace below MUST match the site this broker serves. Dev and prod run
+# separate brokers (mosquitto_container_dev on :9001, mosquitto_container_prod
+# on :9002) with separate copies of this file under /mosquitto_files_${SITE}/.
+#
+#     dev broker  -> dev/+/+
+#     prod broker -> prod/+/+
+#
+# The namespace is the same value the frontend builds with
+# (VITE_MQTT_NAMESPACE) and always equals ${SITE}.
+#
+# ⚠️ Before this file existed, mosquitto ran with NO acl_file and therefore no
+# ACL callback registered at all, which means it allowed everything. Adding an
+# ACL flips the default to deny, so every legitimate client must appear below —
+# a client that is missing here still connects fine and is then silently denied
+# every publish and subscribe. Silence is the failure signature; check that
+# upstage_stats and event_archive keep writing ROWS, not just that they connect.
+#
+# ⚠️ How mosquitto 2.1.2 enforces this (verified in a throwaway container, do
+# not assume otherwise): a SUBSCRIBE to a filter this ACL does not cover is
+# still ACKed — `mosquitto_sub -t '#'` as `performance` succeeds and reports
+# "Subscribed (mid: 1): 0". Enforcement happens on message DELIVERY: that
+# subscriber then receives only topics matching the rules below. Publishes
+# outside the rules are silently dropped. So test with pub/sub traffic, never
+# by checking whether a subscribe was refused.
+
+
+# ---------------------------------------------------------------------------
+# performance — the browser account, served to clients on GraphQL `Stage.mqtt`
+# ---------------------------------------------------------------------------
+# Browsers only ever touch three-segment topics `<namespace>/<stage>/<topic>`,
+# built by namespaceTopic() in upstage_frontend/src/utils/mqttTopics.ts.
+#
+#   <namespace> is dev|prod, one segment.
+#   <stage>     is the stage's file_location. Validated `^[a-zA-Z0-9-_]*$` in
+#               StageManagement/General.vue and generated as [a-z0-9-] by
+#               StageService.get_short_name, so it never contains "/" — always
+#               exactly one segment.
+#   <topic>     is one of chat, board, background, audio, audio_master,
+#               reaction, counter, draw, statistics, stream_health
+#               (upstage_frontend/src/utils/constants.ts).
+#
+# The browser issues no wildcard subscriptions — stage.ts subscribe() names its
+# nine topics explicitly and publishes `statistics` retained — so there is no
+# subscribe-ACL mismatch to worry about here.
+#
+# This denies `#`, `$SYS/#`, the other namespace, and any forging of
+# upstage_stats/* (two segments). It does NOT stop this shared account from
+# addressing another stage inside the same namespace; that is inherent to a
+# shared credential and is what per-session credentials would fix.
+user performance
+topic readwrite dev/+/+
+
+
+# ---------------------------------------------------------------------------
+# admin — the backend workers (never the API process, which holds no client)
+# ---------------------------------------------------------------------------
+# event_archive subscribes PERFORMANCE_TOPIC_RULE (default "#") and
+# upstage_stats subscribes upstage_stats/connections, upstage_stats/live_clients
+# and +/+/statistics, publishing to the first two.
+#
+# Left broad deliberately: this is the backend's own account, so leaking it
+# implies the backend is already compromised, and enumerating topics here means
+# any future backend publish breaks silently. Tighten to the following if you
+# prefer, but keep it in sync with the workers:
+#
+#     topic read #
+#     topic readwrite upstage_stats/connections
+#     topic readwrite upstage_stats/live_clients
+user admin
+topic readwrite #

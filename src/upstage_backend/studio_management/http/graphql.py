@@ -362,6 +362,16 @@ type_defs = gql("""
         performances: [Performance]
         exitAnimation: String
         exitSpeed: Int
+        mqtt: MqttCredentials
+    }
+
+
+    # Broker login for this stage, resolved only when explicitly selected (see
+    # the Stage ObjectType in stages/http/schema.py). Keeps the credential out
+    # of the frontend bundle; list queries that do not ask for it never carry it.
+    type MqttCredentials {
+        username: String
+        password: String
     }
 
 

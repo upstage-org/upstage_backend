@@ -56,6 +56,7 @@ def config_graphql_endpoints(app: FastAPI, endpoint="/api/studio_graphql"):
     from upstage_backend.stages.http.schema import (
         query as stage_query,
         mutation as stage_mutation,
+        stage_type,
     )
     from upstage_backend.upstage_options.http.schema import (
         query as upstage_options_query,
@@ -195,7 +196,12 @@ def config_graphql_endpoints(app: FastAPI, endpoint="/api/studio_graphql"):
         "quickAssignMutation",
         studio_mutation._resolvers["quickAssignMutation"],
     )
-    combined_schema = make_executable_schema(studio_type_defs, combined_query, combined_mutation)
+    # `stage_type` carries the field-level resolvers on `Stage` (currently just
+    # `mqtt`). Unlike the query/mutation resolvers above, which are re-bound one
+    # by one via set_field, an ObjectType is passed straight to the schema.
+    combined_schema = make_executable_schema(
+        studio_type_defs, combined_query, combined_mutation, stage_type
+    )
 
     combined_graphql_app = GraphQL(
         combined_schema,

@@ -62,6 +62,12 @@ MQTT_ADMIN_PORT = int(os.getenv("MQTT_ADMIN_PORT", "1883"))
 MQTT_TRANSPORT = "tcp"
 MQTT_ADMIN_USER = os.getenv("MQTT_ADMIN_USER")
 MQTT_ADMIN_PASSWORD = os.getenv("MQTT_ADMIN_PASSWORD")
+# Browser-facing broker account. Served to clients at runtime on `Stage.mqtt`
+# so the credential is not compiled into the frontend bundle. Deployed hosts
+# already define these in `load_env.py` (star-imported below, so their values
+# win); declared here so a bare checkout/CI import does not blow up.
+MQTT_USER = os.getenv("MQTT_USER")
+MQTT_PASSWORD = os.getenv("MQTT_PASSWORD")
 PERFORMANCE_TOPIC_RULE = os.getenv("PERFORMANCE_TOPIC_RULE", "#")
 
 EVENT_COLLECTION = os.getenv("EVENT_COLLECTION")
@@ -93,6 +99,17 @@ try:
     from .load_env import *  # noqa: F401,F403
 except ModuleNotFoundError:
     logger.info("load_env.py not present; using environment configuration only")
+
+# Browsers get their broker credential from `Stage.mqtt` at runtime and have no
+# build-time fallback (by design — a Vite fallback would re-inline the secret).
+# A deployed host missing these would therefore hand every client a null
+# credential and silently take MQTT down, so say so at boot. Only checked on the
+# deployed environments; CI and local checkouts legitimately run without them.
+if ENV_TYPE in ("Dev", "Production") and not (MQTT_USER and MQTT_PASSWORD):
+    logger.error(
+        "MQTT_USER/MQTT_PASSWORD are not configured; Stage.mqtt will return null "
+        "and no browser will be able to connect to the broker. Set them in load_env.py."
+    )
 
 if DATABASE_CONNECT:
     DATABASE_URL = f"{DATABASE_CONNECT}://{DATABASE_USER}:{DATABASE_PASSWORD}@{DATABASE_HOST}:{DATABASE_PORT}/{DATABASE_NAME}"

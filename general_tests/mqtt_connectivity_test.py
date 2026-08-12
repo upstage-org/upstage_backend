@@ -29,8 +29,17 @@ CLIENT_ID = f"python-test-client-{random.randint(1000, 9999)}"
 USERNAME = "performance"  # Set in Mosquitto password_file
 PASSWORD = ""
 
-# Topic to use for testing
-TEST_TOPIC = "test/python/wss"
+# Topic to use for testing.
+#
+# Must sit inside the namespace the `performance` account is allowed to use:
+# the broker ACL (etc_mosquitto/acl.txt) grants that account `<namespace>/+/+`
+# only, so the old "test/python/wss" is now denied — the client still connects,
+# then silently publishes nothing. Change the first segment to `prod` when
+# pointing this at the production broker.
+#
+# "connectivity-test" occupies the stage-slug segment. It is not a real stage,
+# so nothing subscribes to it and this cannot disturb a live performance.
+TEST_TOPIC = "dev/connectivity-test/wss"
 QOS = 1
 
 

@@ -1,7 +1,8 @@
 # -*- coding: iso8859-15 -*-
 
-from ariadne import MutationType, QueryType, make_executable_schema
+from ariadne import MutationType, ObjectType, QueryType, make_executable_schema
 from upstage_backend.global_config.decorators.authenticated import authenticated
+from upstage_backend.global_config.env import MQTT_PASSWORD, MQTT_USER
 from upstage_backend.performance_config.services.performance import PerformanceService
 from upstage_backend.performance_config.services.scene import SceneService
 from upstage_backend.studio_management.http.graphql import type_defs
@@ -29,6 +30,22 @@ from upstage_backend.users.db_models.user import ADMIN, PLAYER, SUPER_ADMIN, Use
 
 query = QueryType()
 mutation = MutationType()
+stage_type = ObjectType("Stage")
+
+
+@stage_type.field("mqtt")
+def resolve_stage_mqtt(stage, info):
+    """Broker login for the browser's own mqtt.js client.
+
+    A field resolver rather than a key on the dicts built in StageService so it
+    is evaluated ONLY when a query selects it: `foyerStageList` and the admin
+    list views return [Stage] too, and none of them should carry a credential.
+
+    Shared account for now, so `stage` is unused — it is the hook a per-session
+    / stage-scoped credential would mint against later, without a schema change
+    or a frontend redeploy.
+    """
+    return {"username": MQTT_USER, "password": MQTT_PASSWORD}
 
 
 @query.field("stages")
@@ -230,5 +247,5 @@ def update_last_access(_, __, id: int):
     return StageService().update_last_access(id)
 
 
-schema = make_executable_schema(type_defs, query, mutation)
+schema = make_executable_schema(type_defs, query, mutation, stage_type)
 stage_graphql_app = GraphQL(schema, debug=True)
