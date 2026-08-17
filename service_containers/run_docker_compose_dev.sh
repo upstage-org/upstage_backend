@@ -43,6 +43,12 @@ if [ ! -d "${MQ_DATA_DIR}" ]; then
         sudo mkdir -p ${MQ_DATA_DIR}/var/lib/mosquitto && \
         sudo cp -r ./deployment_config/etc_mosquitto/* ${MQ_DATA_DIR}/etc/mosquitto && \
         sudo chown -R 1883:1883 ${MQ_DATA_DIR}
+    # acl.txt ships as a dev-namespace template; the performance account must be
+    # granted this site's own namespace or every browser topic is silently denied
+    # (see the header of acl.txt). A no-op for SITE=dev, kept for symmetry with
+    # the prod script.
+    sudo sed -i "s|^topic readwrite dev/+/+$|topic readwrite ${SITE}/+/+|" ${MQ_DATA_DIR}/etc/mosquitto/acl.txt
+    echo "Installed ACL with namespace ${SITE}/+/+ : ${MQ_DATA_DIR}/etc/mosquitto/acl.txt"
     echo "Change the performance and admin passwords in this file: ${MQ_DATA_DIR}/etc/mosquitto/pw.backup"
 
     # SSL for mqtt is handled by nginx, and an mqtt.* domain name.
