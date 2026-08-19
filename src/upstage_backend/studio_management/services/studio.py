@@ -238,7 +238,9 @@ class StudioService:
             user.firebase_pushnot_id = input.firebasePushnotId
         if input.uploadLimit:
             user.upload_limit = input.uploadLimit
-        if input.intro:
+        # `is not None` (not truthiness) so an admin can clear the intro;
+        # omitting the field still leaves it untouched.
+        if input.intro is not None:
             user.intro = input.intro
 
     async def _handle_active_status(self, user: UserModel, value):

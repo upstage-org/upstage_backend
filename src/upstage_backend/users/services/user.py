@@ -25,7 +25,6 @@ from upstage_backend.mails.templates.templates import (
 )
 from upstage_backend.stages.services.stage_operation import StageOperationService
 from upstage_backend.users.db_models.user import PLAYER, SUPER_ADMIN, UserModel
-from upstage_backend.users.http.validation import CreateUserInput
 from upstage_backend.users.db_models.one_time_totp import OneTimeTOTPModel
 
 
@@ -49,7 +48,9 @@ class UserService:
             .first()
         )
 
-    async def create(self, data: CreateUserInput, request: Request):
+    # `data` is the already-validated CreateUserInput as a plain dict
+    # (the resolver runs the pydantic validation and passes model_dump()).
+    async def create(self, data: dict, request: Request):
         self.verify_captcha(data["token"], request)
         del data["token"]
 

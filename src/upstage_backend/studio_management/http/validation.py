@@ -22,7 +22,11 @@ class UpdateUserInput(BaseModel):
     active: bool
     firebasePushnotId: Optional[str] = Field(None)
     uploadLimit: int
-    intro: Optional[str] = Field(None, max_length=500)
+    # Character (not byte) limit, so multibyte scripts (e.g. Cyrillic) count
+    # the same as ASCII. Must stay >= the longest intro already stored in
+    # prod: the status toggle round-trips the whole user record through this
+    # model, so a lower cap makes existing users un-editable.
+    intro: Optional[str] = Field(None, max_length=5000)
 
 
 class ChangePasswordInput(BaseModel):

@@ -1,12 +1,14 @@
 # -*- coding: iso8859-15 -*-
 
 from ariadne import MutationType, QueryType, make_executable_schema
+from graphql import GraphQLError
+from pydantic import ValidationError
 from upstage_backend.global_config.helpers.object import convert_keys_to_camel_case
 from upstage_backend.global_config.decorators.authenticated import authenticated
 from upstage_backend.studio_management.http.graphql import type_defs
 from ariadne.asgi import GraphQL
 
-from upstage_backend.users.http.validation import CreateUserInput
+from upstage_backend.users.http.validation import CreateUserInput, format_validation_error
 from upstage_backend.users.services.user import UserService
 
 query = QueryType()
@@ -20,8 +22,12 @@ def current_user(_, info):
 
 
 @mutation.field("createUser")
-def create_user(_, info, inbound: CreateUserInput, user_service=UserService()):
-    return user_service.create(inbound, info.context["request"])
+def create_user(_, info, inbound: dict, user_service=UserService()):
+    try:
+        validated = CreateUserInput(**inbound)
+    except ValidationError as exc:
+        raise GraphQLError(format_validation_error(exc)) from exc
+    return user_service.create(validated.model_dump(), info.context["request"])
 
 
 @mutation.field("requestPasswordReset")
