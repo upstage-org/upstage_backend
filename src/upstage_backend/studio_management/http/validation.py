@@ -21,7 +21,11 @@ class UpdateUserInput(BaseModel):
     displayName: Optional[str] = Field(None, max_length=100)
     active: bool
     firebasePushnotId: Optional[str] = Field(None)
-    uploadLimit: int
+    # Optional: the SPA strips null variables before sending (userGraph
+    # .updateUser omits nil), so a user whose stored upload_limit is NULL
+    # (the migration-seeded admin) could not be edited at all while this
+    # was required. The service only writes it when a value is given.
+    uploadLimit: Optional[int] = None
     # Character (not byte) limit, so multibyte scripts (e.g. Cyrillic) count
     # the same as ASCII. Must stay >= the longest intro already stored in
     # prod: the status toggle round-trips the whole user record through this

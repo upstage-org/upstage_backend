@@ -18,6 +18,7 @@ from upstage_backend.studio_management.http.validation import (
     UpdateUserInput,
 )
 from upstage_backend.studio_management.services.studio import StudioService
+from upstage_backend.users.services.upload_limit import effective_upload_limit
 from upstage_backend.users.db_models.user import (
     ADMIN,
     ROLES,
@@ -35,7 +36,13 @@ mutation = MutationType()
 @authenticated()
 def current_user(_, info):
     user = info.context["request"].state.current_user
-    return convert_keys_to_camel_case({**user, "roleName": ROLES[int(user["role"])]})
+    return convert_keys_to_camel_case(
+        {
+            **user,
+            "roleName": ROLES[int(user["role"])],
+            "effectiveUploadLimit": effective_upload_limit(user["role"], user.get("upload_limit")),
+        }
+    )
 
 
 @query.field("adminPlayers")

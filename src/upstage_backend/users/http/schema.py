@@ -9,6 +9,7 @@ from upstage_backend.studio_management.http.graphql import type_defs
 from ariadne.asgi import GraphQL
 
 from upstage_backend.users.http.validation import CreateUserInput, format_validation_error
+from upstage_backend.users.services.upload_limit import effective_upload_limit
 from upstage_backend.users.services.user import UserService
 
 query = QueryType()
@@ -18,7 +19,13 @@ mutation = MutationType()
 @query.field("currentUser")
 @authenticated()
 def current_user(_, info):
-    return convert_keys_to_camel_case(info.context["request"].state.current_user)
+    user = info.context["request"].state.current_user
+    return convert_keys_to_camel_case(
+        {
+            **user,
+            "effectiveUploadLimit": effective_upload_limit(user["role"], user.get("upload_limit")),
+        }
+    )
 
 
 @mutation.field("createUser")

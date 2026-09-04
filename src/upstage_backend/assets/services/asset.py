@@ -42,6 +42,7 @@ from upstage_backend.stages.services.assignment import (
     snapshot_exit_settings,
 )
 from upstage_backend.users.db_models.user import ADMIN, PLAYER, SUPER_ADMIN, UserModel
+from upstage_backend.users.services.upload_limit import per_user_upload_cap
 from upstage_backend.files.file_handling import FileHandling
 from upstage_backend.files.video_poster import extract_first_frame
 from upstage_backend.mails.helpers.mail import send
@@ -196,14 +197,17 @@ class AssetService:
     def upload_file(self, user: UserModel, base64: str, filename: str):
         file_size = self.file_handing.get_file_size(base64)
 
-        # Per-user cap is optional. NULL means "no per-user override"; the
-        # global per-extension caps in FileHandling.validate_file_size still
-        # apply. Without this guard a freshly-seeded user (whose row was
-        # inserted without upload_limit, e.g. via batch creation) gets a
-        # TypeError on the comparison and the request returns 400.
-        if user.upload_limit is not None and file_size > user.upload_limit:
+        # Per-user cap is optional. NULL means "no per-user override", and
+        # admins / super admins are never capped per user (see
+        # users.services.upload_limit); the global per-extension caps in
+        # FileHandling.validate_file_size still apply in both cases. Without
+        # the None guard a freshly-seeded user (whose row was inserted
+        # without upload_limit, e.g. via batch creation) gets a TypeError
+        # on the comparison and the request returns 400.
+        upload_cap = per_user_upload_cap(user.role, user.upload_limit)
+        if upload_cap is not None and file_size > upload_cap:
             raise GraphQLError(
-                f"File size must be under {self.file_handing.convert_KB_to_MB(user.upload_limit)}MB."
+                f"File size must be under {self.file_handing.convert_KB_to_MB(upload_cap)}MB."
             )
 
         file_location = self.file_handing.upload_file(base64, filename, None, storagePath, "media")

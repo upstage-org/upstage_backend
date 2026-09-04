@@ -291,6 +291,10 @@ type_defs = gql("""
         firebasePushnotId: String
         deactivatedOn: String
         uploadLimit: Int
+        # Largest file (bytes) this user can actually upload: the per-user
+        # cap for players, the server-wide max for admins / super admins.
+        # Populated by the whoami / currentUser resolvers.
+        effectiveUploadLimit: Int
         intro: String
         canSendEmail: Boolean
         lastLogin: String

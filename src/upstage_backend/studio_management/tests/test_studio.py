@@ -1,6 +1,7 @@
 # -*- coding: iso8859-15 -*-
 
 import random
+from datetime import datetime, timedelta
 from faker import Faker
 import pytest
 from upstage_backend.authentication.tests.auth_test import TestAuthenticationController
@@ -11,6 +12,7 @@ from upstage_backend.stages.tests.test_stage import TestStageController
 from upstage_backend.users.db_models.user import PLAYER, SUPER_ADMIN, UserModel
 from upstage_backend.global_config import get_session
 from upstage_backend.global_config.database import ScopedSession
+from upstage_backend.global_config.env import EMAIL_HOST
 
 test_AuthenticationController = TestAuthenticationController()
 test_StageController = TestStageController()
@@ -75,7 +77,7 @@ class TestStudioController:
             json={"query": query, "variables": variables},
         )
 
-        assert response.status_code == 200
+        assert response.status_code in (200, 400)  # GraphQL error -> HTTP 400 (older builds: 200)
         assert "errors" in response.json()
 
         variables = {
@@ -91,13 +93,19 @@ class TestStudioController:
             json={"query": query, "variables": variables},
         )
 
-        assert response.status_code == 200
+        assert response.status_code in (200, 400)  # GraphQL error -> HTTP 400 (older builds: 200)
         assert "errors" in response.json()
 
     async def test_02_update_user(self, client):
         username = None
+        # Operate on a throwaway account created here — NOT the first row of
+        # the table, which is the seeded super admin on every real database.
+        # Renaming it to a test_user_*/@example identity handed it to the
+        # conftest sweep, which then deleted the real admin (seen on the e2e
+        # harness 2026-09-05).
+        test_AuthenticationController.get_headers(client, PLAYER)
         with ScopedSession() as session:
-            user = session.query(UserModel).first()
+            user = session.query(UserModel).order_by(UserModel.id.desc()).first()
             user.active = False
             username = user.username
             session.flush()
@@ -192,7 +200,7 @@ class TestStudioController:
             json={"query": query, "variables": variables},
         )
 
-        assert response.status_code == 200
+        assert response.status_code in (200, 400)  # GraphQL error -> HTTP 400 (older builds: 200)
         assert "errors" in response.json()
 
         variables = {
@@ -208,7 +216,7 @@ class TestStudioController:
             json={"query": query, "variables": variables},
         )
 
-        assert response.status_code == 200
+        assert response.status_code in (200, 400)  # GraphQL error -> HTTP 400 (older builds: 200)
         assert "errors" in response.json()
 
         user_2 = get_session().query(UserModel).all()[-1]
@@ -227,7 +235,7 @@ class TestStudioController:
             json={"query": query, "variables": variables},
         )
 
-        assert response.status_code == 200
+        assert response.status_code in (200, 400)  # GraphQL error -> HTTP 400 (older builds: 200)
         assert "errors" in response.json()
 
     async def test_03_admin_players(self, client):
@@ -254,7 +262,10 @@ class TestStudioController:
                 "CREATED_ON_ASC",
             ],
             "usernameLike": "@",
-            "createdBetween": ["2021-01-01", "2025-12-31"],
+            "createdBetween": [
+                "2021-01-01",
+                (datetime.now() + timedelta(days=365)).strftime("%Y-%m-%d"),
+            ],
         }
 
         response = client.post(
@@ -272,7 +283,10 @@ class TestStudioController:
 
     async def test_04_delete_user(self, client):
         headers = test_AuthenticationController.get_headers(client, SUPER_ADMIN)
-        user = get_session().query(UserModel).all()[-1]
+        # A separate throwaway account: an unordered .all()[-1] may hand back
+        # the super admin created just above, and deleting yourself is refused.
+        test_AuthenticationController.get_headers(client, PLAYER)
+        user = get_session().query(UserModel).order_by(UserModel.id.desc()).first()
 
         query = """
             mutation deleteUser($id: ID!) {
@@ -301,7 +315,7 @@ class TestStudioController:
             json={"query": query, "variables": variables},
         )
 
-        assert response.status_code == 200
+        assert response.status_code in (200, 400)  # GraphQL error -> HTTP 400 (older builds: 200)
         assert "errors" in response.json()
 
     async def test_05_change_password(self, client):
@@ -349,7 +363,7 @@ class TestStudioController:
             json={"query": query, "variables": variables},
         )
 
-        assert response.status_code == 200
+        assert response.status_code in (200, 400)  # GraphQL error -> HTTP 400 (older builds: 200)
         assert "errors" in response.json()
 
         variables = {
@@ -366,7 +380,7 @@ class TestStudioController:
             json={"query": query, "variables": variables},
         )
 
-        assert response.status_code == 200
+        assert response.status_code in (200, 400)  # GraphQL error -> HTTP 400 (older builds: 200)
         assert "errors" in response.json()
 
     async def test_06_calc_sizes(self, client):
@@ -442,7 +456,7 @@ class TestStudioController:
             json={"query": query, "variables": variables},
         )
 
-        assert response.status_code == 200
+        assert response.status_code in (200, 400)  # GraphQL error -> HTTP 400 (older builds: 200)
         assert "errors" in response.json()
 
         with ScopedSession() as session:
@@ -502,7 +516,7 @@ class TestStudioController:
             json={"query": query, "variables": variables},
         )
 
-        assert response.status_code == 200
+        assert response.status_code in (200, 400)  # GraphQL error -> HTTP 400 (older builds: 200)
         assert "errors" in response.json()
 
         response = client.post(
@@ -528,7 +542,7 @@ class TestStudioController:
             json={"query": query, "variables": variables},
         )
 
-        assert response.status_code == 200
+        assert response.status_code in (200, 400)  # GraphQL error -> HTTP 400 (older builds: 200)
         assert "errors" in response.json()
 
         variables = {
@@ -585,7 +599,7 @@ class TestStudioController:
             json={"query": query, "variables": variables},
         )
 
-        assert response.status_code == 200
+        assert response.status_code in (200, 400)  # GraphQL error -> HTTP 400 (older builds: 200)
         assert "errors" in response.json()
 
         variables = {
@@ -599,7 +613,7 @@ class TestStudioController:
             json={"query": query, "variables": variables},
         )
 
-        assert response.status_code == 200
+        assert response.status_code in (200, 400)  # GraphQL error -> HTTP 400 (older builds: 200)
         assert "errors" in response.json()
 
     async def test_10_whoami(self, client):
@@ -628,6 +642,8 @@ class TestStudioController:
         assert "role" in response.json()["data"]["whoami"]
 
     async def test_11_send_email(self, client):
+        if not EMAIL_HOST:
+            pytest.skip("EMAIL_HOST is not configured on this instance (the e2e harness blanks it)")
         headers = test_AuthenticationController.get_headers(client, SUPER_ADMIN)
         query = """
             mutation sendEmail($input: SendEmailInput!) {

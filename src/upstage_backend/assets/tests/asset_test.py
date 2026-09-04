@@ -2,6 +2,8 @@
 
 
 import base64
+import os
+
 import pytest
 from upstage_backend.global_config.env import JWT_HEADER_NAME
 from upstage_backend.global_config import get_session
@@ -9,10 +11,15 @@ from upstage_backend.authentication.tests.auth_test import TestAuthenticationCon
 from upstage_backend.assets.db_models.asset import AssetModel
 from upstage_backend.stages.tests.test_stage import TestStageController
 from upstage_backend.stages.db_models.stage import StageModel
-from upstage_backend.users.db_models.user import UserModel
+from upstage_backend.users.db_models.user import PLAYER, UserModel
 
 
 def load_base64_from_image(image_path):
+    # Paths are given relative to the src tree ("src/assets/tests/images/..."),
+    # which only resolves when pytest's cwd is the package root; resolve them
+    # against this file instead so the suite runs from /usr/app too.
+    if not os.path.isabs(image_path) and not os.path.exists(image_path):
+        image_path = os.path.join(os.path.dirname(__file__), "images", os.path.basename(image_path))
     with open(image_path, "rb") as image_file:
         base64_encoded = base64.b64encode(image_file.read()).decode("utf-8")
     return base64_encoded
@@ -66,7 +73,8 @@ class TestAssetController:
             "/api/studio_graphql",
             json={"query": self.mutation_query, "variables": variables},
         )
-        assert response.status_code == 200
+        # GraphQL-level errors are answered with HTTP 400 (older builds: 200).
+        assert response.status_code in (200, 400)
         data = response.json()
         assert "data" in data
         assert "errors" in data
@@ -151,7 +159,8 @@ class TestAssetController:
             "/api/studio_graphql",
             json={"query": mutation_query, "variables": variables},
         )
-        assert response.status_code == 200
+        # GraphQL-level errors are answered with HTTP 400 (older builds: 200).
+        assert response.status_code in (200, 400)
         data = response.json()
         assert "data" in data
         assert "errors" in data
@@ -242,7 +251,9 @@ class TestAssetController:
             "/api/studio_graphql",
             json={
                 "query": query,
-                "variables": {"mediaType": "image", "owner": asset.owner.username},
+                # The first asset on a real DB is whatever happens to be there
+                # (an e2e prop, say) — filter by ITS type, not a hard-coded one.
+                "variables": {"mediaType": asset.asset_type.name, "owner": asset.owner.username},
             },
             headers=headers,
         )
@@ -334,7 +345,9 @@ class TestAssetController:
             headers=headers,
         )
 
-        assert response.status_code == 200
+        # Permission error is a GraphQL-level error -> HTTP 400 (older builds: 200).
+        assert response.status_code in (200, 400)
+        assert "errors" in response.json()
 
     async def test_09_delete_media_failed(self, client):
         asset = get_session().query(AssetModel).first()
@@ -372,7 +385,9 @@ class TestAssetController:
             headers=headers,
         )
 
-        assert response.status_code == 200
+        # "Media not found" is a GraphQL-level error -> HTTP 400 (older builds: 200).
+        assert response.status_code in (200, 400)
+        assert "errors" in response.json()
 
     async def test_10_delete_media(self, client):
         asset = get_session().query(AssetModel).first()
@@ -402,12 +417,10 @@ class TestAssetController:
         assert asset is None
 
     async def test_11_upload_file_with_large_file(self, client):
-        data = await test_AuthenticationController.test_02_login_successfully(client)
-
-        headers = {
-            "Authorization": f"Bearer {data['data']['login']['access_token']}",
-            JWT_HEADER_NAME: data["data"]["login"]["refresh_token"],
-        }
+        # A PLAYER: admins / super admins are no longer subject to the
+        # per-user cap (users.services.upload_limit, 2026-09-05), so the
+        # 1 MB rejection this test asserts only applies to non-admins.
+        headers = test_AuthenticationController.get_headers(client, PLAYER)
 
         variables = {
             "base64": f"data:image/jpeg;base64,{load_base64_from_image('src/assets/tests/images/large-file.jpg')}",
@@ -418,7 +431,8 @@ class TestAssetController:
             json={"query": self.mutation_query, "variables": variables},
             headers=headers,
         )
-        assert response.status_code == 200
+        # GraphQL-level errors are answered with HTTP 400 (older builds: 200).
+        assert response.status_code in (200, 400)
         data = response.json()
         assert "data" in data
         assert "errors" in data
