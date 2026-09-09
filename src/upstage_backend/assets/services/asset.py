@@ -6,6 +6,7 @@ from datetime import datetime, timedelta
 import hashlib
 import json
 from operator import or_
+import re
 from typing import Optional
 import time
 from graphql import GraphQLError
@@ -50,6 +51,20 @@ from upstage_backend.mails.templates.templates import notify_mark_media_active
 
 
 storagePath = UPLOAD_USER_CONTENT_FOLDER
+
+
+# A MediaMTX playback origin as the frontend lists it in VITE_RTMP_ENDPOINTS:
+# scheme + host (+ optional port), nothing else. The value is used verbatim to
+# build WHEP/HLS URLs and the OBS ingest URL, so reject anything with a path,
+# query, credentials or a non-http scheme.
+_RTMP_ENDPOINT_RE = re.compile(r"^https?://[A-Za-z0-9.-]+(:[0-9]{1,5})?$")
+
+
+def normalise_rtmp_endpoint(value: str) -> str:
+    candidate = (value or "").strip().rstrip("/")
+    if not _RTMP_ENDPOINT_RE.match(candidate):
+        raise GraphQLError("Invalid streaming server: expected https://host[:port]")
+    return candidate
 
 
 class AssetService:
@@ -243,6 +258,11 @@ class AssetService:
         # file_location) that crashed that commit, and on edits it silently
         # committed partial name/copyright changes.
         file_location = self.process_file_location(input, session, asset)
+        # Same rule for the RTMP server binding: validate before the asset is
+        # pending so a malformed value cannot leave a half-built row behind.
+        rtmp_endpoint = (
+            normalise_rtmp_endpoint(input.rtmpEndpoint) if input.rtmpEndpoint else None
+        )
         if not input.id:
             session.add(asset)
 
@@ -252,7 +272,7 @@ class AssetService:
 
         self.change_owner(input.owner, session, asset)
 
-        self.process_urls(input, session, asset_type, asset, file_location)
+        self.process_urls(input, session, asset_type, asset, file_location, rtmp_endpoint)
 
         self.update_asset_permissions(input, session, asset)
         asset = self.update_asset_tags(input, session, asset)
@@ -334,6 +354,7 @@ class AssetService:
         asset_type: AssetTypeModel,
         asset: AssetModel,
         file_location: str,
+        rtmp_endpoint: Optional[str] = None,
     ):
         # Voice / link / note used to be nested inside `if input.urls:`, which
         # meant clicking Save on the Voice tab (or Link tab) without uploading
@@ -372,6 +393,11 @@ class AssetService:
                 attributes["h"] = input.h
                 if asset_type.name == "stream" and "/" not in file_location:
                     attributes["isRTMP"] = True
+                    # Multi-server streaming: pin the feed to one MediaMTX.
+                    # Absent ⇒ keep whatever the blob already had (legacy
+                    # feeds have nothing and resolve to the default server).
+                    if rtmp_endpoint:
+                        attributes["rtmpEndpoint"] = rtmp_endpoint
 
             if input.voice is not None:
                 voice = input.voice

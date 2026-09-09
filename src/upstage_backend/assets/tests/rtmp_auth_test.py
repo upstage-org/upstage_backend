@@ -12,10 +12,10 @@ import time
 import pytest
 
 from upstage_backend.assets.http import rtmp_auth
-from upstage_backend.authentication.tests.auth_test import TestAuthenticationController
+from upstage_backend.authentication.tests.auth_test import TestAuthenticationController as _TestAuthenticationController
 from upstage_backend.global_config.env import JWT_HEADER_NAME
 
-test_AuthenticationController = TestAuthenticationController()
+test_AuthenticationController = _TestAuthenticationController()
 
 STREAM_ASSET_KEY = "rtmpauthtestkey"
 

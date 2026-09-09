@@ -1,11 +1,11 @@
 # -*- coding: iso8859-15 -*-
 
 import pytest
-from upstage_backend.authentication.tests.auth_test import TestAuthenticationController
+from upstage_backend.authentication.tests.auth_test import TestAuthenticationController as _TestAuthenticationController
 from upstage_backend.global_config.env import JWT_HEADER_NAME
 from faker import Faker
 
-test_AuthenticationController = TestAuthenticationController()
+test_AuthenticationController = _TestAuthenticationController()
 
 email = Faker().email()
 

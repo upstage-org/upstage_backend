@@ -16,7 +16,7 @@ from upstage_backend.assets.db_models.asset_usage import AssetUsageModel
 from upstage_backend.assets.tests import asset_test
 from upstage_backend.assets.tests.asset_test import load_base64_from_image
 from upstage_backend.authentication.db_models.user_session import UserSessionModel
-from upstage_backend.authentication.tests.auth_test import TestAuthenticationController
+from upstage_backend.authentication.tests.auth_test import TestAuthenticationController as _TestAuthenticationController
 from upstage_backend.event_archive.db_models.event import EventModel
 from upstage_backend.global_config import get_session
 from upstage_backend.global_config.database import ScopedSession
@@ -36,7 +36,7 @@ from upstage_backend.stages.scripts.scaffold_base_media import (
 )
 from upstage_backend.users.db_models.user import PLAYER, SUPER_ADMIN, UserModel
 
-auth = TestAuthenticationController()
+auth = _TestAuthenticationController()
 
 GRAPHQL = "/api/studio_graphql"
 TEST_IMAGE = os.path.join(os.path.dirname(asset_test.__file__), "images", "test.png")
@@ -393,6 +393,18 @@ class TestDeleteUserContent:
             assert survivor.owner_id == admin_id
         assert session.query(AssetModel).filter_by(id=audio_id).first() is None
         assert not os.path.exists(os.path.join(UPLOAD_USER_CONTENT_FOLDER, audio_loc))
+
+        # Clean up: the survivors now belong to the canonical admin, whom the
+        # fixture sweep never touches, so they would pile up in a shared
+        # database (three "keep-*" rows per run on dev, 2026-09-10).
+        with ScopedSession() as s:
+            s.query(AssetModel).filter(
+                AssetModel.id.in_([asset_id for asset_id, _ in kept.values()])
+            ).delete(synchronize_session=False)
+        for _, loc in kept.values():
+            path = os.path.join(UPLOAD_USER_CONTENT_FOLDER, loc)
+            if os.path.exists(path):
+                os.remove(path)
 
     async def test_04_guards(self, client):
         _, admin_headers = make_user(client, SUPER_ADMIN)

@@ -17,6 +17,7 @@ importable, not its database to be reachable.
 """
 
 import os
+import re
 import time
 
 import pytest
@@ -122,9 +123,12 @@ def _sweep_test_fixtures(engine):
     users themselves and everything they own (stages, attributes, assets,
     sessions). Runs only for real-DB sessions (see _guard_against_real_db).
     """
+    import json
+
     from sqlalchemy import text
 
     from upstage_backend.global_config import logger
+    from upstage_backend.global_config.env import UPLOAD_USER_CONTENT_FOLDER
 
     statements = [
         """CREATE TEMP TABLE _sweep_users AS SELECT id FROM upstage_user
@@ -134,6 +138,12 @@ def _sweep_test_fixtures(engine):
            WHERE owner_id IN (SELECT id FROM _sweep_users)""",
         """CREATE TEMP TABLE _sweep_assets AS SELECT id FROM asset
            WHERE owner_id IN (SELECT id FROM _sweep_users)""",
+        # Live events are keyed by topic (= the stage slug), not only by
+        # performance: the "Stage Name"/"doomed…" fixtures left topic rows
+        # like '/path/to/file/' behind on dev (2026-09-10).
+        """DELETE FROM events WHERE topic LIKE ANY
+           (SELECT '%/' || file_location || '/%' FROM stage
+             WHERE id IN (SELECT id FROM _sweep_stages))""",
         "DELETE FROM media_tag WHERE asset_id IN (SELECT id FROM _sweep_assets)",
         "DELETE FROM asset_attribute WHERE asset_id IN (SELECT id FROM _sweep_assets)",
         """DELETE FROM parent_stage WHERE stage_id IN (SELECT id FROM _sweep_stages)
@@ -151,8 +161,63 @@ def _sweep_test_fixtures(engine):
     ]
     try:
         with engine.begin() as connection:
-            for statement in statements:
+            connection.execute(text(statements[0]))
+            connection.execute(text(statements[1]))
+            connection.execute(text(statements[2]))
+            # Uploaded files of swept assets (test.png copies under image/,
+            # media/, avatar/ …) are only removable while the rows still exist.
+            file_locations = []
+            for location, description in connection.execute(
+                text(
+                    "SELECT file_location, description FROM asset"
+                    " WHERE id IN (SELECT id FROM _sweep_assets)"
+                )
+            ).fetchall():
+                file_locations.append(location)
+                # Multi-frame media keep extra files listed in the description.
+                try:
+                    frames = (json.loads(description or "{}") or {}).get("frames") or []
+                except (TypeError, ValueError):
+                    frames = []
+                file_locations.extend(f for f in frames if isinstance(f, str))
+            # Users created by the tests were appended to every default
+            # stage's playerAccess by assign_user_to_default_stage; strip
+            # those ids so the JSON does not accumulate dangling entries.
+            swept_ids = {
+                str(row[0]) for row in connection.execute(text("SELECT id FROM _sweep_users"))
+            }
+            for attr_id, description in connection.execute(
+                text("SELECT id, description FROM stage_attribute WHERE name = 'playerAccess'")
+            ).fetchall():
+                try:
+                    accesses = json.loads(description or "")
+                except (TypeError, ValueError):
+                    continue
+                if not isinstance(accesses, list):
+                    continue
+                trimmed = [
+                    [uid for uid in group if str(uid) not in swept_ids]
+                    if isinstance(group, list)
+                    else group
+                    for group in accesses
+                ]
+                if trimmed != accesses:
+                    connection.execute(
+                        text("UPDATE stage_attribute SET description = :d WHERE id = :i"),
+                        {"d": json.dumps(trimmed), "i": attr_id},
+                    )
+            for statement in statements[3:]:
                 connection.execute(text(statement))
+        upload_root = os.path.realpath(UPLOAD_USER_CONTENT_FOLDER)
+        for location in file_locations:
+            if not location or "://" in location:
+                continue
+            path = os.path.realpath(os.path.join(upload_root, location))
+            if path.startswith(upload_root + os.sep) and os.path.isfile(path):
+                try:
+                    os.remove(path)
+                except OSError:
+                    logger.warning("Could not remove swept test upload {}".format(path))
         logger.info("Swept @example.* test fixtures from the database")
     except Exception:
         logger.exception("Failed to sweep test fixtures; leftover rows may remain")
@@ -202,6 +267,15 @@ def db_engine(request):
         return
     from sqlalchemy.exc import OperationalError
 
+    # Terminating every backend is only appropriate on a throwaway database
+    # (CI drops it next). On a shared dev database it severs the live API's
+    # connection pool and every open browser session mid-request.
+    if not re.search(r"(_e2e|_test|test_)", env.DATABASE_NAME or ""):
+        logger.warning(
+            "Not terminating backends of shared database %s (only *_e2e/*_test databases)",
+            env.DATABASE_NAME,
+        )
+        return
     try:
         with create_engine(
             env.DATABASE_URL.rsplit("/", 1)[0], isolation_level="AUTOCOMMIT"

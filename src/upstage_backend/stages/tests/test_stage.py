@@ -2,12 +2,12 @@
 
 import pytest
 
-from upstage_backend.authentication.tests.auth_test import TestAuthenticationController
+from upstage_backend.authentication.tests.auth_test import TestAuthenticationController as _TestAuthenticationController
 from upstage_backend.global_config.env import JWT_HEADER_NAME
 from upstage_backend.global_config import get_session
 from upstage_backend.stages.db_models.stage import StageModel
 
-test_AuthenticationController = TestAuthenticationController()
+test_AuthenticationController = _TestAuthenticationController()
 
 
 @pytest.mark.anyio
@@ -99,7 +99,20 @@ class TestStageController:
 
     async def test_02_update_stage(self, client):
         data = await test_AuthenticationController.test_02_login_successfully(client)
-        stage = get_session().query(StageModel).first()
+        # Only ever touch the fixture stage test_01 created. An unfiltered
+        # .first() picks whatever stage sorts first in the configured database
+        # and overwrites it with these placeholder values - on dev that was the
+        # Demo Stage (renamed to "Stage Name" / "path/to/file", 2026-09-10).
+        stage = (
+            get_session()
+            .query(StageModel)
+            .filter(StageModel.name == "Stage Name", StageModel.file_location == "path/to/file")
+            .order_by(StageModel.id.desc())
+            .first()
+        )
+        if stage is None:
+            stage = await self.test_01_create_stage(client)
+            stage = get_session().query(StageModel).get(int(stage["id"]))
         response = self.update_stage(client, stage.id, data)
         print(response)
         assert "errors" not in response

@@ -2,10 +2,11 @@
 
 from faker import Faker
 import pytest
-from upstage_backend.authentication.tests.auth_test import TestAuthenticationController
+from upstage_backend.authentication.tests.auth_test import TestAuthenticationController as _TestAuthenticationController
+from upstage_backend.global_config.database import ScopedSession
 from upstage_backend.users.db_models.user import SUPER_ADMIN
 
-test_AuthenticationController = TestAuthenticationController()
+test_AuthenticationController = _TestAuthenticationController()
 
 
 @pytest.mark.anyio
@@ -99,6 +100,23 @@ class TestUpStageOptionsController:
 
     async def test_04_update_terms_of_service(self, client):
         headers = test_AuthenticationController.get_headers(client, SUPER_ADMIN)
+        # Remember the live value: this test rewrites a real config row and
+        # must put it back (it left dev pointing at www.test.com, 2026-09-10).
+        from upstage_backend.upstage_options.db_models.config import ConfigModel
+
+        with ScopedSession() as s:
+            row = s.query(ConfigModel).filter(ConfigModel.name == "TERMS_OF_SERVICE").first()
+            original = row.value if row else None
+        try:
+            await self._update_terms_of_service_twice(client, headers)
+        finally:
+            if original is not None:
+                with ScopedSession() as s:
+                    s.query(ConfigModel).filter(ConfigModel.name == "TERMS_OF_SERVICE").update(
+                        {"value": original}
+                    )
+
+    async def _update_terms_of_service_twice(self, client, headers):
         query = """
         mutation {
             updateTermsOfService(url: "https://www.example.com") {
@@ -142,6 +160,16 @@ class TestUpStageOptionsController:
         assert "errors" not in response.json()
 
     async def test_05_save_config(self, client):
+        from upstage_backend.upstage_options.db_models.config import ConfigModel
+
+        try:
+            await self._save_config_twice(client)
+        finally:
+            # Never leave the throwaway "test" row behind in a shared database.
+            with ScopedSession() as s:
+                s.query(ConfigModel).filter(ConfigModel.name == "test").delete()
+
+    async def _save_config_twice(self, client):
         headers = test_AuthenticationController.get_headers(client, SUPER_ADMIN)
         query = """
             mutation {

@@ -1,20 +1,24 @@
 # -*- coding: iso8859-15 -*-
 
+import os
+
 import pytest
 from upstage_backend.assets.db_models.asset import AssetModel
-from upstage_backend.authentication.tests.auth_test import TestAuthenticationController
+from upstage_backend.authentication.tests.auth_test import TestAuthenticationController as _TestAuthenticationController
 from upstage_backend.global_config import get_session
-from upstage_backend.stages.tests.test_stage import TestStageController
+from upstage_backend.global_config.env import UPLOAD_USER_CONTENT_FOLDER
+from upstage_backend.stages.tests.test_stage import TestStageController as _TestStageController
 from upstage_backend.assets.tests.asset_test import (
-    TestAssetController,
+    TestAssetController as _TestAssetController,
     load_base64_from_image,
+    newest_test_asset,
 )
 from upstage_backend.users.db_models.user import SUPER_ADMIN
 import random
 
-test_AuthenticationController = TestAuthenticationController()
-test_StageController = TestStageController()
-test_AssetController = TestAssetController()
+test_AuthenticationController = _TestAuthenticationController()
+test_StageController = _TestStageController()
+test_AssetController = _TestAssetController()
 
 
 @pytest.mark.anyio
@@ -42,7 +46,7 @@ class TestMediaController:
     async def test_01_assign_media(self, client):
         stage = await test_StageController.test_01_create_stage(client)
         await test_AssetController.test_03_save_media_successfully(client)
-        assets = get_session().query(AssetModel).all()
+        assets = get_session().query(AssetModel).filter(AssetModel.name == "test").all()
         response = await self.assign_media(client, stage["id"], [asset.id for asset in assets])
 
         assert "data" in response.json()
@@ -52,7 +56,7 @@ class TestMediaController:
         assert response.json()["data"]["assignMedia"]["id"] == stage["id"]
 
     async def test_02_assign_media_stage_not_found(self, client):
-        assets = get_session().query(AssetModel).all()
+        assets = get_session().query(AssetModel).filter(AssetModel.name == "test").all()
         response = await self.assign_media(client, 0, [asset.id for asset in assets])
         data = response.json()
         assert "errors" in data
@@ -94,9 +98,12 @@ class TestMediaController:
     async def test_04_update_media(self, client):
         headers = test_AuthenticationController.get_headers(client, SUPER_ADMIN)
         await test_AssetController.test_03_save_media_successfully(client)
-        asset = get_session().query(AssetModel).first()
+        await self.test_03_upload_media(client)
+        asset = newest_test_asset()
+        original_file = asset.file_location
         file_location = "image/test2.png"
         response = self.update_media(client, headers, asset.id, file_location)
+        self.remove_orphaned_upload(original_file)
         assert response.status_code == 200
         assert "data" in response.json()
         assert "updateMedia" in response.json()["data"]
@@ -107,11 +114,47 @@ class TestMediaController:
         assert response.status_code == 200
         assert "errors" in response.json()
 
-        asset = get_session().query(AssetModel).all()[1]
+        # Second-newest test asset: owned by a different faker user, so the
+        # update must be refused (never the second row of the whole table).
+        asset = (
+            get_session()
+            .query(AssetModel)
+            .filter(AssetModel.name == "test")
+            .order_by(AssetModel.id.desc())
+            .offset(1)
+            .first()
+        )
         response = self.update_media(client, headers, asset.id, file_location)
         assert "errors" in response.json()
 
+    @staticmethod
+    def remove_orphaned_upload(file_location):
+        """updateMedia moves the row to a new file_location; the file it was
+        uploaded to is left behind, so delete it (the sweep only knows the
+        row's current path)."""
+        if not file_location:
+            return
+        path = os.path.join(UPLOAD_USER_CONTENT_FOLDER, file_location)
+        if os.path.isfile(path):
+            os.remove(path)
+
     def update_media(self, client, headers, id, file_location="image/test.png"):
+        # updateMedia writes the uploaded frame under uploads/<type>/ with a
+        # hashed name and, for a single frame, drops the reference again
+        # (assets/services/asset.py), so nothing records the file. Diff the
+        # directory around the request and delete what appeared.
+        frames_dir = os.path.join(UPLOAD_USER_CONTENT_FOLDER, os.path.dirname(file_location))
+        before = set(os.listdir(frames_dir)) if os.path.isdir(frames_dir) else set()
+        try:
+            return self._update_media(client, headers, id, file_location)
+        finally:
+            if os.path.isdir(frames_dir):
+                for name in set(os.listdir(frames_dir)) - before:
+                    path = os.path.join(frames_dir, name)
+                    if os.path.isfile(path) and name != os.path.basename(file_location):
+                        os.remove(path)
+
+    def _update_media(self, client, headers, id, file_location):
         variables = {
             "input": {
                 "id": id,
@@ -145,8 +188,11 @@ class TestMediaController:
 
     async def test_05_delete_media(self, client):
         headers = test_AuthenticationController.get_headers(client, SUPER_ADMIN)
-        asset = get_session().query(AssetModel).first()
+        await self.test_03_upload_media(client)
+        asset = newest_test_asset()
+        original_file = asset.file_location
         self.update_media(client, headers, asset.id, f"image/test{random.randint(1, 1000)}.png")
+        self.remove_orphaned_upload(original_file)
 
         response = self.delete_media_request(client, headers, asset)
         assert response.json()["data"]["deleteMediaOnStage"]["success"] is True
@@ -201,7 +247,8 @@ class TestMediaController:
         headers = test_AuthenticationController.get_headers(client, SUPER_ADMIN)
         stage = await test_StageController.test_01_create_stage(client)
         stage2 = await test_StageController.test_01_create_stage(client)
-        asset = get_session().query(AssetModel).first()
+        await self.test_03_upload_media(client)
+        asset = newest_test_asset()
 
         response = await self.assign_stages(client, headers, [stage["id"], stage2["id"]], asset.id)
         assert response.json()["data"]["assignStages"]["id"] is not None
@@ -217,7 +264,8 @@ class TestMediaController:
         session = get_session()
 
         # Ensure at least two assets so a reversed order is distinguishable.
-        template = session.query(AssetModel).first()
+        await self.test_03_upload_media(client)
+        template = newest_test_asset()
         extra = AssetModel(
             name="reorder extra",
             asset_type_id=template.asset_type_id,

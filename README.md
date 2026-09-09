@@ -131,6 +131,10 @@ JWT_REFRESH_TOKEN_DAYS = "30"
 
 # RTMP streaming (optional, needs an external MediaMTX server): shared secret
 # for signing publish tokens. Generate with: openssl rand -hex 24
+# One key serves ALL MediaMTX hosts (multi-server streaming): the token is
+# server-agnostic and every MediaMTX validates publishes against this backend's
+# POST /api/rtmp/auth (remote hosts via the public nginx alias on the backend
+# host, see /root/streaming2/nginx-rtmp-auth-public.conf).
 STREAM_KEY = "XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX"
 ```
 

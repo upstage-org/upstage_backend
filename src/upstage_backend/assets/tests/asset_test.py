@@ -5,11 +5,11 @@ import base64
 import os
 
 import pytest
-from upstage_backend.global_config.env import JWT_HEADER_NAME
+from upstage_backend.global_config.env import JWT_HEADER_NAME, UPLOAD_USER_CONTENT_FOLDER
 from upstage_backend.global_config import get_session
-from upstage_backend.authentication.tests.auth_test import TestAuthenticationController
+from upstage_backend.authentication.tests.auth_test import TestAuthenticationController as _TestAuthenticationController
 from upstage_backend.assets.db_models.asset import AssetModel
-from upstage_backend.stages.tests.test_stage import TestStageController
+from upstage_backend.stages.tests.test_stage import TestStageController as _TestStageController
 from upstage_backend.stages.db_models.stage import StageModel
 from upstage_backend.users.db_models.user import PLAYER, UserModel
 
@@ -25,8 +25,22 @@ def load_base64_from_image(image_path):
     return base64_encoded
 
 
-test_AuthenticationController = TestAuthenticationController()
-test_stageController = TestStageController()
+test_AuthenticationController = _TestAuthenticationController()
+
+
+def newest_test_asset():
+    """The most recent asset a test created (they are all named "test").
+    Never fall back to an unfiltered .first(): against a shared database that
+    is a real user's media (the dev Demo Stage lost its cover, backdrop,
+    streams and audio that way on 2026-09-10)."""
+    return (
+        get_session()
+        .query(AssetModel)
+        .filter(AssetModel.name == "test")
+        .order_by(AssetModel.id.desc())
+        .first()
+    )
+test_stageController = _TestStageController()
 
 
 @pytest.mark.anyio
@@ -63,6 +77,13 @@ class TestAssetController:
         assert "uploadFile" in data["data"]
         assert "url" in data["data"]["uploadFile"]
         assert data["data"]["uploadFile"]["url"] is not None
+
+        # A raw upload has no asset row, so the fixture sweep cannot find the
+        # file - remove it here (they piled up under uploads/image on dev).
+        location = data["data"]["uploadFile"]["url"].split("/resources/", 1)[-1].split("?")[0]
+        path = os.path.join(UPLOAD_USER_CONTENT_FOLDER, location.lstrip("/"))
+        if os.path.isfile(path):
+            os.remove(path)
 
     async def test_02_upload_file_without_authentication(self, client):
         variables = {
@@ -224,7 +245,10 @@ class TestAssetController:
 
     async def test_06_get_all_medias(self, client):
         data = await test_AuthenticationController.test_02_login_successfully(client)
-        asset = get_session().query(AssetModel).join(UserModel).first()
+        asset = newest_test_asset()
+        if asset is None:
+            await self.test_03_save_media_successfully(client)
+            asset = newest_test_asset()
         headers = {
             "Authorization": f"Bearer {data['data']['login']['access_token']}",
             JWT_HEADER_NAME: data["data"]["login"]["refresh_token"],
@@ -265,7 +289,10 @@ class TestAssetController:
 
     async def test_07_update_media(self, client):
         data = await test_AuthenticationController.test_02_login_successfully(client)
-        asset = get_session().query(AssetModel).join(UserModel).first()
+        asset = newest_test_asset()
+        if asset is None:
+            await self.test_03_save_media_successfully(client)
+            asset = newest_test_asset()
 
         headers = {
             "Authorization": f"Bearer {data['data']['login']['access_token']}",
@@ -307,7 +334,10 @@ class TestAssetController:
 
     async def test_08_update_media_failed(self, client):
         data = await test_AuthenticationController.test_player_login_successfully(client)
-        asset = get_session().query(AssetModel).join(UserModel).first()
+        asset = newest_test_asset()
+        if asset is None:
+            await self.test_03_save_media_successfully(client)
+            asset = newest_test_asset()
 
         headers = {
             "Authorization": f"Bearer {data['data']['login']['access_token']}",
@@ -350,7 +380,10 @@ class TestAssetController:
         assert "errors" in response.json()
 
     async def test_09_delete_media_failed(self, client):
-        asset = get_session().query(AssetModel).first()
+        asset = newest_test_asset()
+        if asset is None:
+            await self.test_03_save_media_successfully(client)
+            asset = newest_test_asset()
         data = await test_AuthenticationController.test_player_login_successfully(client)
 
         headers = {
@@ -390,7 +423,8 @@ class TestAssetController:
         assert "errors" in response.json()
 
     async def test_10_delete_media(self, client):
-        asset = get_session().query(AssetModel).first()
+        await self.test_03_save_media_successfully(client)
+        asset = newest_test_asset()
         data = await test_AuthenticationController.test_02_login_successfully(client)
         headers = {
             "Authorization": f"Bearer {data['data']['login']['access_token']}",

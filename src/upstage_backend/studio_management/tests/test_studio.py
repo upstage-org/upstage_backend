@@ -4,18 +4,18 @@ import random
 from datetime import datetime, timedelta
 from faker import Faker
 import pytest
-from upstage_backend.authentication.tests.auth_test import TestAuthenticationController
+from upstage_backend.authentication.tests.auth_test import TestAuthenticationController as _TestAuthenticationController
 from upstage_backend.assets.db_models.asset import AssetModel
 from upstage_backend.assets.db_models.asset_usage import AssetUsageModel
 from upstage_backend.stages.db_models.stage import StageModel
-from upstage_backend.stages.tests.test_stage import TestStageController
+from upstage_backend.stages.tests.test_stage import TestStageController as _TestStageController
 from upstage_backend.users.db_models.user import PLAYER, SUPER_ADMIN, UserModel
 from upstage_backend.global_config import get_session
 from upstage_backend.global_config.database import ScopedSession
 from upstage_backend.global_config.env import EMAIL_HOST
 
-test_AuthenticationController = TestAuthenticationController()
-test_StageController = TestStageController()
+test_AuthenticationController = _TestAuthenticationController()
+test_StageController = _TestStageController()
 
 
 @pytest.mark.anyio
@@ -426,8 +426,13 @@ class TestStudioController:
                 }
         """
 
-        asset = get_session().query(AssetModel).first()
+        # Request permission on an asset this test uploaded (uploadMedia
+        # writes a real description; saveMedia-by-URL fixtures carry none and
+        # the resolver json.loads() it). Never the first asset of the table.
+        from upstage_backend.stages.tests.test_media import TestMediaController as _MediaFixtures
 
+        asset_id = int(await _MediaFixtures().test_03_upload_media(client))
+        asset = get_session().query(AssetModel).get(asset_id)
         variables = {
             "assetId": asset.id,
             "note": "This is a permission request",
@@ -460,7 +465,7 @@ class TestStudioController:
         assert "errors" in response.json()
 
         with ScopedSession() as session:
-            asset = session.query(AssetModel).first()
+            asset = session.query(AssetModel).get(asset_id)
             asset.copyright_level = 2
             session.flush()
             variables = {
@@ -568,9 +573,20 @@ class TestStudioController:
                 }
         """
 
-        asset = get_session().query(AssetModel).first()
+        # Fixtures only: the newest test asset and the newest "Stage Name"
+        # stage. An unfiltered .first() would quick-assign onto a real stage.
+        from upstage_backend.assets.tests.asset_test import newest_test_asset
+        from upstage_backend.stages.tests.test_stage import TestStageController as _TestStageController
 
-        stage = get_session().query(StageModel).first()
+        asset = newest_test_asset()
+        if asset is None:
+            from upstage_backend.assets.tests.asset_test import TestAssetController
+
+            await TestAssetController().test_03_save_media_successfully(client)
+            asset = newest_test_asset()
+
+        stage = await _TestStageController().test_01_create_stage(client)
+        stage = get_session().query(StageModel).get(int(stage["id"]))
 
         variables = {
             "stageIds": [stage.id],

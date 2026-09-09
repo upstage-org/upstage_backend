@@ -87,6 +87,7 @@ type_defs = gql("""
         urls: [String!]!
         voice: VoiceInput
         link: LinkInput
+        rtmpEndpoint: String
     }
 
     input StageAssignmentInput {

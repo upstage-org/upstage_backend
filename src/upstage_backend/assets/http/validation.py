@@ -42,6 +42,10 @@ class SaveMediaInput(BaseModel):
     urls: conlist(str)
     voice: Optional[VoiceInput] = None
     link: Optional[LinkInput] = None
+    # Multi-server streaming: the MediaMTX origin an RTMP stream feed is
+    # bound to (e.g. "https://streaming4.upstage.live"). Only stored for
+    # stream assets; ignored for every other media type. None = default server.
+    rtmpEndpoint: Optional[constr(max_length=200)] = None
 
 
 class Asset(BaseModel):

@@ -16,11 +16,11 @@ import base64
 import os
 
 import pytest
-from upstage_backend.authentication.tests.auth_test import TestAuthenticationController
+from upstage_backend.authentication.tests.auth_test import TestAuthenticationController as _TestAuthenticationController
 from upstage_backend.global_config.env import UPLOAD_USER_CONTENT_FOLDER as storagePath
 from upstage_backend.users.db_models.user import ADMIN, PLAYER, SUPER_ADMIN
 
-test_AuthenticationController = TestAuthenticationController()
+test_AuthenticationController = _TestAuthenticationController()
 
 MIB = 1024 * 1024
 ONE_POINT_TWO_MB = int(1.2 * MIB)

@@ -529,7 +529,8 @@ class StudioService:
         else:
             asset_usage.approved = True
 
-            description = json.loads(asset.description)
+            # Uploaded media may carry no description yet; never crash the request.
+            description = json.loads(asset.description) if asset.description else {}
 
             asyncio.create_task(
                 send(

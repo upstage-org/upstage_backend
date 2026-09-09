@@ -1,7 +1,7 @@
 # -*- coding: iso8859-15 -*-
 
 import pytest
-from upstage_backend.authentication.tests.auth_test import TestAuthenticationController
+from upstage_backend.authentication.tests.auth_test import TestAuthenticationController as _TestAuthenticationController
 from upstage_backend.global_config import get_session
 from upstage_backend.global_config.database import ScopedSession
 from upstage_backend.event_archive.db_models.event import EventModel
@@ -9,15 +9,30 @@ from upstage_backend.performance_config.db_models.performance import Performance
 from upstage_backend.performance_config.db_models.scene import SceneModel
 from upstage_backend.stages.db_models.stage import StageModel
 from upstage_backend.users.db_models.user import PLAYER, SUPER_ADMIN
-from upstage_backend.stages.tests.test_stage import TestStageController
+from upstage_backend.stages.tests.test_stage import TestStageController as _TestStageController
 
-test_AuthenticationController = TestAuthenticationController()
-test_StageController = TestStageController()
+test_AuthenticationController = _TestAuthenticationController()
+test_StageController = _TestStageController()
 
 
 @pytest.mark.anyio
 class TestPerformanceController:
     stage = None
+
+    def newest_test_performance(self):
+        """The newest recording on a "Stage Name" fixture stage. Never the
+        first performance of the whole table: on a shared database that is a
+        real user's recording (updated/saved/deleted by the tests below)."""
+        from upstage_backend.stages.db_models.stage import StageModel
+
+        return (
+            get_session()
+            .query(PerformanceModel)
+            .join(StageModel, StageModel.id == PerformanceModel.stage_id)
+            .filter(StageModel.name == "Stage Name")
+            .order_by(PerformanceModel.id.desc())
+            .first()
+        )
 
     async def test_01_start_recording(self, client):
         stage = await test_StageController.test_01_create_stage(client)
@@ -161,7 +176,7 @@ class TestPerformanceController:
         assert "errors" in data
         assert data["errors"][0]["message"] == "Performance not found"
 
-        performance = get_session().query(PerformanceModel).first()
+        performance = self.newest_test_performance()
         variables = {
             "input": {
                 "id": performance.id,
@@ -186,7 +201,7 @@ class TestPerformanceController:
 
     async def test_05_save_recording(self, client):
         headers = test_AuthenticationController.get_headers(client, SUPER_ADMIN)
-        performance = get_session().query(PerformanceModel).first()
+        performance = self.newest_test_performance()
         variables = {"id": performance.id}
 
         query = """
@@ -253,7 +268,7 @@ class TestPerformanceController:
         assert "errors" in data
         assert data["errors"][0]["message"] == "Performance not found"
 
-        performance = get_session().query(PerformanceModel).first()
+        performance = self.newest_test_performance()
         variables = {"id": performance.id}
 
         headers = test_AuthenticationController.get_headers(client, PLAYER)
@@ -272,7 +287,7 @@ class TestPerformanceController:
 
     async def test_07_delete_performance(self, client):
         headers = test_AuthenticationController.get_headers(client, SUPER_ADMIN)
-        performance = get_session().query(PerformanceModel).first()
+        performance = self.newest_test_performance()
         variables = {"id": performance.id}
 
         query = """
@@ -317,7 +332,7 @@ class TestPerformanceController:
         assert "errors" in data
         assert data["errors"][0]["message"] == "Performance not found"
 
-        performance = get_session().query(PerformanceModel).first()
+        performance = self.newest_test_performance()
         variables = {"id": performance.id}
 
         headers = test_AuthenticationController.get_headers(client, PLAYER)
@@ -486,9 +501,21 @@ class TestPerformanceController:
         assert "saveScene" in data["data"]
         assert data["data"]["saveScene"] is None
 
+    def newest_test_scene(self):
+        # Only the "Test" scene test_10 saved - never the first scene of the
+        # whole table (that soft-deleted the dev Demo Stage's scene, 2026-09-10).
+        return (
+            get_session()
+            .query(SceneModel)
+            .filter(SceneModel.name == "Test")
+            .order_by(SceneModel.id.desc())
+            .first()
+        )
+
     async def test_11_delete_scene(self, client):
         headers = test_AuthenticationController.get_headers(client, SUPER_ADMIN)
-        scene = get_session().query(SceneModel).first()
+        await self.test_10_save_scene(client)
+        scene = self.newest_test_scene()
         variables = {"id": scene.id}
 
         query = """
@@ -532,7 +559,8 @@ class TestPerformanceController:
         assert "errors" in data
         assert data["errors"][0]["message"] == "Scene not found"
 
-        scene = get_session().query(SceneModel).first()
+        await self.test_10_save_scene(client)
+        scene = self.newest_test_scene()
         variables = {"id": scene.id}
 
         headers = test_AuthenticationController.get_headers(client, PLAYER)
