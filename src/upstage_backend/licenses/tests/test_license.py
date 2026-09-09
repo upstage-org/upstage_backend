@@ -2,7 +2,6 @@
 
 
 import pytest
-from upstage_backend.assets.db_models.asset import AssetModel
 from upstage_backend.assets.tests.asset_test import TestAssetController as _TestAssetController, newest_test_asset
 from upstage_backend.assets.db_models.asset_license import AssetLicenseModel
 from upstage_backend.global_config import get_session
