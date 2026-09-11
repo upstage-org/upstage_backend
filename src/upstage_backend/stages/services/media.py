@@ -30,6 +30,7 @@ from upstage_backend.stages.http.validation import (
     UploadMediaInput,
 )
 from upstage_backend.users.db_models.user import ADMIN, SUPER_ADMIN, UserModel
+from upstage_backend.users.services.upload_limit import enforce_upload_cap
 
 storagePath = UPLOAD_USER_CONTENT_FOLDER
 
@@ -59,9 +60,14 @@ class MediaService:
         return convert_keys_to_camel_case(stage.to_dict())
 
     def upload_media(self, user: UserModel, input: UploadMediaInput):
+        # Same per-user cap as AssetService.upload_file, checked before any
+        # lookup or write: this mutation used to skip it entirely
+        # (2026-09-11).
+        size = self.file_handling.get_file_size(input.base64)
+        enforce_upload_cap(user.role, user.upload_limit, size)
+
         session = get_session()
         asset_type = self.asset_service.validate_asset_type(input, session)
-        size = self.file_handling.get_file_size(input.base64)
         file_location = self.file_handling.upload_file(
             base64=input.base64,
             file_name=input.filename,
@@ -81,7 +87,17 @@ class MediaService:
 
         return self.asset_service.resolve_fields(asset, user)
 
-    def update_media(self, input: UpdateMediaInput):
+    def update_media(self, input: UpdateMediaInput, user: UserModel):
+        # Cap the replacement file and every uploaded frame BEFORE any
+        # lookup, write or mutation, so an over-limit frame cannot leave a
+        # half-updated asset behind. Neither path was capped before
+        # (2026-09-11).
+        for payload in [input.base64, *(input.uploadedFrames or [])]:
+            if payload:
+                enforce_upload_cap(
+                    user.role, user.upload_limit, self.file_handling.get_file_size(payload)
+                )
+
         session = get_session()
         asset_type = self.asset_service.validate_asset_type(input, session)
 

@@ -9,7 +9,11 @@ Contract under test (users.services.upload_limit):
   * admin / super admin -> no per-user cap; only the server-wide 500 MiB
     cap (FileHandling.validate_file_size, matching nginx's 500M) applies
   * player / guest      -> capped at upstage_user.upload_limit
-                            (1 MiB by default, adjustable by an admin)
+                            (1 MiB by default, adjustable by an admin);
+                            a NULL stored value IS the 1 MiB default
+                            (2026-09-11: it used to lift the cap)
+  * every upload mutation (uploadFile, uploadMedia, updateMedia) applies
+    the same cap through enforce_upload_cap
 """
 
 import base64
@@ -21,12 +25,15 @@ from pydantic import ValidationError
 
 from upstage_backend.assets.services.asset import AssetService
 from upstage_backend.files.file_handling import FileHandling
+from upstage_backend.stages.http.validation import UpdateMediaInput, UploadMediaInput
+from upstage_backend.stages.services.media import MediaService
 from upstage_backend.studio_management.http.validation import UpdateUserInput
 from upstage_backend.users.db_models.user import ADMIN, GUEST, PLAYER, SUPER_ADMIN, UserModel
 from upstage_backend.users.services.upload_limit import (
     DEFAULT_PLAYER_UPLOAD_LIMIT,
     SERVER_UPLOAD_MAX,
     effective_upload_limit,
+    enforce_upload_cap,
     per_user_upload_cap,
 )
 
@@ -58,9 +65,36 @@ class TestPolicy:
         assert effective_upload_limit(role, DEFAULT_PLAYER_UPLOAD_LIMIT) == MIB
         assert effective_upload_limit(role, 2 * MIB) == 2 * MIB
 
-    def test_player_with_null_limit_falls_back_to_server_max(self):
-        assert per_user_upload_cap(PLAYER, None) is None
-        assert effective_upload_limit(PLAYER, None) == SERVER_UPLOAD_MAX
+    @pytest.mark.parametrize("role", [PLAYER, GUEST])
+    def test_null_limit_is_the_1mb_default_not_uncapped(self, role):
+        # 2026-09-11: a player whose row has upload_limit NULL (old accounts,
+        # batch-created users) was effectively uncapped on the server and
+        # told "500 MB" by whoami. NULL now reads as the column default.
+        assert per_user_upload_cap(role, None) == DEFAULT_PLAYER_UPLOAD_LIMIT
+        assert effective_upload_limit(role, None) == DEFAULT_PLAYER_UPLOAD_LIMIT
+
+    def test_stored_limit_given_as_string_is_coerced(self):
+        assert per_user_upload_cap(PLAYER, str(2 * MIB)) == 2 * MIB
+
+
+class TestEnforceUploadCap:
+    def test_admin_never_raises(self):
+        for stored in (None, DEFAULT_PLAYER_UPLOAD_LIMIT):
+            enforce_upload_cap(ADMIN, stored, SERVER_UPLOAD_MAX)
+
+    def test_player_boundary(self):
+        enforce_upload_cap(PLAYER, DEFAULT_PLAYER_UPLOAD_LIMIT, MIB)
+        with pytest.raises(GraphQLError, match=r"^File size must be under 1MB\.$"):
+            enforce_upload_cap(PLAYER, DEFAULT_PLAYER_UPLOAD_LIMIT, MIB + 1)
+
+    def test_player_null_limit_raises_like_default(self):
+        with pytest.raises(GraphQLError, match="File size must be under 1MB"):
+            enforce_upload_cap(PLAYER, None, ONE_POINT_TWO_MB)
+
+    def test_fractional_cap_is_not_truncated_in_the_message(self):
+        # int(1.5 MiB / MiB) used to print "1MB" for a 1.5 MiB cap.
+        with pytest.raises(GraphQLError, match="File size must be under 1.5MB"):
+            enforce_upload_cap(PLAYER, int(1.5 * MIB), 2 * MIB)
 
 
 class TestUploadEnforcement:
@@ -137,6 +171,56 @@ class TestUploadEnforcement:
         payload = b"x" * ONE_POINT_TWO_MB
         b64 = "data:image/png;base64," + base64.b64encode(payload).decode()
         assert FileHandling().get_file_size(b64) == ONE_POINT_TWO_MB
+
+
+class TestMediaServicePathsAreCapped:
+    """
+    uploadMedia and updateMedia (replacement file / multiframe frames) write
+    through FileHandling directly and used to skip the per-user cap
+    entirely. The cap must fire before validate_asset_type / any DB access,
+    so these run with no session at all: reaching the DB would itself fail.
+    """
+
+    @pytest.fixture
+    def service(self, monkeypatch):
+        service = MediaService()
+        monkeypatch.setattr(service.file_handling, "get_file_size", lambda _b64: ONE_POINT_TWO_MB)
+
+        def explode(*_args, **_kwargs):
+            raise AssertionError("must be refused before touching the DB or disk")
+
+        monkeypatch.setattr(service.asset_service, "validate_asset_type", explode)
+        monkeypatch.setattr(service.file_handling, "upload_file", explode)
+        monkeypatch.setattr(service.file_handling, "write_file", explode)
+        return service
+
+    def test_upload_media_refuses_over_limit_player(self, service):
+        payload = UploadMediaInput(
+            name="big", base64="data:image/png;base64,AAAA", mediaType="avatar", filename="big.png"
+        )
+        with pytest.raises(GraphQLError, match="File size must be under 1MB"):
+            service.upload_media(_user(PLAYER), payload)
+
+    def test_update_media_refuses_over_limit_replacement_file(self, service):
+        payload = UpdateMediaInput(id=1, name="x", base64="data:image/png;base64,AAAA")
+        with pytest.raises(GraphQLError, match="File size must be under 1MB"):
+            service.update_media(payload, _user(PLAYER))
+
+    def test_update_media_refuses_over_limit_frame(self, service):
+        payload = UpdateMediaInput(id=1, name="x", uploadedFrames=["data:image/png;base64,AAAA"])
+        with pytest.raises(GraphQLError, match="File size must be under 1MB"):
+            service.update_media(payload, _user(PLAYER, upload_limit=None))
+
+    def test_update_media_without_payloads_does_not_measure_anything(self, service, monkeypatch):
+        # No file, no frames: nothing to cap. Make get_file_size explode to
+        # prove it is never consulted, then let validate_asset_type stop
+        # the call before the DB.
+        def never_measure(_b64):
+            raise AssertionError("get_file_size must not run without a payload")
+
+        monkeypatch.setattr(service.file_handling, "get_file_size", never_measure)
+        with pytest.raises(AssertionError, match="before touching"):
+            service.update_media(UpdateMediaInput(id=1, name="x"), _user(PLAYER))
 
 
 class TestUpdateUserInput:

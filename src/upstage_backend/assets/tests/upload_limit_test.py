@@ -10,6 +10,9 @@ Scenarios (2026-09-05 report):
   * player, no change: default 1 MiB, a 1.2 MB file is refused
   * player, limit raised by an admin to 2 MiB: the same file is accepted
   * player, limit put back to 1 MiB: the same file is refused again
+  * player with a NULL stored limit (old / batch-created account): treated
+    as 1 MiB, whoami says so, uploads are refused (2026-09-11)
+  * the uploadMedia mutation applies the same cap as uploadFile
 """
 
 import base64
@@ -17,8 +20,9 @@ import os
 
 import pytest
 from upstage_backend.authentication.tests.auth_test import TestAuthenticationController as _TestAuthenticationController
+from upstage_backend.global_config import ScopedSession
 from upstage_backend.global_config.env import UPLOAD_USER_CONTENT_FOLDER as storagePath
-from upstage_backend.users.db_models.user import ADMIN, PLAYER, SUPER_ADMIN
+from upstage_backend.users.db_models.user import ADMIN, PLAYER, SUPER_ADMIN, UserModel
 
 test_AuthenticationController = _TestAuthenticationController()
 
@@ -29,6 +33,11 @@ SERVER_MAX = 500 * MIB
 UPLOAD = """
     mutation UploadFile($base64: String!, $filename: String!) {
         uploadFile(base64: $base64, filename: $filename) { url }
+    }
+"""
+UPLOAD_MEDIA = """
+    mutation UploadMedia($input: UploadMediaInput!) {
+        uploadMedia(input: $input) { id fileLocation }
     }
 """
 WHOAMI = "query { whoami { id username email role active uploadLimit effectiveUploadLimit } }"
@@ -166,3 +175,55 @@ class TestUploadLimits:
         )
         assert "errors" not in body, body
         assert body["data"]["updateUser"]["uploadLimit"] == MIB
+
+    async def test_player_with_null_stored_limit_is_capped_at_1mb(self, client, uploaded_files):
+        player_headers = test_AuthenticationController.get_headers(client, PLAYER)
+        player = _whoami(client, player_headers)
+        with ScopedSession() as s:
+            s.query(UserModel).filter(UserModel.id == int(player["id"])).update(
+                {"upload_limit": None}
+            )
+
+        me = _whoami(client, player_headers)
+        assert me["uploadLimit"] is None
+        assert me["effectiveUploadLimit"] == MIB, "NULL reads as the default, not 'uncapped'"
+
+        body = _upload(client, player_headers, ONE_POINT_TWO_MB)
+        assert body["errors"][0]["message"] == "File size must be under 1MB."
+        body = _upload(client, player_headers, 900 * 1024)
+        assert "errors" not in body, body
+        uploaded_files.append(body["data"]["uploadFile"]["url"])
+
+    async def test_upload_media_mutation_applies_the_same_cap(self, client, uploaded_files):
+        player_headers = test_AuthenticationController.get_headers(client, PLAYER)
+        body = _post(
+            client,
+            player_headers,
+            UPLOAD_MEDIA,
+            {
+                "input": {
+                    "name": "too big",
+                    "base64": _png_payload(ONE_POINT_TWO_MB),
+                    "mediaType": "avatar",
+                    "filename": "too-big.png",
+                }
+            },
+        )
+        assert body["errors"][0]["message"] == "File size must be under 1MB."
+
+        admin_headers = test_AuthenticationController.get_headers(client, ADMIN)
+        body = _post(
+            client,
+            admin_headers,
+            UPLOAD_MEDIA,
+            {
+                "input": {
+                    "name": "admin big",
+                    "base64": _png_payload(ONE_POINT_TWO_MB),
+                    "mediaType": "avatar",
+                    "filename": "admin-big.png",
+                }
+            },
+        )
+        assert "errors" not in body, body
+        uploaded_files.append(body["data"]["uploadMedia"]["fileLocation"])

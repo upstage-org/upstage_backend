@@ -136,6 +136,7 @@ def upload_media(_, info, input: UploadMediaInput):
 def update_media(_, info, input: UpdateMediaInput):
     return MediaService().update_media(
         UpdateMediaInput(**input),
+        UserModel(**info.context["request"].state.current_user),
     )
 
 

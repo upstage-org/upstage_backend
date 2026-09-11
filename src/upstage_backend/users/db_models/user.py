@@ -1,6 +1,6 @@
 # -*- coding: iso8859-15 -*-
 
-from sqlalchemy import TIMESTAMP, BigInteger, Boolean, Column, Integer, String, Text
+from sqlalchemy import TIMESTAMP, BigInteger, Boolean, Column, Integer, String, Text, text
 from datetime import datetime
 from upstage_backend.global_config.db_models.base import BaseModel
 
@@ -33,7 +33,9 @@ class UserModel(BaseModel):
     firebase_pushnot_id = Column(String, default=None)
     created_on = Column(TIMESTAMP(timezone=True), default=datetime.now)
     deactivated_on = Column(TIMESTAMP(timezone=True), default=None)
-    upload_limit = Column(Integer, default=1024 * 1024)
+    # server_default mirrors alembic c3d5e7f9a1b2: NULL is never "unlimited"
+    # (users.services.upload_limit reads it as this default anyway).
+    upload_limit = Column(Integer, default=1024 * 1024, server_default=text("1048576"))
     intro = Column(Text, default=None)
     can_send_email = Column(Boolean, default=False)
     last_login = Column(TIMESTAMP(timezone=True), default=None)

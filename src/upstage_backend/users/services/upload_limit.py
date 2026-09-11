@@ -9,14 +9,23 @@ Rules (product decision, 2026-09-05):
     and nginx client_max_body_size, both 500M).
   * Everyone else is capped by `upstage_user.upload_limit`, which defaults
     to 1 MiB and which an admin may raise or lower per player.
-  * A NULL `upload_limit` means "no per-user override" (see
-    AssetService.upload_file); only the server-wide caps apply.
+  * A NULL `upload_limit` on a non-admin counts as the 1 MiB default
+    (2026-09-11). Until then NULL meant "no per-user cap", which was only
+    ever intended for the migration-seeded admin -- admins are exempt by
+    role now, so for a player it was just a silent hole: Player Management
+    showed nothing useful and the server let anything up to 500 MiB through.
 
-Kept dependency-free (env + the role constants) so it can be imported by
-the asset service, the GraphQL resolvers and the DB-free unit tests alike.
+Every upload path (uploadFile, uploadMedia, updateMedia's replacement
+file and multiframe frames) must go through `enforce_upload_cap` so the
+rule cannot drift between them again.
+
+Kept light (env + the role constants + GraphQLError) so it can be imported
+by the services, the GraphQL resolvers and the DB-free unit tests alike.
 """
 
 from typing import Optional
+
+from graphql import GraphQLError
 
 from upstage_backend.global_config.env import OTHER_MEDIA_MAX_SIZE
 from upstage_backend.users.db_models.user import ADMIN, SUPER_ADMIN
@@ -40,13 +49,15 @@ def _role_as_int(role) -> Optional[int]:
 
 def per_user_upload_cap(role, upload_limit: Optional[int]) -> Optional[int]:
     """
-    The per-user byte cap that `AssetService.upload_file` must enforce for
-    a user with this role/stored limit, or None when no per-user cap
-    applies (admins, or a NULL stored limit).
+    The per-user byte cap to enforce for a user with this role/stored
+    limit, or None when no per-user cap applies (admins). A NULL stored
+    limit on anyone else is the 1 MiB default.
     """
     if _role_as_int(role) in UNCAPPED_ROLES:
         return None
-    return upload_limit
+    if upload_limit is None:
+        return DEFAULT_PLAYER_UPLOAD_LIMIT
+    return int(upload_limit)
 
 
 def effective_upload_limit(role, upload_limit: Optional[int]) -> int:
@@ -57,3 +68,22 @@ def effective_upload_limit(role, upload_limit: Optional[int]) -> int:
     """
     cap = per_user_upload_cap(role, upload_limit)
     return SERVER_UPLOAD_MAX if cap is None else int(cap)
+
+
+def _cap_label_mb(cap: int) -> str:
+    """Label a cap as "1MB" for whole mebibytes, "1.5MB" otherwise (the old
+    int() truncation reported a 1.5 MiB cap as "1MB")."""
+    mb = cap / (1024 * 1024)
+    return f"{int(mb)}MB" if mb == int(mb) else f"{mb:g}MB"
+
+
+def enforce_upload_cap(role, upload_limit: Optional[int], file_size: int) -> None:
+    """
+    Raise the user-facing GraphQLError when `file_size` (decoded bytes)
+    exceeds the per-user cap for this role/stored limit. No-op for admins.
+    The server-wide per-extension caps (FileHandling.validate_file_size)
+    are enforced separately by the file write itself.
+    """
+    cap = per_user_upload_cap(role, upload_limit)
+    if cap is not None and file_size > cap:
+        raise GraphQLError(f"File size must be under {_cap_label_mb(cap)}.")
