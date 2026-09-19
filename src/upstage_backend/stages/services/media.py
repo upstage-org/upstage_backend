@@ -1,4 +1,5 @@
 # -*- coding: iso8859-15 -*-
+import asyncio
 import os
 
 import json
@@ -7,12 +8,12 @@ from graphql import GraphQLError
 from sqlalchemy import and_, or_
 from upstage_backend.assets.db_models.asset import AssetModel
 from upstage_backend.assets.db_models.asset_license import AssetLicenseModel
-from upstage_backend.assets.db_models.asset_type import AssetTypeModel
 from upstage_backend.assets.db_models.asset_usage import AssetUsageModel
 from upstage_backend.assets.db_models.media_tag import MediaTagModel
 from upstage_backend.assets.services.asset import AssetService
 from upstage_backend.assets.services.asset_license import AssetLicenseService
 from upstage_backend.global_config import get_session
+from upstage_backend.global_config.db_context import finish_request_transaction
 from upstage_backend.global_config.env import UPLOAD_USER_CONTENT_FOLDER
 from upstage_backend.global_config.helpers.object import convert_keys_to_camel_case
 from upstage_backend.files.file_handling import FileHandling
@@ -59,16 +60,29 @@ class MediaService:
         session.flush()
         return convert_keys_to_camel_case(stage.to_dict())
 
-    def upload_media(self, user: UserModel, input: UploadMediaInput):
+    # Event-loop rules for the two upload mutations below. Resolvers run on
+    # the uvicorn event loop, so decoding a multi-megabyte base64 payload and
+    # writing it to disk there froze every other request. That work now runs
+    # in a worker thread, under two constraints:
+    #   * the thread never touches the SQLAlchemy session (not thread-safe);
+    #   * no flushed write may be pending when we ``await``: a row lock held
+    #     while other requests get the loop is the 2026-09-19 outage. So all
+    #     file IO happens BEFORE the first write that takes a lock, and the
+    #     one write that can precede it (validate_asset_type inserting a
+    #     brand-new asset type) is committed first.
+
+    async def upload_media(self, user: UserModel, input: UploadMediaInput):
         # Same per-user cap as AssetService.upload_file, checked before any
         # lookup or write: this mutation used to skip it entirely
         # (2026-09-11).
-        size = self.file_handling.get_file_size(input.base64)
+        size = await asyncio.to_thread(self.file_handling.get_file_size, input.base64)
         enforce_upload_cap(user.role, user.upload_limit, size)
 
         session = get_session()
         asset_type = self.asset_service.validate_asset_type(input, session)
-        file_location = self.file_handling.upload_file(
+        finish_request_transaction(commit=True)
+        file_location = await asyncio.to_thread(
+            self.file_handling.upload_file,
             base64=input.base64,
             file_name=input.filename,
             absolute_path=None,
@@ -87,7 +101,7 @@ class MediaService:
 
         return self.asset_service.resolve_fields(asset, user)
 
-    def update_media(self, input: UpdateMediaInput, user: UserModel):
+    async def update_media(self, input: UpdateMediaInput, user: UserModel):
         # Cap the replacement file and every uploaded frame BEFORE any
         # lookup, write or mutation, so an over-limit frame cannot leave a
         # half-updated asset behind. Neither path was capped before
@@ -95,11 +109,15 @@ class MediaService:
         for payload in [input.base64, *(input.uploadedFrames or [])]:
             if payload:
                 enforce_upload_cap(
-                    user.role, user.upload_limit, self.file_handling.get_file_size(payload)
+                    user.role,
+                    user.upload_limit,
+                    await asyncio.to_thread(self.file_handling.get_file_size, payload),
                 )
 
         session = get_session()
         asset_type = self.asset_service.validate_asset_type(input, session)
+        # Nothing else is pending yet, so this commits at most a new asset type.
+        finish_request_transaction(commit=True)
 
         asset = self.retrieve_asset(input, session)
         asset.name = input.name
@@ -111,11 +129,26 @@ class MediaService:
         )
         asset.file_location = file_location
 
-        if input.base64:
-            self.file_handling.write_file(
-                base64=input.base64,
-                path=os.path.join(storagePath, asset.file_location),
-            )
+        # Everything above is reads plus unflushed in-memory changes
+        # (autoflush is off), so no row lock is held across this await.
+        frames_sub_path = asset_type.file_location
+        processed_description, frame_jobs = self.plan_uploaded_frames(input, asset, frames_sub_path)
+        replacement_path = os.path.join(storagePath, asset.file_location)
+
+        def _write_files():
+            if input.base64:
+                self.file_handling.write_file(base64=input.base64, path=replacement_path)
+            for frame, filename in frame_jobs:
+                self.file_handling.upload_file(
+                    base64=frame,
+                    file_name=filename,
+                    absolute_path=None,
+                    storage_path=storagePath,
+                    sub_path=frames_sub_path,
+                )
+
+        if input.base64 or frame_jobs:
+            await asyncio.to_thread(_write_files)
 
         self.asset_license_service.create(
             asset_id=asset.id,
@@ -123,10 +156,9 @@ class MediaService:
             local_db_session=session,
             copyright_level=input.copyrightLevel,
         )
-        # process_uploaded_frames returns None when input.uploadedFrames is
+        # plan_uploaded_frames yields None when input.uploadedFrames is
         # falsy; assigning that back would wipe asset.description (and any
         # saved voice/link/note attributes) on every non-frame edit.
-        processed_description = self.process_uploaded_frames(input, asset, asset_type)
         if processed_description is not None:
             asset.description = processed_description
         session.flush()
@@ -155,30 +187,29 @@ class MediaService:
 
         return asset
 
-    def process_uploaded_frames(
-        self, input: UpdateMediaInput, asset: AssetModel, asset_type: AssetTypeModel
-    ):
-        if input.uploadedFrames:
-            filename, file_extension = os.path.splitext(asset.file_location)
-            attributes = json.loads(asset.description)
-            if "frames" not in attributes:
-                attributes["frames"] = []
+    def plan_uploaded_frames(self, input: UpdateMediaInput, asset: AssetModel, sub_path: str):
+        """Session-side half of multiframe uploads: pick the frame filenames
+        and build the new description, without touching the disk.
 
-            for frame in input.uploadedFrames:
-                filename = uuid.uuid4().hex + file_extension
+        Returns ``(description_json | None, [(frame_base64, filename), ...])``;
+        the caller writes the files in a worker thread. Filenames and the
+        recorded locations are computed exactly as before the split.
+        """
+        if not input.uploadedFrames:
+            return None, []
 
-                frame_location = self.file_handling.upload_file(
-                    base64=frame,
-                    file_name=filename,
-                    absolute_path=None,
-                    storage_path=storagePath,
-                    sub_path=asset_type.file_location,
-                )
+        _, file_extension = os.path.splitext(asset.file_location)
+        attributes = json.loads(asset.description)
+        if "frames" not in attributes:
+            attributes["frames"] = []
 
-                frame_location = os.path.join(asset_type.file_location, filename)
-                attributes["frames"].append(frame_location)
+        jobs = []
+        for frame in input.uploadedFrames:
+            filename = uuid.uuid4().hex + file_extension
+            jobs.append((frame, filename))
+            attributes["frames"].append(os.path.join(sub_path, filename))
 
-            return json.dumps(attributes)
+        return json.dumps(attributes), jobs
 
     def delete_media(self, id: int):
         session = get_session()

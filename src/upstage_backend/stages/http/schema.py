@@ -124,8 +124,8 @@ def assign_media(_, info, input: AssignMediaInput):
 
 @mutation.field("uploadMedia")
 @authenticated(allowed_roles=[SUPER_ADMIN, ADMIN, PLAYER])
-def upload_media(_, info, input: UploadMediaInput):
-    return MediaService().upload_media(
+async def upload_media(_, info, input: UploadMediaInput):
+    return await MediaService().upload_media(
         UserModel(**info.context["request"].state.current_user),
         UploadMediaInput(**input),
     )
@@ -133,8 +133,8 @@ def upload_media(_, info, input: UploadMediaInput):
 
 @mutation.field("updateMedia")
 @authenticated(allowed_roles=[SUPER_ADMIN, ADMIN, PLAYER])
-def update_media(_, info, input: UpdateMediaInput):
-    return MediaService().update_media(
+async def update_media(_, info, input: UpdateMediaInput):
+    return await MediaService().update_media(
         UpdateMediaInput(**input),
         UserModel(**info.context["request"].state.current_user),
     )

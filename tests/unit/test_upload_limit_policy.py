@@ -16,6 +16,7 @@ Contract under test (users.services.upload_limit):
     the same cap through enforce_upload_cap
 """
 
+import asyncio
 import base64
 import os
 
@@ -199,17 +200,17 @@ class TestMediaServicePathsAreCapped:
             name="big", base64="data:image/png;base64,AAAA", mediaType="avatar", filename="big.png"
         )
         with pytest.raises(GraphQLError, match="File size must be under 1MB"):
-            service.upload_media(_user(PLAYER), payload)
+            asyncio.run(service.upload_media(_user(PLAYER), payload))
 
     def test_update_media_refuses_over_limit_replacement_file(self, service):
         payload = UpdateMediaInput(id=1, name="x", base64="data:image/png;base64,AAAA")
         with pytest.raises(GraphQLError, match="File size must be under 1MB"):
-            service.update_media(payload, _user(PLAYER))
+            asyncio.run(service.update_media(payload, _user(PLAYER)))
 
     def test_update_media_refuses_over_limit_frame(self, service):
         payload = UpdateMediaInput(id=1, name="x", uploadedFrames=["data:image/png;base64,AAAA"])
         with pytest.raises(GraphQLError, match="File size must be under 1MB"):
-            service.update_media(payload, _user(PLAYER, upload_limit=None))
+            asyncio.run(service.update_media(payload, _user(PLAYER, upload_limit=None)))
 
     def test_update_media_without_payloads_does_not_measure_anything(self, service, monkeypatch):
         # No file, no frames: nothing to cap. Make get_file_size explode to
@@ -220,7 +221,7 @@ class TestMediaServicePathsAreCapped:
 
         monkeypatch.setattr(service.file_handling, "get_file_size", never_measure)
         with pytest.raises(AssertionError, match="before touching"):
-            service.update_media(UpdateMediaInput(id=1, name="x"), _user(PLAYER))
+            asyncio.run(service.update_media(UpdateMediaInput(id=1, name="x"), _user(PLAYER)))
 
 
 class TestUpdateUserInput:

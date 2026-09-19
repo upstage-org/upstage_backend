@@ -230,3 +230,137 @@ STRIPE_ENTRY_POINTS = {
 @pytest.mark.parametrize("entry_point", STRIPE_ENTRY_POINTS)
 def test_concurrent_stripe_calls_do_not_block_the_loop(slow_stripe, entry_point):
     _assert_loop_stayed_responsive(*_measure(STRIPE_ENTRY_POINTS[entry_point]))
+
+
+# ------------------------------------------- stage media upload / update
+#
+# These two mutations mix file IO with database writes, so besides keeping
+# the loop responsive they must never await while a flushed write (a row
+# lock) is pending: that is the 2026-09-19 outage shape. The journal below
+# records the order of every database-side and disk-side step.
+
+
+@pytest.fixture
+def media_service(monkeypatch):
+    from upstage_backend.stages.services import media as media_module
+    from upstage_backend.stages.services.media import MediaService
+
+    service = MediaService()
+    journal = []
+
+    def step(name, result=None, block=False):
+        def fake(*args, **kwargs):
+            journal.append(name)
+            if block:
+                time.sleep(BLOCK)
+            return result
+
+        return fake
+
+    asset = SimpleNamespace(
+        id=7,
+        name="",
+        asset_type_id=None,
+        file_location="avatar/a.png",
+        description='{"frames": []}',
+    )
+    session = SimpleNamespace(
+        flush=step("db:flush"),
+        query=lambda *_: SimpleNamespace(
+            filter_by=lambda **_: SimpleNamespace(first=lambda: asset)
+        ),
+    )
+    monkeypatch.setattr(media_module, "get_session", lambda: session)
+    monkeypatch.setattr(media_module, "finish_request_transaction", step("db:locks-released"))
+    asset_type = SimpleNamespace(id=1, file_location="avatar")
+    monkeypatch.setattr(
+        service.asset_service, "validate_asset_type", step("db:validate-type", asset_type)
+    )
+    monkeypatch.setattr(service.asset_service, "create_asset", step("db:create-asset", asset))
+    monkeypatch.setattr(service.asset_service, "resolve_fields", lambda *a, **k: {"id": 7})
+    monkeypatch.setattr(
+        service.asset_service, "process_file_location", lambda *a, **k: "avatar/a.png"
+    )
+    monkeypatch.setattr(service, "retrieve_asset", lambda *a, **k: asset)
+    monkeypatch.setattr(service.asset_license_service, "create", step("db:license-write"))
+    monkeypatch.setattr(service.file_handling, "get_file_size", step("disk:measure", 10))
+    monkeypatch.setattr(
+        service.file_handling, "upload_file", step("disk:upload", "avatar/x.png", block=True)
+    )
+    monkeypatch.setattr(service.file_handling, "write_file", step("disk:write", block=True))
+    return service, journal
+
+
+def _media_admin():
+    return UserModel(role=SUPER_ADMIN, upload_limit=None)
+
+
+def test_concurrent_stage_media_uploads_do_not_block_the_loop(media_service):
+    from upstage_backend.stages.http.validation import UploadMediaInput
+
+    service, _ = media_service
+    payload = UploadMediaInput(
+        name="a", base64="data:image/png;base64,AAAA", mediaType="avatar", filename="a.png"
+    )
+    _assert_loop_stayed_responsive(*_measure(lambda: service.upload_media(_media_admin(), payload)))
+
+
+def test_concurrent_stage_media_updates_do_not_block_the_loop(media_service):
+    from upstage_backend.stages.http.validation import UpdateMediaInput
+
+    service, _ = media_service
+    payload = UpdateMediaInput(
+        id=7,
+        name="a",
+        mediaType="avatar",
+        fileLocation="avatar/a.png",
+        base64="data:image/png;base64,AAAA",
+    )
+    _assert_loop_stayed_responsive(*_measure(lambda: service.update_media(payload, _media_admin())))
+
+
+def test_upload_media_holds_no_lock_while_it_is_off_the_loop(media_service):
+    from upstage_backend.stages.http.validation import UploadMediaInput
+
+    service, journal = media_service
+    payload = UploadMediaInput(
+        name="a", base64="data:image/png;base64,AAAA", mediaType="avatar", filename="a.png"
+    )
+    asyncio.run(service.upload_media(_media_admin(), payload))
+    # The possible asset-type INSERT is committed before the disk hop, and
+    # the asset row is only written after it.
+    assert journal == [
+        "disk:measure",
+        "db:validate-type",
+        "db:locks-released",
+        "disk:upload",
+        "db:create-asset",
+    ]
+
+
+def test_update_media_does_all_disk_work_before_its_first_locking_write(media_service):
+    from upstage_backend.stages.http.validation import UpdateMediaInput
+
+    service, journal = media_service
+    payload = UpdateMediaInput(
+        id=7,
+        name="a",
+        mediaType="avatar",
+        fileLocation="avatar/a.png",
+        description='{"frames": []}',
+        base64="data:image/png;base64,AAAA",
+        uploadedFrames=["data:image/png;base64,BBBB", "data:image/png;base64,CCCC"],
+    )
+    asyncio.run(service.update_media(payload, _media_admin()))
+    assert journal == [
+        "disk:measure",
+        "disk:measure",
+        "disk:measure",
+        "db:validate-type",
+        "db:locks-released",
+        "disk:write",
+        "disk:upload",
+        "disk:upload",
+        "db:license-write",
+        "db:flush",
+    ]
