@@ -209,6 +209,17 @@ class AssetService:
     # generated for it.
     _VIDEO_EXTENSIONS = (".mp4", ".webm", ".opgg", ".3gp", ".flv")
 
+    async def upload_file_async(self, user: UserModel, base64: str, filename: str):
+        """upload_file without stalling the server.
+
+        The upload path is pure blocking work: a base64 decode of the whole
+        payload, a disk write, and for videos a synchronous ffmpeg run that
+        may take up to its 30 s timeout. On the event loop that froze every
+        other request for the duration. It touches no database session, so
+        it is safe to run in a worker thread.
+        """
+        return await asyncio.to_thread(self.upload_file, user, base64, filename)
+
     def upload_file(self, user: UserModel, base64: str, filename: str):
         file_size = self.file_handing.get_file_size(base64)
 
@@ -252,9 +263,7 @@ class AssetService:
         file_location = self.process_file_location(input, session, asset)
         # Same rule for the RTMP server binding: validate before the asset is
         # pending so a malformed value cannot leave a half-built row behind.
-        rtmp_endpoint = (
-            normalise_rtmp_endpoint(input.rtmpEndpoint) if input.rtmpEndpoint else None
-        )
+        rtmp_endpoint = normalise_rtmp_endpoint(input.rtmpEndpoint) if input.rtmpEndpoint else None
         if not input.id:
             session.add(asset)
 

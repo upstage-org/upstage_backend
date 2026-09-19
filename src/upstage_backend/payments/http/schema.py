@@ -20,8 +20,10 @@ mutation = MutationType()
 @mutation.field("paymentSecret")
 async def get_payment_secret(_, info, input: PaymentIntentInput):
     dto = PaymentIntentInput(**input) if isinstance(input, dict) else input
-    UserService().verify_captcha(dto.token, info.context["request"])
-    secret = PaymentService().create_payment_intent(amount=dto.amount, currency=dto.currency)
+    await UserService().verify_captcha_async(dto.token, info.context["request"])
+    secret = await PaymentService().create_payment_intent_async(
+        amount=dto.amount, currency=dto.currency
+    )
     return secret or "Stripe failed"
 
 

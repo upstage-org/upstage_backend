@@ -17,7 +17,18 @@ from upstage_backend.global_config.env import DATABASE_URL
 # `pytest --collect-only` from the host (whenever `postgres_container_dev`
 # isn't resolvable) and offered no production value — table creation runs
 # through Alembic. Both were removed.
-engine = create_engine(DATABASE_URL, poolclass=NullPool, query_cache_size=0)
+# Per-connection Postgres safety net. Sync resolvers run on the uvicorn
+# event loop (Ariadne does not thread-pool them) with blocking psycopg2, so
+# a statement that waits on a row lock stalls the whole process. With
+# lock_timeout, a contended statement fails that one request after 5 s
+# instead of freezing prod; idle_in_transaction_session_timeout reaps any
+# transaction a yielded request leaves open (see 2026-09-19 outage).
+engine = create_engine(
+    DATABASE_URL,
+    poolclass=NullPool,
+    query_cache_size=0,
+    connect_args={"options": "-c lock_timeout=5000 -c idle_in_transaction_session_timeout=120000"},
+)
 
 
 class ScopedSession(object):
@@ -60,13 +71,9 @@ class ScopedSession(object):
                     try:
                         self.session.rollback()
                     except Exception:
-                        logger.exception(
-                            "ScopedSession: rollback after handler error failed"
-                        )
+                        logger.exception("ScopedSession: rollback after handler error failed")
                 else:
-                    logger.error(
-                        "ScopedSession: handler raised but rollback_upon_failure=False"
-                    )
+                    logger.error("ScopedSession: handler raised but rollback_upon_failure=False")
             else:
                 try:
                     self.session.commit()
@@ -78,9 +85,7 @@ class ScopedSession(object):
                             logger.exception(
                                 "ScopedSession: commit failed and rollback also failed"
                             )
-                        logger.error(
-                            f"ScopedSession: failed to commit, rolled back: {e}"
-                        )
+                        logger.error(f"ScopedSession: failed to commit, rolled back: {e}")
                     else:
                         logger.error(
                             f"ScopedSession: failed to commit, NOT rolled back per request: {e}"

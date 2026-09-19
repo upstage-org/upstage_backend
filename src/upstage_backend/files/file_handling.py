@@ -59,8 +59,10 @@ class FileHandling:
         else:
             media_directory = os.path.join(storage_path, sub_path)
 
-        if not os.path.exists(media_directory):
-            os.makedirs(media_directory)
+        # exist_ok, not check-then-create: uploads run concurrently in worker
+        # threads, and two first uploads would race between the check and
+        # the mkdir (FileExistsError).
+        os.makedirs(media_directory, exist_ok=True)
         file_data = b64decode(base64.split(",")[1])
         file_size = len(file_data)
         self.validate_file_size(file_extension, file_size)

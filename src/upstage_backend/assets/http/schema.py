@@ -54,7 +54,7 @@ async def get_voices(_, __):
 @mutation.field("uploadFile")
 @authenticated(allowed_roles=[SUPER_ADMIN, ADMIN, PLAYER])
 async def upload_file(_, info, base64: str, filename: str):
-    return AssetService().upload_file(
+    return await AssetService().upload_file_async(
         UserModel(**info.context["request"].state.current_user), base64, filename
     )
 
@@ -71,9 +71,7 @@ async def save_media(_, info, input: SaveMediaInput):
 @mutation.field("deleteMedia")
 @authenticated(allowed_roles=[SUPER_ADMIN, ADMIN, PLAYER])
 async def delete_media(_, info, id: int):
-    return AssetService().delete_media(
-        UserModel(**info.context["request"].state.current_user), id
-    )
+    return AssetService().delete_media(UserModel(**info.context["request"].state.current_user), id)
 
 
 @mutation.field("updateMediaStatus")

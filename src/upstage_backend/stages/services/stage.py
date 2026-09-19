@@ -5,7 +5,7 @@ from datetime import datetime
 from graphql import GraphQLError
 import jwt
 from requests import Request
-from sqlalchemy import and_, nulls_last, exists, or_
+from sqlalchemy import and_, nulls_last, exists, or_, update
 from upstage_backend.global_config import get_session
 from upstage_backend.global_config.env import ALGORITHM, SECRET_KEY
 from upstage_backend.global_config.helpers.bearer import parse_bearer_token
@@ -576,14 +576,24 @@ class StageService:
             id = int(id)
         except (TypeError, ValueError):
             raise GraphQLError("Stage not found")
+        # Single atomic UPDATE, committed here rather than at request
+        # teardown. Ariadne runs sync resolvers on the event loop with a
+        # blocking psycopg2 driver, so a row lock must never be held across
+        # an ``await``: on 2026-09-19 two audience members loading the same
+        # stage 20 ms apart deadlocked prod (A flushed and yielded before the
+        # middleware commit; B blocked the loop waiting for A's row lock).
         session = get_session()
-        stage = session.query(StageModel).filter(StageModel.id == id).first()
-        if not stage:
+        row = session.execute(
+            update(StageModel)
+            .where(StageModel.id == id)
+            .values(last_access=datetime.now())
+            .returning(StageModel.last_access)
+        ).first()
+        if row is None:
+            session.rollback()
             raise GraphQLError("Stage not found")
-
-        stage.last_access = datetime.now()
-        session.flush()
-        return {"result": stage.last_access}
+        session.commit()
+        return {"result": row[0]}
 
     def get_parent_stage(self):
         session = get_session()

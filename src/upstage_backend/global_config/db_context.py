@@ -33,9 +33,7 @@ SessionFactory = sessionmaker(
 )
 
 
-_session_cv: ContextVar[Optional[Session]] = ContextVar(
-    "upstage_request_session", default=None
-)
+_session_cv: ContextVar[Optional[Session]] = ContextVar("upstage_request_session", default=None)
 
 
 def _strict_mode() -> bool:
@@ -84,6 +82,36 @@ def current_session_or_none() -> Optional[Session]:
     return _session_cv.get()
 
 
+def finish_request_transaction(commit: bool) -> None:
+    """
+    End the request session's open transaction NOW, synchronously.
+
+    Resolvers run on the uvicorn event loop with a blocking psycopg2 driver,
+    and request_session() only commits at request teardown, which is several
+    event-loop yields after the resolver returned. Any row lock taken by a
+    flushed write used to survive those yields; a second request writing the
+    same row then blocked the whole loop waiting for a lock whose owner could
+    never resume to commit (2026-09-19 prod outage). The GraphQL layer calls
+    this the moment a root mutation resolver settles, so no lock is ever held
+    while other requests can run. request_session()'s teardown commit then
+    finds nothing pending and stays as the safety net for non-GraphQL routes.
+
+    No-op when no session is bound or no transaction is open.
+    """
+    session = _session_cv.get()
+    if session is None or not session.in_transaction():
+        return
+    if not commit:
+        session.rollback()
+        return
+    try:
+        session.commit()
+    except Exception:
+        logger.exception("finish_request_transaction: commit failed, rolling back")
+        session.rollback()
+        raise
+
+
 @contextmanager
 def request_session() -> Iterator[Session]:
     """
@@ -96,12 +124,7 @@ def request_session() -> Iterator[Session]:
     try:
         yield session
         try:
-            if (
-                session.in_transaction()
-                or session.new
-                or session.dirty
-                or session.deleted
-            ):
+            if session.in_transaction() or session.new or session.dirty or session.deleted:
                 session.commit()
         except Exception:
             logger.exception("request_session: commit failed, rolling back")
@@ -111,9 +134,7 @@ def request_session() -> Iterator[Session]:
         try:
             session.rollback()
         except Exception:
-            logger.exception(
-                "request_session: rollback after handler error also failed"
-            )
+            logger.exception("request_session: rollback after handler error also failed")
         raise
     finally:
         try:

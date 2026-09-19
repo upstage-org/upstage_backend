@@ -1,5 +1,7 @@
 # -*- coding: iso8859-15 -*-
 
+import asyncio
+
 from upstage_backend.global_config import logger
 
 import stripe
@@ -17,6 +19,14 @@ ACCEPT_CURRENCIES = ["usd", "nzd"]
 
 
 class PaymentService:
+    # The stripe client is synchronous (default network timeout 80 s) and the
+    # resolvers run on the uvicorn event loop, so a direct call froze every
+    # other request until Stripe answered. The async entry points below push
+    # the blocking calls to a worker thread; nothing here uses the database.
+
+    async def create_payment_intent_async(self, amount: int, currency: str = "usd"):
+        return await asyncio.to_thread(self.create_payment_intent, amount, currency)
+
     def create_payment_intent(self, amount: int, currency: str = "usd"):
         intent = stripe.PaymentIntent.create(
             amount=amount,
@@ -64,14 +74,16 @@ class PaymentService:
             amount = data.amount
             currency = data.currency
 
-            payment_method = self.create_payment_card(
-                card_number, card_exp_month, card_exp_year, card_cvc
-            )
-            customer = self.create_customer(data.email)
-            price = self.create_price(amount, currency)
-            subscription = self.create_subscription(
-                payment_method.id, customer.id, price.id
-            )
+            def _stripe_calls():
+                payment_method = self.create_payment_card(
+                    card_number, card_exp_month, card_exp_year, card_cvc
+                )
+                customer = self.create_customer(data.email)
+                price = self.create_price(amount, currency)
+                subscription = self.create_subscription(payment_method.id, customer.id, price.id)
+                return customer, subscription
+
+            customer, subscription = await asyncio.to_thread(_stripe_calls)
 
             return convert_keys_to_camel_case(
                 {
@@ -108,7 +120,7 @@ class PaymentService:
 
     async def cancel_subscription(self, subscription_id):
         """Cancel a subcription"""
-        stripe.Subscription.delete(subscription_id)
+        await asyncio.to_thread(stripe.Subscription.delete, subscription_id)
         return {"success": True}
 
     def create_customer(self, email):
@@ -118,7 +130,7 @@ class PaymentService:
 
     async def update_email_customer(self, customer_id, email):
         """Update customer email"""
-        stripe.Customer.modify(customer_id, email=email)
+        await asyncio.to_thread(stripe.Customer.modify, customer_id, email=email)
         return {"success": True}
 
     def create_payment_card(self, card_number, exp_month, exp_year, cvc):
@@ -151,11 +163,13 @@ class PaymentService:
         card_cvc = data.cvc
         amount = data.amount
 
-        card_token = self.generate_card_token(
-            card_number, card_exp_month, card_exp_year, card_cvc
-        )
+        def _stripe_calls():
+            card_token = self.generate_card_token(
+                card_number, card_exp_month, card_exp_year, card_cvc
+            )
+            return self.create_payment_charge(card_token, amount)
 
-        _ = self.create_payment_charge(card_token, amount)
+        _ = await asyncio.to_thread(_stripe_calls)
 
         return {"success": True}
 

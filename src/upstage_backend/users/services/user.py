@@ -27,6 +27,9 @@ from upstage_backend.stages.services.stage_operation import StageOperationServic
 from upstage_backend.users.db_models.user import PLAYER, SUPER_ADMIN, UserModel
 from upstage_backend.users.db_models.one_time_totp import OneTimeTOTPModel
 
+# (connect, read) seconds for the Cloudflare Turnstile siteverify call.
+CAPTCHA_VERIFY_TIMEOUT = (3.05, 5)
+
 
 class UserService:
     def __init__(self):
@@ -51,7 +54,7 @@ class UserService:
     # `data` is the already-validated CreateUserInput as a plain dict
     # (the resolver runs the pydantic validation and passes model_dump()).
     async def create(self, data: dict, request: Request):
-        self.verify_captcha(data["token"], request)
+        await self.verify_captcha_async(data["token"], request)
         del data["token"]
 
         existing_user = self.find_one(data["username"], data.get("email", ""))
@@ -90,6 +93,17 @@ class UserService:
 
         return {"user": user.to_dict()}
 
+    async def verify_captcha_async(self, token: str, request: Request):
+        """verify_captcha without stalling the server.
+
+        Resolvers run on the uvicorn event loop, so the blocking HTTPS round
+        trip to Cloudflare used to freeze EVERY request for its duration, on
+        every production login and registration. It runs in a worker thread
+        instead. Callers await this before touching the database, so no
+        transaction is open while it is in flight.
+        """
+        await asyncio.to_thread(self.verify_captcha, token, request)
+
     def verify_captcha(self, token: str, request: Request):
         if ENV_TYPE != "Production":
             return
@@ -111,8 +125,21 @@ class UserService:
             "remoteip": cf_ip or ip,
         }
 
-        result = requests.post(CLOUDFLARE_CAPTCHA_VERIFY_ENDPOINT, data=formData)
-        outcome = result.json()
+        # requests has NO default timeout: without one, a stalled Cloudflare
+        # connection would hang the caller forever. Fail closed on any
+        # network/parse problem so an outage cannot be used to skip the check.
+        try:
+            result = requests.post(
+                CLOUDFLARE_CAPTCHA_VERIFY_ENDPOINT,
+                data=formData,
+                timeout=CAPTCHA_VERIFY_TIMEOUT,
+            )
+            outcome = result.json()
+        except (requests.RequestException, ValueError) as error:
+            logger.warning("Cloudflare Turnstile verification unavailable: {}", error)
+            raise GraphQLError(
+                "We could not verify the captcha right now. Please try again in a moment."
+            )
         remoteip = cf_ip or ip
 
         if outcome.get("success"):

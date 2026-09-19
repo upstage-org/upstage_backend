@@ -1,12 +1,17 @@
 # -*- coding: iso8859-15 -*-
 
+import inspect
+
 from ariadne import MutationType, QueryType, make_executable_schema
 from fastapi import FastAPI
 from ariadne.asgi import GraphQL
+from ariadne.asgi.handlers import GraphQLHTTPHandler
+from graphql import OperationType
 
 from upstage_backend.global_config.db_context import (
     SessionFactory,
     current_session_or_none,
+    finish_request_transaction,
     set_session,
 )
 from upstage_backend.global_config.env import ENV_TYPE
@@ -33,6 +38,44 @@ def _make_graphql_context(request, data=None):
     session = SessionFactory()
     set_session(session)
     return {"request": request, "db": session}
+
+
+def end_transaction_after_root_mutation(resolver, obj, info, **kwargs):
+    """
+    GraphQL middleware: commit (or roll back) the request session as soon as
+    a top-level mutation resolver settles, with no event-loop yield between
+    the resolver's last statement and the COMMIT. See
+    db_context.finish_request_transaction for why this matters.
+
+    Success commits. A raised exception, or a returned Exception instance
+    (graphql-core reports those as errors too), rolls back, so a failed
+    mutation no longer persists whatever it had flushed before failing.
+    Nested fields and query operations pass straight through.
+    """
+    if info.path.prev is not None or info.operation.operation is not OperationType.MUTATION:
+        return resolver(obj, info, **kwargs)
+
+    try:
+        result = resolver(obj, info, **kwargs)
+    except BaseException:
+        finish_request_transaction(commit=False)
+        raise
+
+    if inspect.isawaitable(result):
+
+        async def _settle():
+            try:
+                value = await result
+            except BaseException:
+                finish_request_transaction(commit=False)
+                raise
+            finish_request_transaction(commit=not isinstance(value, Exception))
+            return value
+
+        return _settle()
+
+    finish_request_transaction(commit=not isinstance(result, Exception))
+    return result
 
 
 def config_graphql_endpoints(app: FastAPI, endpoint="/api/studio_graphql"):
@@ -207,6 +250,7 @@ def config_graphql_endpoints(app: FastAPI, endpoint="/api/studio_graphql"):
         combined_schema,
         debug=ENV_TYPE != "Production",
         context_value=_make_graphql_context,
+        http_handler=GraphQLHTTPHandler(middleware=[end_transaction_after_root_mutation]),
     )
 
     logger.info("GraphQL endpoint mounted at {}", endpoint)
