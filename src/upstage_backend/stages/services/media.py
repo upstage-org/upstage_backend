@@ -22,6 +22,7 @@ from upstage_backend.stages.db_models.stage import StageModel
 from upstage_backend.stages.services.assignment import (
     make_parent_stage,
     snapshot_exit_settings,
+    sync_asset_assignments,
 )
 from upstage_backend.stages.http.validation import (
     AssignMediaInput,
@@ -289,10 +290,11 @@ class MediaService:
 
     def assign_stages(self, input: AssignStagesInput):
         session = get_session()
-        snapshot = snapshot_exit_settings(session, asset_id=input.id)
-        session.query(ParentStageModel).filter(ParentStageModel.child_asset_id == input.id).delete()
-        for stage_id in input.stageIds:
-            session.add(make_parent_stage(stage_id, input.id, snapshot))
+        # Surviving assignments keep their parent_stage row, i.e. their
+        # place in each stage's saved media order (see sync_asset_assignments).
+        sync_asset_assignments(
+            session, input.id, [(stage_id, None, None) for stage_id in input.stageIds]
+        )
         session.flush()
 
         asset = session.query(AssetModel).filter_by(id=input.id).first()

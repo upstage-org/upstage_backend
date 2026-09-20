@@ -31,10 +31,7 @@ from upstage_backend.mails.templates.templates import (
 )
 from upstage_backend.stages.services.stage_operation import StageOperationService
 from upstage_backend.stages.db_models.parent_stage import ParentStageModel
-from upstage_backend.stages.services.assignment import (
-    make_parent_stage,
-    snapshot_exit_settings,
-)
+from upstage_backend.stages.services.assignment import sync_asset_assignments
 from upstage_backend.stages.db_models.stage import StageModel
 from upstage_backend.stages.db_models.stage_attribute import StageAttributeModel
 from upstage_backend.stages.services.stage import StageService
@@ -678,12 +675,11 @@ class StudioService:
         if any(stage_id not in found_ids for stage_id in wanted_ids):
             raise GraphQLError("Stage not found!")
 
-        snapshot = snapshot_exit_settings(session, asset_id=asset_id)
-        session.query(ParentStageModel).filter(ParentStageModel.child_asset_id == asset_id).delete()
-        session.flush()
-
-        for stage_id in wanted_ids:
-            asset.stages.append(make_parent_stage(stage_id, asset_id, snapshot))
+        # Surviving assignments keep their parent_stage row, i.e. their
+        # place in each stage's saved media order (see sync_asset_assignments).
+        sync_asset_assignments(
+            session, asset_id, [(stage_id, None, None) for stage_id in wanted_ids]
+        )
         session.flush()
         return {"success": True}
 

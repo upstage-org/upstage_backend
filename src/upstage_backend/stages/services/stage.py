@@ -481,6 +481,11 @@ class StageService:
         if not stage:
             raise GraphQLError("Stage not found")
 
+        # Owner / editor / admin only, like every other stage mutation. The
+        # resolver's role check alone let ANY logged-in player account sweep
+        # ANY stage, including one it is merely audience on (2026-09).
+        self.extract_permission(user, stage)
+
         events = (
             session.query(EventModel)
             .filter(EventModel.performance_id == None)  # noqa: E711  (SQLAlchemy column NULL comparison)

@@ -38,10 +38,7 @@ from upstage_backend.assets.http.validation import (
 )
 from upstage_backend.stages.db_models.stage import StageModel
 from upstage_backend.stages.db_models.parent_stage import ParentStageModel
-from upstage_backend.stages.services.assignment import (
-    make_parent_stage,
-    snapshot_exit_settings,
-)
+from upstage_backend.stages.services.assignment import sync_asset_assignments
 from upstage_backend.users.db_models.user import ADMIN, PLAYER, SUPER_ADMIN, UserModel
 from upstage_backend.users.services.upload_limit import enforce_upload_cap
 from upstage_backend.files.file_handling import FileHandling
@@ -433,18 +430,21 @@ class AssetService:
         # Rebuild the stage assignments. Exit settings live per assignment;
         # explicit values win, otherwise a pair that survives the rebuild
         # keeps the settings it already had.
-        snapshot = snapshot_exit_settings(local_db_session, asset_id=asset.id)
-        asset.stages.delete()
-        for assignment in input.stageAssignments:
-            asset.stages.append(
-                make_parent_stage(
-                    assignment.stageId,
-                    asset.id,
-                    snapshot,
-                    assignment.exitAnimation,
-                    assignment.exitSpeed,
-                )
-            )
+        # Surviving assignments also keep their parent_stage ROW, i.e. their
+        # place in each stage's saved media order — re-saving a media item
+        # used to send it to the end of every stage it was on (see
+        # sync_asset_assignments).
+        if asset.id is None:
+            # Brand-new asset whose INSERT has not been flushed yet.
+            local_db_session.flush()
+        sync_asset_assignments(
+            local_db_session,
+            asset.id,
+            [
+                (assignment.stageId, assignment.exitAnimation, assignment.exitSpeed)
+                for assignment in input.stageAssignments
+            ],
+        )
 
     def change_owner(self, owner: str, local_db_session, asset: AssetModel):
         if owner:

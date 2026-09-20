@@ -6,9 +6,12 @@ not in the asset's description JSON. NULL means the default exit
 
   - saveMedia's process_urls writes per-assignment settings and no
     longer touches exitAnimation/exitSpeed keys in the description blob,
-  - every delete-recreate assignment path preserves settings for
-    stage<->asset pairs that survive the rebuild (via the
-    snapshot_exit_settings/make_parent_stage helpers),
+  - every assignment path preserves settings for stage<->asset pairs that
+    survive: assign_media (stage-level reorder) rebuilds its rows via the
+    snapshot_exit_settings/make_parent_stage helpers; the per-media paths
+    (saveMedia, assignStages, quickAssignMutation) go through
+    sync_asset_assignments, which keeps a surviving pair's ROW — and with it
+    the item's place in the stage's saved media order (2026-09),
   - pairs removed and later re-added start back at NULL.
 
 Pure attribute logic with stub session/asset objects — no DB.
@@ -53,16 +56,27 @@ class _Query:
     def filter(self, *_):
         return self
 
+    def order_by(self, *_):
+        return self
+
     def all(self):
-        return self._rows
+        return list(self._rows)
 
 
 class _Session:
+    """The parent_stage rows of asset 7, as a unit of work would leave them."""
+
     def __init__(self, rows=None):
-        self._rows = list(rows or [])
+        self.rows = list(rows or [])
 
     def query(self, _model):
-        return _Query(self._rows)
+        return _Query(self.rows)
+
+    def add(self, row) -> None:
+        self.rows.append(row)
+
+    def delete(self, row) -> None:
+        self.rows.remove(row)
 
     def flush(self) -> None:
         pass
@@ -103,11 +117,12 @@ def _process(asset, session, **overrides):
         asset,
         "",  # file_location: same
     )
+    return session
 
 
 def test_save_media_persists_per_assignment_settings() -> None:
     asset = _Asset()
-    _process(
+    session = _process(
         asset,
         _Session(),
         stageAssignments=[
@@ -115,7 +130,7 @@ def test_save_media_persists_per_assignment_settings() -> None:
             {"stageId": 2},
         ],
     )
-    by_stage = {row.stage_id: row for row in asset.stages.rows}
+    by_stage = {row.stage_id: row for row in session.rows}
     assert by_stage[1].exit_animation == "poof"
     assert by_stage[1].exit_speed == 2500
     assert by_stage[2].exit_animation is None
@@ -139,12 +154,12 @@ def test_save_media_writes_no_exit_keys_to_description() -> None:
 def test_save_media_snapshot_preserves_omitted_settings() -> None:
     existing = [_row(1, animation="ghost", speed=4000)]
     asset = _Asset(rows=existing)
-    _process(
+    session = _process(
         asset,
         _Session(existing),
         stageAssignments=[{"stageId": 1}, {"stageId": 2}],
     )
-    by_stage = {row.stage_id: row for row in asset.stages.rows}
+    by_stage = {row.stage_id: row for row in session.rows}
     assert by_stage[1].exit_animation == "ghost"
     assert by_stage[1].exit_speed == 4000
     assert by_stage[2].exit_animation is None
@@ -153,13 +168,38 @@ def test_save_media_snapshot_preserves_omitted_settings() -> None:
 def test_save_media_explicit_settings_override_snapshot() -> None:
     existing = [_row(1, animation="ghost", speed=4000)]
     asset = _Asset(rows=existing)
-    _process(
+    session = _process(
         asset,
         _Session(existing),
         stageAssignments=[{"stageId": 1, "exitAnimation": "fade", "exitSpeed": 1500}],
     )
-    (row,) = asset.stages.rows
+    (row,) = session.rows
     assert (row.exit_animation, row.exit_speed) == ("fade", 1500)
+    # The surviving pair keeps its ROW (= its place in the stage's media order).
+    assert row is existing[0]
+
+
+def test_save_media_keeps_surviving_rows_and_drops_removed_ones() -> None:
+    keep, drop = _row(1, animation="ghost", speed=4000), _row(2)
+    asset = _Asset(rows=[keep, drop])
+    session = _process(
+        asset,
+        _Session([keep, drop]),
+        stageAssignments=[{"stageId": 1}, {"stageId": 3}],
+    )
+    assert session.rows[0] is keep
+    assert drop not in session.rows
+    assert [row.stage_id for row in session.rows] == [1, 3]
+
+
+def test_sync_collapses_duplicate_pairs_and_repeated_stage_ids() -> None:
+    from upstage_backend.stages.services.assignment import sync_asset_assignments
+
+    first, duplicate = _row(1, animation="ghost"), _row(1)
+    session = _Session([first, duplicate])
+    sync_asset_assignments(session, 7, [("1", None, None), (1, None, None)])
+    assert session.rows == [first]
+    assert first.exit_animation == "ghost"
 
 
 def test_snapshot_and_rebuild_preserves_surviving_pairs() -> None:
