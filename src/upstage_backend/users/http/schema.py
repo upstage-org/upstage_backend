@@ -8,7 +8,12 @@ from upstage_backend.global_config.decorators.authenticated import authenticated
 from upstage_backend.studio_management.http.graphql import type_defs
 from ariadne.asgi import GraphQL
 
-from upstage_backend.users.http.validation import CreateUserInput, format_validation_error
+from upstage_backend.users.http.validation import (
+    CreateUserInput,
+    PasswordResetTokenInput,
+    ResetPasswordInput,
+    format_validation_error,
+)
 from upstage_backend.users.services.upload_limit import effective_upload_limit
 from upstage_backend.users.services.user import UserService
 
@@ -29,27 +34,35 @@ def current_user(_, info):
 
 
 @mutation.field("createUser")
-def create_user(_, info, inbound: dict, user_service=UserService()):
+def create_user(_, info, inbound: dict):
     try:
         validated = CreateUserInput(**inbound)
     except ValidationError as exc:
         raise GraphQLError(format_validation_error(exc)) from exc
-    return user_service.create(validated.model_dump(), info.context["request"])
+    return UserService().create(validated.model_dump(), info.context["request"])
 
 
 @mutation.field("requestPasswordReset")
-async def request_password_reset(_, info, email, user_service=UserService()):
-    return await user_service.request_password_reset(email)
+async def request_password_reset(_, info, email):
+    return await UserService().request_password_reset(email)
 
 
 @mutation.field("verifyPasswordReset")
-async def verify_password_reset(_, info, input, user_service=UserService()):
-    return await user_service.verify_password_reset(input)
+async def verify_password_reset(_, info, input):
+    try:
+        validated = PasswordResetTokenInput(**input)
+    except ValidationError as exc:
+        raise GraphQLError(format_validation_error(exc)) from exc
+    return await UserService().verify_password_reset(validated)
 
 
 @mutation.field("resetPassword")
-async def reset_password(_, info, input, user_service=UserService()):
-    return await user_service.reset_password(input)
+async def reset_password(_, info, input):
+    try:
+        validated = ResetPasswordInput(**input)
+    except ValidationError as exc:
+        raise GraphQLError(format_validation_error(exc)) from exc
+    return await UserService().reset_password(validated)
 
 
 schema = make_executable_schema(type_defs, query, mutation)

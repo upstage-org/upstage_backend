@@ -10,8 +10,11 @@ from contextlib import asynccontextmanager
 from starlette.requests import ClientDisconnect, Request
 from starlette.responses import Response
 
+import re
+
 from upstage_backend.assets.http.rtmp_auth import router as rtmp_auth_router
-from upstage_backend.global_config import ENV_TYPE, config_graphql_endpoints, HOSTNAME
+from upstage_backend.global_config import ENV_TYPE, config_graphql_endpoints
+from upstage_backend.global_config.env import DOMAIN, UPSTAGE_FRONTEND_URL
 from upstage_backend.global_config.db_context import (
     request_session,
     current_session_or_none,
@@ -25,10 +28,27 @@ async def lifespan(app: FastAPI):
 
 
 def add_cors_middleware(app):
-    allowed_origins = ["*"] if ENV_TYPE != "Production" else [HOSTNAME, f"*.{HOSTNAME}"]
+    """
+    The SPA is served same-origin behind nginx (`/api` is proxied), so CORS
+    only matters for other origins. Starlette compares full origins
+    (scheme + host) and has no glob support, so the old Production list
+    `[HOSTNAME, "*.HOSTNAME"]` (with HOSTNAME being the dot-mangled
+    socket.gethostname()) never matched anything. Production now allows the
+    configured frontend URL plus https sub-domains of DOMAIN.
+    """
+    if ENV_TYPE != "Production":
+        app.add_middleware(
+            CORSMiddleware,
+            allow_origins=["*"],
+            allow_credentials=True,
+            allow_methods=["*"],
+            allow_headers=["*"],
+        )
+        return
     app.add_middleware(
         CORSMiddleware,
-        allow_origins=allowed_origins,
+        allow_origins=[UPSTAGE_FRONTEND_URL.rstrip("/")],
+        allow_origin_regex=rf"^https://([a-z0-9-]+\.)*{re.escape(DOMAIN)}$",
         allow_credentials=True,
         allow_methods=["*"],
         allow_headers=["*"],

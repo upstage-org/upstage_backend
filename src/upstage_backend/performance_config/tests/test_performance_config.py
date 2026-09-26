@@ -2,21 +2,45 @@
 
 
 import pytest
+from upstage_backend.authentication.tests.auth_test import (
+    TestAuthenticationController as _TestAuthenticationController,
+)
+from upstage_backend.users.db_models.user import PLAYER, SUPER_ADMIN
+
+test_AuthenticationController = _TestAuthenticationController()
+
+
+def _admin_headers(client):
+    return test_AuthenticationController.get_headers(client, SUPER_ADMIN)
 
 
 @pytest.mark.anyio
 class TestPerformanceConfig:
+    async def test_00_table_dumps_are_admin_only(self, client):
+        """These queries dump whole tables (incl. broker passwords) and used to be public."""
+        query = "query { performanceCommunication { id } }"
+        anonymous = client.post("/api/studio_graphql", json={"query": query})
+        assert anonymous.json()["errors"][0]["message"] == "Authenticated Failed"
+        as_player = client.post(
+            "/api/studio_graphql",
+            json={"query": query},
+            headers=test_AuthenticationController.get_headers(client, PLAYER),
+        )
+        assert as_player.json()["errors"][0]["message"] == "Permission denied"
+
     async def test_01_get_performance_communication(self, client):
         query = """
             query PerformanceCommunication {
                 performanceCommunication {
                     id
                     ownerId
-                } 
+                }
 
             }
         """
-        response = client.post("/api/studio_graphql", json={"query": query})
+        response = client.post(
+            "/api/studio_graphql", json={"query": query}, headers=_admin_headers(client)
+        )
         assert response.status_code == 200
         data = response.json()
         assert "errors" not in data
@@ -30,11 +54,13 @@ class TestPerformanceConfig:
                 performanceConfig {
                     id
 
-                 } 
+                 }
 
             }
         """
-        response = client.post("/api/studio_graphql", json={"query": query})
+        response = client.post(
+            "/api/studio_graphql", json={"query": query}, headers=_admin_headers(client)
+        )
         assert response.status_code == 200
         data = response.json()
         assert "errors" not in data
@@ -48,11 +74,13 @@ class TestPerformanceConfig:
                 scene {
                     id
                     ownerId
-                } 
+                }
 
             }
         """
-        response = client.post("/api/studio_graphql", json={"query": query})
+        response = client.post(
+            "/api/studio_graphql", json={"query": query}, headers=_admin_headers(client)
+        )
         assert response.status_code == 200
         data = response.json()
         assert "errors" not in data
@@ -66,11 +94,13 @@ class TestPerformanceConfig:
                 parentStage {
                     id
                     stageId
-                } 
+                }
 
             }
         """
-        response = client.post("/api/studio_graphql", json={"query": query})
+        response = client.post(
+            "/api/studio_graphql", json={"query": query}, headers=_admin_headers(client)
+        )
         assert response.status_code == 200
         data = response.json()
         assert "errors" not in data

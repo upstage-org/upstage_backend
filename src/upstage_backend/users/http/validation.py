@@ -25,6 +25,20 @@ class CreateUserInput(BaseModel):
     token: Optional[str] = None
 
 
+class PasswordResetTokenInput(BaseModel):
+    """`verifyPasswordReset`: the account (email or username) plus the emailed code."""
+
+    email: str = Field(..., min_length=1, max_length=320)
+    token: str = Field(..., min_length=1, max_length=64)
+
+
+class ResetPasswordInput(PasswordResetTokenInput):
+    # The SDL declares `password: String` (nullable); enforce the same policy
+    # as registration here so a null or 3-character password is rejected
+    # before it reaches the hasher.
+    password: str = Field(..., min_length=8, max_length=256)
+
+
 # Shown to the registering user as the GraphQL error message.
 _FIELD_LABELS = {
     "username": "Username",
@@ -33,6 +47,7 @@ _FIELD_LABELS = {
     "firstName": "First name",
     "lastName": "Last name",
     "intro": "Introduction",
+    "token": "Code",
 }
 
 

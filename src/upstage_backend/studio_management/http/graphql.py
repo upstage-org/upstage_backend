@@ -280,7 +280,6 @@ type_defs = gql("""
     type User {
         id: ID!
         username: String!
-        password: String
         email: String
         binName: String
         role: String
@@ -505,7 +504,6 @@ type_defs = gql("""
     fragment f1 on User {
         id
         username
-        password
         email
         binName
         role

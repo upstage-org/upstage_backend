@@ -15,7 +15,9 @@ from upstage_backend.assets.services.asset_license import AssetLicenseService
 from upstage_backend.global_config import get_session
 from upstage_backend.global_config.db_context import finish_request_transaction
 from upstage_backend.global_config.env import UPLOAD_USER_CONTENT_FOLDER
+from upstage_backend.global_config.helpers.authz import require_owner_or_admin
 from upstage_backend.global_config.helpers.object import convert_keys_to_camel_case
+from upstage_backend.global_config.helpers.paths import safe_join, try_safe_join
 from upstage_backend.files.file_handling import FileHandling
 from upstage_backend.stages.db_models.parent_stage import ParentStageModel
 from upstage_backend.stages.db_models.stage import StageModel
@@ -121,6 +123,7 @@ class MediaService:
         finish_request_transaction(commit=True)
 
         asset = self.retrieve_asset(input, session)
+        require_owner_or_admin(user,asset.owner_id, "You are not allowed to update this asset")
         asset.name = input.name
         asset.asset_type_id = asset_type.id
         asset.description = input.description
@@ -134,7 +137,7 @@ class MediaService:
         # (autoflush is off), so no row lock is held across this await.
         frames_sub_path = asset_type.file_location
         processed_description, frame_jobs = self.plan_uploaded_frames(input, asset, frames_sub_path)
-        replacement_path = os.path.join(storagePath, asset.file_location)
+        replacement_path = safe_join(storagePath, asset.file_location)
 
         def _write_files():
             if input.base64:
@@ -167,10 +170,11 @@ class MediaService:
         return self.asset_service.resolve_fields(asset)
 
     def retrieve_asset(self, input, local_db_session):
+        asset = None
         if input.id:
             asset = local_db_session.query(AssetModel).filter_by(id=input.id).first()
-            if not asset:
-                raise GraphQLError("Media not found")
+        if not asset:
+            raise GraphQLError("Media not found")
 
         if input.fileLocation:
             existed_asset = (
@@ -212,16 +216,21 @@ class MediaService:
 
         return json.dumps(attributes), jobs
 
-    def delete_media(self, id: int):
+    def delete_media(self, id: int, user: UserModel):
         session = get_session()
-        asset = session.query(AssetModel).outerjoin(ParentStageModel).filter_by(id=id).first()
+        # `filter_by` after an outerjoin applied to ParentStageModel.id, not
+        # the asset id; look the asset up directly.
+        asset = session.query(AssetModel).filter(AssetModel.id == id).first()
         if not asset:
             raise GraphQLError("Media not found")
+        require_owner_or_admin(user, asset.owner_id, "Only media owner or admin can delete this media!")
 
-        if asset.stages:
+        # `asset.stages` is a dynamic relationship (a Query object, always
+        # truthy); ask it whether any assignment exists.
+        if asset.stages.first() is not None:
             asset.dormant = True
             session.flush()
-            return
+            return {"success": True, "message": "Media is assigned to a stage; marked dormant"}
 
         physical_path = self.remove_media_frames_and_get_path(session, asset)
 
@@ -254,10 +263,10 @@ class MediaService:
                 .first()
             )
             if not frame_asset:
-                self.file_handling.delete_file(os.path.join(storagePath, frame))
+                self.file_handling.delete_file(try_safe_join(storagePath, frame))
 
     def _get_physical_path(self, file_location):
-        return os.path.join(storagePath, file_location)
+        return try_safe_join(storagePath, file_location or "")
 
     def cleanup_related_entities(self, id: int, local_db_session):
         local_db_session.query(ParentStageModel).filter(
@@ -288,8 +297,13 @@ class MediaService:
             multiple_frame_media.description = json.dumps(attributes)
             local_db_session.flush()
 
-    def assign_stages(self, input: AssignStagesInput):
+    def assign_stages(self, input: AssignStagesInput, user: UserModel):
         session = get_session()
+        asset = session.query(AssetModel).filter_by(id=input.id).first()
+        if not asset:
+            raise GraphQLError("Media not found")
+        require_owner_or_admin(user, asset.owner_id, "You are not allowed to assign this media")
+        self.asset_service.assert_can_assign_to_stages(user, input.stageIds, session)
         # Surviving assignments keep their parent_stage row, i.e. their
         # place in each stage's saved media order (see sync_asset_assignments).
         sync_asset_assignments(

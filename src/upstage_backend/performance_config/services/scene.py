@@ -21,6 +21,15 @@ class SceneService:
 
     def create_scene(self, user: UserModel, input: SceneInput):
         session = get_session()
+        # Deferred import: stages.services.stage is a heavy module and the
+        # stage schema imports this service.
+        from upstage_backend.stages.db_models.stage import StageModel
+        from upstage_backend.stages.services.stage import StageService
+
+        stage = session.query(StageModel).filter(StageModel.id == input.stageId).first()
+        # Owner / editor / admin only (raises "Stage not found" for None).
+        StageService().extract_permission(user, stage)
+
         scene = SceneModel(
             owner_id=user.id,
             stage_id=input.stageId,

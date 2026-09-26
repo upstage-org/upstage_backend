@@ -262,6 +262,7 @@ def media_service(monkeypatch):
         name="",
         asset_type_id=None,
         file_location="avatar/a.png",
+        owner_id=1,
         description='{"frames": []}',
     )
     session = SimpleNamespace(

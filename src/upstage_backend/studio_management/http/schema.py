@@ -8,6 +8,7 @@ from graphql import GraphQLError
 from upstage_backend.global_config import logger
 from upstage_backend.global_config.decorators.authenticated import authenticated
 from upstage_backend.global_config.env import EMAIL_HOST
+from upstage_backend.global_config.helpers.bearer import parse_bearer_token
 from upstage_backend.global_config.helpers.object import convert_keys_to_camel_case
 from ariadne.asgi import GraphQL
 from upstage_backend.mails.helpers.mail import send
@@ -47,8 +48,10 @@ def current_user(_, info):
 
 @query.field("adminPlayers")
 @authenticated()
-def admin_players(_, __, **kwargs):
-    return StudioService().admin_players(kwargs)
+def admin_players(_, info, **kwargs):
+    # Players use this list too (media permissions / stage filters), so the
+    # service trims non-admin callers to UserModel.PUBLIC_FIELDS.
+    return StudioService().admin_players(kwargs, info.context["request"].state.current_user)
 
 
 @query.field("getAllStages")
@@ -59,8 +62,11 @@ def stages(_, info):
 
 @query.field("users")
 @authenticated(allowed_roles=[SUPER_ADMIN, ADMIN, PLAYER])
-def users(_, __, active: bool = True):
-    return StudioService().get_users(active)
+def users(_, info, active: bool = True):
+    # Player screens (stage filter, media permissions) list other players by
+    # id / username / display name; the service trims non-admin callers to
+    # UserModel.PUBLIC_FIELDS so e-mail and the rest stay admin-only.
+    return StudioService().get_users(active, info.context["request"].state.current_user)
 
 
 @mutation.field("batchUserCreation")
@@ -71,8 +77,10 @@ def create_users(_, __, users: List[BatchUserInput]):
 
 @mutation.field("updateUser")
 @authenticated(allowed_roles=[SUPER_ADMIN, ADMIN, PLAYER])
-async def update_user(_, __, input: UpdateUserInput, studio_service=StudioService()):
-    return await studio_service.update_user(UpdateUserInput(**input))
+async def update_user(_, info, input: UpdateUserInput):
+    return await StudioService().update_user(
+        UpdateUserInput(**input), info.context["request"].state.current_user
+    )
 
 
 @mutation.field("deleteUser")
@@ -134,11 +142,17 @@ async def send_email(_, info, input):
 
 @mutation.field("changePassword")
 @authenticated()
-def change_password(_, __, input: ChangePasswordInput):
-    return StudioService().change_password(ChangePasswordInput(**input))
+def change_password(_, info, input: ChangePasswordInput):
+    request = info.context["request"]
+    return StudioService().change_password(
+        ChangePasswordInput(**input),
+        request.state.current_user,
+        keep_access_token=parse_bearer_token(request.headers.get("Authorization")),
+    )
 
 
 @mutation.field("calcSizes")
+@authenticated(allowed_roles=[SUPER_ADMIN, ADMIN])
 def calc_sizes(_, __):
     return StudioService().calc_sizes()
 

@@ -1,7 +1,6 @@
 # -*- coding: iso8859-15 -*-
 import os
 
-import asyncio
 from datetime import datetime
 import json
 from typing import List
@@ -13,12 +12,21 @@ from upstage_backend.assets.services.asset import AssetService
 from upstage_backend.authentication.db_models.user_session import UserSessionModel
 from upstage_backend.event_archive.db_models.event import EventModel
 from upstage_backend.global_config.helpers.object import convert_keys_to_camel_case
-from upstage_backend.global_config import get_session
+from upstage_backend.global_config import get_session, logger
 from upstage_backend.global_config.env import (
     UPLOAD_USER_CONTENT_FOLDER,
     HOSTNAME,
 )
+from upstage_backend.global_config.helpers.authz import (
+    is_admin,
+    is_super_admin,
+    require_owner_or_admin,
+    user_id_of,
+)
+from upstage_backend.global_config.helpers.background import spawn
 from upstage_backend.global_config.helpers.password import hash_password, verify_password
+from upstage_backend.global_config.helpers.paths import try_safe_join
+from upstage_backend.users.services.user import revoke_user_sessions
 from upstage_backend.mails.helpers.mail import send
 from upstage_backend.mails.templates.templates import (
     display_user,
@@ -54,6 +62,7 @@ from upstage_backend.users.db_models.user import (
     ADMIN,
     GUEST,
     PLAYER,
+    ROLES,
     SUPER_ADMIN,
     UserModel,
 )
@@ -67,9 +76,16 @@ class StudioService:
         self.stage_operation_service = StageOperationService()
         pass
 
-    def admin_players(self, params):
+    def admin_players(self, params, requester=None):
         session = get_session()
         query = session.query(UserModel)
+        # Non-admin callers (media permission pickers, stage filters) only get
+        # the public identity fields; email/intro/limits stay admin-only.
+        serialize = (
+            (lambda user: user.to_dict())
+            if requester is None or is_admin(requester)
+            else (lambda user: user.to_public_dict())
+        )
 
         if "usernameLike" in params:
             query = query.filter(
@@ -91,16 +107,15 @@ class StudioService:
         if "sort" in params:
             for sort_param in params["sort"]:
                 field, direction = sort_param.rsplit("_", 1)
-                if field == "USERNAME":
-                    sort_field = UserModel.username
-                elif field == "ROLE":
-                    sort_field = UserModel.role
-                elif field == "CREATED_ON":
-                    sort_field = UserModel.created_on
-                elif field == "EMAIL":
-                    sort_field = UserModel.email
-                elif field == "LAST_LOGIN":
-                    sort_field = UserModel.last_login
+                sort_field = {
+                    "USERNAME": UserModel.username,
+                    "ROLE": UserModel.role,
+                    "CREATED_ON": UserModel.created_on,
+                    "EMAIL": UserModel.email,
+                    "LAST_LOGIN": UserModel.last_login,
+                }.get(field)
+                if sort_field is None:
+                    continue
 
                 if direction == "ASC":
                     query = query.order_by(nulls_last(sort_field.asc()))
@@ -118,7 +133,7 @@ class StudioService:
         results = query.all()
 
         return convert_keys_to_camel_case(
-            {"totalCount": total_count, "edges": [user.to_dict() for user in results]}
+            {"totalCount": total_count, "edges": [serialize(user) for user in results]}
         )
 
     def create_users(self, users: List[BatchUserInput]):
@@ -175,22 +190,55 @@ class StudioService:
                 f"Users with emails {', '.join([user.email for user in existing_users])} already exist"
             )
 
-    async def update_user(self, input: UpdateUserInput):
+    def _authorize_user_update(self, input: UpdateUserInput, actor, target: UserModel):
+        """
+        Who may change what on a user record:
+          * players/guests: only their own profile fields — never role,
+            active, upload limit, or another account;
+          * admins: anyone except promoting to / editing a super admin;
+          * super admins: anything.
+        """
+        if input.role is not None and input.role not in ROLES:
+            raise GraphQLError("Invalid role")
+
+        if is_super_admin(actor):
+            return
+
+        if is_admin(actor):
+            if target.role == SUPER_ADMIN or input.role == SUPER_ADMIN:
+                raise GraphQLError("Only a super admin can manage super admin accounts")
+            return
+
+        if user_id_of(actor) != target.id:
+            raise GraphQLError("You are not authorized to update this user")
+        if input.role != target.role:
+            raise GraphQLError("You cannot change your own role")
+        if input.active != target.active:
+            raise GraphQLError("You cannot change your own account status")
+        if input.uploadLimit is not None and input.uploadLimit != target.upload_limit:
+            raise GraphQLError("You cannot change your own upload limit")
+
+    async def update_user(self, input: UpdateUserInput, actor):
         try:
             session = get_session()
             self._validate_email(input)
             user = self._get_user(session, input.id)
+            self._authorize_user_update(input, actor, user)
             self._check_existing_email(input)
+            password_changed = bool(input.password)
             await self._update_user_fields(user, input)
             session.add(user)
             session.flush()
+            if password_changed:
+                revoke_user_sessions(session, user.id)
             user = self._get_user(session, input.id)
             return convert_keys_to_camel_case(user.to_dict())
         except GraphQLError:
             raise
-        except Exception as e:
+        except Exception:
+            logger.exception("update_user failed for user id {}", input.id)
             raise GraphQLError(
-                f"There was an error updating this user information: {str(e)}. Please check the logs and try again later!"
+                "There was an error updating this user information. Please check the logs and try again later!"
             )
 
     def _validate_email(self, input: UpdateUserInput):
@@ -242,7 +290,7 @@ class StudioService:
 
     async def _handle_active_status(self, user: UserModel, value):
         if value and not user.active and not user.deactivated_on:
-            asyncio.create_task(
+            spawn(
                 send(
                     [user.email],
                     f"Registration approved for user {user.username}",
@@ -270,6 +318,8 @@ class StudioService:
             raise GraphQLError("The default admin account cannot be deleted.")
         if user.id == int(current_user.id):
             raise GraphQLError("You cannot delete your own account.")
+        if user.role == SUPER_ADMIN and not is_super_admin(current_user):
+            raise GraphQLError("Only a super admin can delete a super admin account.")
 
         admin_user = ensure_admin_user(session)
 
@@ -454,36 +504,45 @@ class StudioService:
                 tokens.append(frame)
         return tokens
 
-    def change_password(self, input: ChangePasswordInput):
+    def change_password(self, input: ChangePasswordInput, actor, keep_access_token=None):
         session = get_session()
-        user = session.query(UserModel).filter(UserModel.id == input.id).first()
+        # Non-admins can only change their own password; the target id in the
+        # input used to be trusted, which made this an unthrottled password
+        # oracle against any account.
+        target_id = input.id if is_admin(actor) else user_id_of(actor)
+        user = session.query(UserModel).filter(UserModel.id == target_id).first()
         if not user:
             raise GraphQLError("User not found!")
+        if user.role == SUPER_ADMIN and not is_super_admin(actor) and user.id != user_id_of(actor):
+            raise GraphQLError("Only a super admin can manage super admin accounts")
 
         if not verify_password(user.password, input.oldPassword):
             raise GraphQLError("Old password is incorrect!")
 
         user.password = hash_password(input.newPassword)
         session.flush()
+        # Other logins of this account are revoked; the caller's own session
+        # survives when they changed their own password.
+        keep = keep_access_token if user.id == user_id_of(actor) else None
+        revoke_user_sessions(session, user.id, keep_access_token=keep)
         return convert_keys_to_camel_case(
             {"success": True, "message": "Password changed successfully!"}
         )
 
     def calc_sizes(self):
         session = get_session()
-        size = 0
+        total = 0
         for media in session.query(AssetModel).all():
             if not media.size:
-                full_path = os.path.join(storagePath, media.file_location)
+                full_path = try_safe_join(storagePath, media.file_location or "")
                 try:
-                    size = os.path.getsize(full_path)
-                except Exception:
-                    size = 0  # file not exist
-                media.size = size
+                    media.size = os.path.getsize(full_path) if full_path else 0
+                except OSError:
+                    media.size = 0  # file does not exist
                 session.flush()
-            size += media.size
+            total += media.size or 0
 
-        return {"size": size}
+        return {"size": total}
 
     async def request_permission(self, user: UserModel, asset_id: int, note: str):
         session = get_session()
@@ -509,14 +568,14 @@ class StudioService:
         if asset.copyright_level == 2:
             asset_usage.approved = False
             studio_url = f"https://{HOSTNAME}/media"
-            asyncio.create_task(
+            spawn(
                 send(
                     [asset.owner.email],
                     f"{display_user(user)} wants to use your media {asset.name}",
                     request_permission_for_media(user, asset, note if note else "", studio_url),
                 )
             )
-            asyncio.create_task(
+            spawn(
                 send(
                     [user.email],
                     "Your permission request is waiting for approval",
@@ -529,7 +588,7 @@ class StudioService:
             # Uploaded media may carry no description yet; never crash the request.
             description = json.loads(asset.description) if asset.description else {}
 
-            asyncio.create_task(
+            spawn(
                 send(
                     [user.email],
                     "Media acknowledgement",
@@ -542,7 +601,7 @@ class StudioService:
                 )
             )
 
-            asyncio.create_task(
+            spawn(
                 send(
                     [asset.owner.email],
                     f"{display_user(user)} is using your media {asset.name}",
@@ -579,7 +638,7 @@ class StudioService:
             session.delete(asset_usage)
 
         studio_url = f"https://{HOSTNAME}/media"
-        asyncio.create_task(
+        spawn(
             send(
                 [asset_usage.user.email],
                 f"Permission approved for media {asset_usage.asset.name}"
@@ -666,6 +725,7 @@ class StudioService:
         asset = session.query(AssetModel).filter(AssetModel.id == asset_id).first()
         if not asset:
             raise GraphQLError("Asset not found!")
+        require_owner_or_admin(user, asset.owner_id, "You are not allowed to assign this media")
 
         wanted_ids = [int(stage_id) for stage_id in stage_ids]
         found_ids = {
@@ -674,6 +734,7 @@ class StudioService:
         }
         if any(stage_id not in found_ids for stage_id in wanted_ids):
             raise GraphQLError("Stage not found!")
+        AssetService().assert_can_assign_to_stages(user, wanted_ids, session)
 
         # Surviving assignments keep their parent_stage row, i.e. their
         # place in each stage's saved media order (see sync_asset_assignments).
@@ -683,10 +744,15 @@ class StudioService:
         session.flush()
         return {"success": True}
 
-    def get_users(self, active: bool):
+    def get_users(self, active: bool, requester=None):
         session = get_session()
+        serialize = (
+            (lambda user: user.to_dict())
+            if requester is None or is_admin(requester)
+            else (lambda user: user.to_public_dict())
+        )
         return [
-            convert_keys_to_camel_case(user.to_dict())
+            convert_keys_to_camel_case(serialize(user))
             for user in session.query(UserModel)
             .filter(UserModel.active == active)
             .order_by(UserModel.username.asc())

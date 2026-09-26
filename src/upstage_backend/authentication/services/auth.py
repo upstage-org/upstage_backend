@@ -1,6 +1,4 @@
-# -*- coding: iso8859-15 -*-
-
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from graphql import GraphQLError
 import jwt
 from fastapi import Request
@@ -34,13 +32,12 @@ class AuthenticationService:
     async def login(self, dto: LoginInput, request: Request):
         await self.user_service.verify_captcha_async(dto.token, request)
 
-        user: UserModel = None
         username, password = dto.username, dto.password
 
         email = self.validate_login_payload(username)
         user = self.user_service.find_one(username, email)
         if not user:
-            return GraphQLError("Incorrect username or password. Please try again.")
+            raise GraphQLError("Incorrect username or password. Please try again.")
 
         self.validate_password(password, user)
         access_token = self.create_token(
@@ -112,9 +109,13 @@ class AuthenticationService:
                 "Your account has been successfully created but not approved yet.<br/>Please wait for approval or contact UpStage Admin for support!"
             )
 
-    def create_token(self, data: dict, exp=timedelta(minutes=int(JWT_ACCESS_TOKEN_MINUTES))):
+    def create_token(self, data: dict, exp: timedelta | None = None):
+        if exp is None:
+            exp = timedelta(minutes=int(JWT_ACCESS_TOKEN_MINUTES))
         to_encode = data.copy()
-        expire = datetime.now() + exp
+        # PyJWT reads naive datetimes as UTC; an aware value is correct on any
+        # host timezone.
+        expire = datetime.now(timezone.utc) + exp
         to_encode.update({"exp": expire})
         encoded_jwt = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
         return encoded_jwt
@@ -140,6 +141,18 @@ class AuthenticationService:
         if not current_refresh_token:
             raise GraphQLError("Invalid refresh token")
 
+        # The token used to be looked up in the DB only, so its `exp` and
+        # `type` claims were never enforced: a leaked refresh token worked
+        # for as long as the session row survived.
+        try:
+            claims = jwt.decode(current_refresh_token, SECRET_KEY, algorithms=[ALGORITHM])
+        except jwt.ExpiredSignatureError:
+            raise GraphQLError("Invalid refresh token") from None
+        except jwt.InvalidTokenError:
+            raise GraphQLError("Invalid refresh token") from None
+        if claims.get("type") != "refresh":
+            raise GraphQLError("Invalid refresh token")
+
         db = get_request_session()
         session = (
             db.query(UserSessionModel)
@@ -147,10 +160,13 @@ class AuthenticationService:
             .first()
         )
 
-        if not session:
+        if not session or session.user_id != claims.get("user_id"):
             raise GraphQLError("Invalid refresh token")
 
         user = db.query(UserModel).filter(UserModel.id == session.user_id).first()
+        if not user or not user.active:
+            db.delete(session)
+            raise GraphQLError("Invalid refresh token")
 
         access_token = self.create_token(
             {"user_id": session.user_id},

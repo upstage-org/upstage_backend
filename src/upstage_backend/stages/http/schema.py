@@ -143,13 +143,17 @@ async def update_media(_, info, input: UpdateMediaInput):
 @mutation.field("deleteMediaOnStage")
 @authenticated(allowed_roles=[SUPER_ADMIN, ADMIN, PLAYER])
 def delete_media(_, info, id: int):
-    return MediaService().delete_media(id)
+    return MediaService().delete_media(
+        id, UserModel(**info.context["request"].state.current_user)
+    )
 
 
 @mutation.field("assignStages")
 @authenticated(allowed_roles=[SUPER_ADMIN, ADMIN, PLAYER])
 def assign_stages(_, info, input: AssignStagesInput):
-    return MediaService().assign_stages(AssignStagesInput(**input))
+    return MediaService().assign_stages(
+        AssignStagesInput(**input), UserModel(**info.context["request"].state.current_user)
+    )
 
 
 @mutation.field("updateStageAssignment")

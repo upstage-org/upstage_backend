@@ -1,7 +1,10 @@
-import asyncio
 import fitz  # PyMuPDF
 import io
 import base64
+import os
+import re
+from pathlib import Path
+from xml.sax.saxutils import escape
 
 from reportlab.pdfgen import canvas
 from reportlab.lib.pagesizes import A4
@@ -9,13 +12,24 @@ from reportlab.lib import colors
 from reportlab.platypus import Table, TableStyle, Paragraph
 from reportlab.lib.styles import getSampleStyleSheet
 
-from upstage_backend.global_config.env import SUPPORT_EMAILS
+from upstage_backend.global_config.env import SUPPORT_EMAILS, UPLOAD_USER_CONTENT_FOLDER
+from upstage_backend.global_config.helpers.background import spawn
 from upstage_backend.mails.helpers.mail import send
+
+# Resolved relative to this module, not the process working directory (the
+# old "src/payments/services/..." string predates the package rename).
+TEMPLATE_PATH = Path(__file__).with_name("UpStage_Receipt_Template.pdf")
+
+
+def _receipt_filename(received_from: str) -> str:
+    # The donor name is caller-supplied; keep only a conservative subset so
+    # it can never carry path separators or shell-hostile characters.
+    slug = re.sub(r"[^a-z0-9_-]+", "", received_from.strip().lower().replace(" ", "_"))
+    return f"UpStage_receipt_{slug[:50] or 'donor'}.pdf"
 
 
 def create_receipt_base64(received_from, date, description, amount):
-    template_path = "src/payments/services/UpStage_Receipt_Template.pdf"
-    doc = fitz.open(template_path)
+    doc = fitz.open(str(TEMPLATE_PATH))
 
     packet = io.BytesIO()
     can = canvas.Canvas(packet, pagesize=A4)
@@ -24,13 +38,14 @@ def create_receipt_base64(received_from, date, description, amount):
     styles = getSampleStyleSheet()
     normal_style = styles["Normal"]
 
+    # Paragraph() parses ReportLab markup: escape the free-text fields.
     data = [
         ["Received from", "Date", "Description", "Amount"],
         [
-            Paragraph(received_from, normal_style),
-            date,
-            Paragraph(description, normal_style),
-            "USD$" + amount,
+            Paragraph(escape(received_from), normal_style),
+            escape(date),
+            Paragraph(escape(description), normal_style),
+            "USD$" + escape(amount),
         ],
     ]
 
@@ -67,14 +82,15 @@ def create_receipt_base64(received_from, date, description, amount):
     doc.close()
     pdf_bytes = out_buf.getvalue()
 
-    file_path = (
-        f"./uploads/UpStage_receipt_{received_from.replace(' ', '_').lower()}.pdf"
-    )
+    file_name = _receipt_filename(received_from)
+    receipts_dir = os.path.join(UPLOAD_USER_CONTENT_FOLDER, "receipts")
+    os.makedirs(receipts_dir, exist_ok=True)
+    file_path = os.path.join(receipts_dir, file_name)
     with open(file_path, "wb") as f:
         f.write(pdf_bytes)
 
     admin_emails = SUPPORT_EMAILS
-    asyncio.create_task(
+    spawn(
         send(
             admin_emails,
             "Donation receipt issued",
@@ -85,5 +101,5 @@ def create_receipt_base64(received_from, date, description, amount):
 
     return {
         "fileBase64": base64.b64encode(pdf_bytes).decode("utf-8"),
-        "fileName": f"UpStage_receipt_{received_from.replace(' ', '_').lower()}.pdf",
+        "fileName": file_name,
     }

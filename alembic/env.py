@@ -17,10 +17,16 @@ if config.config_file_name is not None:
 
 config.set_main_option("sqlalchemy.url", DATABASE_URL)
 
-# add your model's MetaData object here
-# for 'autogenerate' support
-# target_metadata = mymodel.Base.metadata
-target_metadata = None
+# Model metadata for `alembic revision --autogenerate` / `alembic check`.
+# Importing the GraphQL wiring module registers every mapped class on
+# `Base.metadata` (the models are spread across the feature packages).
+# NOTE: `alembic check` currently reports pre-existing drift (see the
+# 2026-09 review: StageLicenseModel has no table, a few legacy tables have
+# no model, FK column widths differ) — resolve that before adding it to CI.
+from upstage_backend.global_config.db_models.base import Base  # noqa: E402
+import upstage_backend.global_config.schema  # noqa: E402,F401  (registers all models)
+
+target_metadata = Base.metadata
 
 # other values from the config, defined by the needs of env.py,
 # can be acquired:

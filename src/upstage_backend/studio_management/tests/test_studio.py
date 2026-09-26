@@ -192,7 +192,7 @@ class TestStudioController:
         assert "updateUser" in response.json()["data"]
         assert "email" in response.json()["data"]["updateUser"]
 
-        variables = {"input": {**variables["input"], "id": 1000}}
+        variables = {"input": {**variables["input"], "id": 999999999}}
 
         response = client.post(
             "/api/studio_graphql",
@@ -368,7 +368,7 @@ class TestStudioController:
 
         variables = {
             "input": {
-                "id": 1000,
+                "id": 999999999,
                 "oldPassword": "testpassword",
                 "newPassword": "new_password",
             }
@@ -537,7 +537,7 @@ class TestStudioController:
         assert "permissions" in response.json()["data"]["confirmPermission"]
 
         variables = {
-            "id": 1000,
+            "id": 999999999,
             "approved": True,
         }
 

@@ -88,14 +88,16 @@ class StageService:
                 if field == "ACCESS":
                     continue
 
-                if field == "OWNER_ID":
-                    sort_field = StageModel.owner_id
-                elif field == "NAME":
-                    sort_field = StageModel.name
-                elif field == "CREATED_ON":
-                    sort_field = StageModel.created_on
-                elif field == "LAST_ACCESS":
-                    sort_field = StageModel.last_access
+                sort_field = {
+                    "OWNER_ID": StageModel.owner_id,
+                    "NAME": StageModel.name,
+                    "CREATED_ON": StageModel.created_on,
+                    "LAST_ACCESS": StageModel.last_access,
+                }.get(field)
+                if sort_field is None:
+                    # Unknown key used to leave `sort_field` unbound (or reuse
+                    # the previous iteration's column).
+                    continue
 
                 if direction == "ASC":
                     query = query.order_by(nulls_last(sort_field.asc()))
@@ -279,12 +281,28 @@ class StageService:
             raise GraphQLError("You are not authorized to update this stage")
         return permission
 
+    # Mirrors the studio form's own check (StageManagement/General.vue); the
+    # slug is also the MQTT / event-archive namespace of the stage.
+    _STAGE_SLUG_RE = re.compile(r"^[A-Za-z0-9_-]{1,64}$")
+
+    def _validate_stage_slug(self, session, file_location, exclude_stage_id=None):
+        if not isinstance(file_location, str) or not self._STAGE_SLUG_RE.match(file_location):
+            raise GraphQLError("Stage URL may only contain letters, digits, '-' and '_'")
+        query = session.query(StageModel.id).filter(StageModel.file_location == file_location)
+        if exclude_stage_id is not None:
+            query = query.filter(StageModel.id != exclude_stage_id)
+        if query.first() is not None:
+            raise GraphQLError("A stage with this URL already exists")
+
     def create_stage(self, user: UserModel, input: StageInput):
         session = get_session()
+        self._validate_stage_slug(session, input.fileLocation)
+        # Only admins may create a stage on someone else's behalf.
+        owner_id = input.owner if input.owner and user.role in (ADMIN, SUPER_ADMIN) else user.id
         stage = StageModel(
             name=input.name,
             description=input.description,
-            owner_id=input.owner if input.owner else user.id,
+            owner_id=owner_id,
             file_location=input.fileLocation,
         )
 
@@ -327,19 +345,31 @@ class StageService:
 
         self.extract_permission(user, stage)
 
+        def is_owner_or_admin() -> bool:
+            return user is not None and (
+                stage.owner_id == user.id or user.role in (ADMIN, SUPER_ADMIN)
+            )
+
         stage.name = input.name if hasattr(input, "name") and input.name else stage.name
         stage.description = (
             input.description
             if hasattr(input, "description") and input.description
             else stage.description
         )
-        stage.file_location = (
-            input.fileLocation
-            if hasattr(input, "fileLocation") and input.fileLocation
-            else stage.file_location
-        )
+        new_slug = getattr(input, "fileLocation", None)
+        if new_slug and new_slug != stage.file_location:
+            # Editors may not rename the stage URL (it is the stage's MQTT and
+            # archive namespace); and it must stay unique.
+            if not is_owner_or_admin():
+                raise GraphQLError("Only the stage owner or an admin can change the stage URL")
+            self._validate_stage_slug(session, new_slug, exclude_stage_id=stage.id)
+            stage.file_location = new_slug
 
-        stage.owner_id = input.owner if hasattr(input, "owner") and input.owner else stage.owner_id
+        new_owner = getattr(input, "owner", None)
+        if new_owner and int(new_owner) != stage.owner_id:
+            if not is_owner_or_admin():
+                raise GraphQLError("Only the stage owner or an admin can transfer ownership")
+            stage.owner_id = new_owner
 
         self.update_stage_attribute(stage.id, "cover", input.cover, session)
         # Same guard as create_stage: partial updates (e.g. the Customisation
@@ -413,6 +443,8 @@ class StageService:
         stage = session.query(StageModel).filter(StageModel.id == input.id).first()
         if not stage:
             raise GraphQLError("Stage not found")
+        # Same rule as every other stage mutation: owner, editor or admin.
+        self.extract_permission(user, stage)
 
         file_location = self.get_short_name(input.name, session)
 

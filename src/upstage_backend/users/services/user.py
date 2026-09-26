@@ -1,14 +1,16 @@
-# -*- coding: iso8859-15 -*-
-
-
-from operator import or_
 import asyncio
+import hashlib
+import hmac
+import secrets
+from datetime import datetime, timedelta
 
 from fastapi import Request
 from graphql import GraphQLError
-import pyotp
 import requests
+from sqlalchemy import or_
+from upstage_backend.authentication.db_models.user_session import UserSessionModel
 from upstage_backend.global_config import get_session, logger
+from upstage_backend.global_config.db_context import finish_request_transaction
 from upstage_backend.global_config.env import (
     ENV_TYPE,
     CLOUDFLARE_CAPTCHA_SECRETKEY,
@@ -16,6 +18,7 @@ from upstage_backend.global_config.env import (
     SUPPORT_EMAILS,
     HOSTNAME,
 )
+from upstage_backend.global_config.helpers.background import spawn
 
 from upstage_backend.mails.helpers.mail import send
 from upstage_backend.mails.templates.templates import (
@@ -24,11 +27,48 @@ from upstage_backend.mails.templates.templates import (
     user_registration,
 )
 from upstage_backend.stages.services.stage_operation import StageOperationService
-from upstage_backend.users.db_models.user import PLAYER, SUPER_ADMIN, UserModel
+from upstage_backend.users.db_models.user import PLAYER, UserModel
 from upstage_backend.users.db_models.one_time_totp import OneTimeTOTPModel
 
 # (connect, read) seconds for the Cloudflare Turnstile siteverify call.
 CAPTCHA_VERIFY_TIMEOUT = (3.05, 5)
+
+# Password-reset codes: 6 digits (the login form's input is maxlength=6 and
+# the email copy says "6-digit"), valid for 30 minutes (matches the email),
+# at most 5 wrong guesses before the code is discarded. Only the sha256 of the
+# code is stored, and the lookup is scoped to the account named in the
+# request, so a guess against one account cannot hit another's code.
+PASSWORD_RESET_CODE_DIGITS = 6
+PASSWORD_RESET_TTL = timedelta(minutes=30)
+PASSWORD_RESET_MAX_ATTEMPTS = 5
+PASSWORD_RESET_INVALID = "Invalid or expired code. Please request a new one."
+# Same answer whether or not the account exists (no user enumeration).
+PASSWORD_RESET_REQUESTED = (
+    "If an account matches, we've sent an email with a code to reset your password."
+)
+
+
+def _hash_reset_code(code: str) -> str:
+    return hashlib.sha256(code.strip().encode("utf-8")).hexdigest()
+
+
+def _lookup_user(session, email_or_username: str):
+    value = (email_or_username or "").strip()
+    if not value:
+        return None
+    return (
+        session.query(UserModel)
+        .filter(or_(UserModel.email == value, UserModel.username == value))
+        .first()
+    )
+
+
+def revoke_user_sessions(session, user_id: int, keep_access_token: str | None = None) -> None:
+    """Delete every login session of `user_id` (after a password change/reset)."""
+    query = session.query(UserSessionModel).filter(UserSessionModel.user_id == user_id)
+    if keep_access_token:
+        query = query.filter(UserSessionModel.access_token != keep_access_token)
+    query.delete(synchronize_session=False)
 
 
 class UserService:
@@ -66,8 +106,11 @@ class UserService:
         session = get_session()
         user = UserModel()
         user.password = hash_password(data["password"])
-        user.role = PLAYER if not user.role else user.role
-        user.active = True if user.role == SUPER_ADMIN else False
+        # Self-registration always creates an inactive PLAYER; an admin
+        # approves it (the old `if not user.role` branch could never be
+        # anything else on a fresh model).
+        user.role = PLAYER
+        user.active = False
         user.email = data.get("email", "")
         user.first_name = data.get("firstName", "")
         user.last_name = data.get("lastName", "")
@@ -78,10 +121,10 @@ class UserService:
 
         user = session.query(UserModel).filter(UserModel.username == data["username"]).first()
 
-        asyncio.create_task(send([user.email], "Welcome to UpStage!", user_registration(user)))
+        spawn(send([user.email], "Welcome to UpStage!", user_registration(user)))
         admin_emails = SUPPORT_EMAILS
         approval_url = f"https://{HOSTNAME}/admin/player?sortByCreated=true"
-        asyncio.create_task(
+        spawn(
             send(
                 admin_emails,
                 f"Approval required for {user.username}'s registration",
@@ -158,57 +201,78 @@ class UserService:
             )
             raise GraphQLError("We think you are not a human! " + ", ".join(error_codes))
 
-    def update(self, user: UserModel):
-        session = get_session()
-        session.query(UserModel).filter(UserModel.id == user.id).update({**user.to_dict()})
-        session.flush()
-
     async def request_password_reset(self, email: str):
         session = get_session()
-        user = (
-            session.query(UserModel)
-            .filter(or_(UserModel.email == email, UserModel.username == email))
-            .first()
-        )
+        user = _lookup_user(session, email)
 
-        if not user:
-            raise GraphQLError("User does not exist")
-        totp = pyotp.TOTP(pyotp.random_base32())
-        otp = totp.now()
+        if user and user.email:
+            code = f"{secrets.randbelow(10**PASSWORD_RESET_CODE_DIGITS):0{PASSWORD_RESET_CODE_DIGITS}d}"
 
-        session.query(OneTimeTOTPModel).filter(OneTimeTOTPModel.user_id == user.id).delete()
-
-        session.flush()
-        session.add(OneTimeTOTPModel(user_id=user.id, code=otp))
-        session.flush()
-
-        asyncio.create_task(
-            send(
-                [user.email],
-                f"Password reset for account {user.username}",
-                password_reset(user, otp),
+            session.query(OneTimeTOTPModel).filter(OneTimeTOTPModel.user_id == user.id).delete()
+            session.flush()
+            session.add(
+                OneTimeTOTPModel(
+                    user_id=user.id,
+                    code=_hash_reset_code(code),
+                    url="0",
+                    recorded_time=datetime.now(),
+                )
             )
-        )
+            session.flush()
 
-        return {
-            "success": True,
-            "message": f"We've sent an email with a code to reset your password to {email}.",
-        }
+            spawn(
+                send(
+                    [user.email],
+                    f"Password reset for account {user.username}",
+                    password_reset(user, code),
+                )
+            )
+
+        return {"success": True, "message": PASSWORD_RESET_REQUESTED}
+
+    def _consume_reset_attempt(self, session, email: str, token: str):
+        """
+        Return the (user, otp_row) pair when `token` is the live code for the
+        account `email`; otherwise record the failed attempt and raise.
+
+        A raised GraphQLError rolls the mutation back (see
+        global_config.schema.end_transaction_after_root_mutation), so the
+        attempt counter / discarded row is committed explicitly first.
+        """
+        user = _lookup_user(session, email)
+        otp = (
+            session.query(OneTimeTOTPModel).filter(OneTimeTOTPModel.user_id == user.id).first()
+            if user
+            else None
+        )
+        if not user or not otp:
+            raise GraphQLError(PASSWORD_RESET_INVALID)
+
+        issued = otp.recorded_time or datetime.min
+        if issued < datetime.now() - PASSWORD_RESET_TTL:
+            session.delete(otp)
+            session.flush()
+            finish_request_transaction(commit=True)
+            raise GraphQLError(PASSWORD_RESET_INVALID)
+
+        if not hmac.compare_digest(otp.code or "", _hash_reset_code(token)):
+            try:
+                attempts = int(otp.url or "0") + 1
+            except ValueError:
+                attempts = PASSWORD_RESET_MAX_ATTEMPTS
+            if attempts >= PASSWORD_RESET_MAX_ATTEMPTS:
+                session.delete(otp)
+            else:
+                otp.url = str(attempts)
+            session.flush()
+            finish_request_transaction(commit=True)
+            raise GraphQLError(PASSWORD_RESET_INVALID)
+
+        return user, otp
 
     async def verify_password_reset(self, input):
         session = get_session()
-        otp = (
-            session.query(OneTimeTOTPModel).filter(OneTimeTOTPModel.code == input["token"]).first()
-        )
-
-        if not otp:
-            raise GraphQLError("Invalid token")
-
-        user = session.query(UserModel).filter(UserModel.id == otp.user_id).first()
-
-        if not user:
-            raise GraphQLError("Invalid token")
-
+        self._consume_reset_attempt(session, input.email, input.token)
         return {
             "success": True,
             "message": "Token verified. Please reset your password.",
@@ -216,20 +280,14 @@ class UserService:
 
     async def reset_password(self, input):
         session = get_session()
-        otp = (
-            session.query(OneTimeTOTPModel).filter(OneTimeTOTPModel.code == input["token"]).first()
-        )
-
-        if not otp:
-            raise GraphQLError("Invalid token")
-
-        user = session.query(UserModel).filter(UserModel.id == otp.user_id).first()
-
-        if not user:
-            raise GraphQLError("Invalid token")
+        user, otp = self._consume_reset_attempt(session, input.email, input.token)
 
         from upstage_backend.global_config.helpers.password import hash_password
 
-        user.password = hash_password(input["password"])
+        user.password = hash_password(input.password)
         session.delete(otp)
+        # Every existing login of this account is invalidated: the reset
+        # exists precisely because the credential may be in the wrong hands.
+        revoke_user_sessions(session, user.id)
+        session.flush()
         return {"success": True, "message": "Password reset successfully."}

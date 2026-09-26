@@ -21,8 +21,10 @@ STRIPE_KEY = ""
 STRIPE_PRODUCT_ID = ""
 
 
-# JWT
-SECRET_KEY = "Secret@123"
+# JWT. No built-in default: an unset key is refused on deployed hosts (see the
+# check after the load_env import below), so a checkout that forgot its
+# load_env.py can never sign tokens with a publicly known secret.
+SECRET_KEY = os.getenv("SECRET_KEY", "")
 ALGORITHM = "HS256"
 JWT_ACCESS_TOKEN_MINUTES = os.getenv("JWT_ACCESS_TOKEN_MINUTES", "15")
 JWT_REFRESH_TOKEN_DAYS = os.getenv("JWT_REFRESH_TOKEN_DAYS", "30")
@@ -109,6 +111,23 @@ if ENV_TYPE in ("Dev", "Production") and not (MQTT_USER and MQTT_PASSWORD):
     logger.error(
         "MQTT_USER/MQTT_PASSWORD are not configured; Stage.mqtt will return null "
         "and no browser will be able to connect to the broker. Set them in load_env.py."
+    )
+
+if not SECRET_KEY:
+    if ENV_TYPE in ("Dev", "Production"):
+        raise RuntimeError(
+            "SECRET_KEY is not configured. Set it in load_env.py (deployed hosts) or the "
+            "SECRET_KEY environment variable; refusing to start with no JWT signing key."
+        )
+    # CI / local checkouts: a random per-process key keeps tests self-contained
+    # without ever falling back to a known value.
+    import secrets as _secrets
+
+    SECRET_KEY = _secrets.token_urlsafe(48)
+    logger.warning(
+        "SECRET_KEY is not configured; using a random per-process key (ENV_TYPE={}). "
+        "Issued tokens will not survive a restart.",
+        ENV_TYPE,
     )
 
 if DATABASE_CONNECT:

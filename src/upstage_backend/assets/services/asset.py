@@ -1,15 +1,14 @@
-# -*- coding: iso8859-15 -*-
 import asyncio
 import os
 
 from datetime import datetime, timedelta
 import hashlib
 import json
-from operator import or_
 import re
 from typing import Optional
 import time
 from graphql import GraphQLError
+from sqlalchemy import or_
 
 
 from upstage_backend.global_config import get_session
@@ -18,7 +17,14 @@ from upstage_backend.global_config.env import (
     STREAM_EXPIRY_DAYS,
     STREAM_KEY,
 )
+from upstage_backend.global_config.helpers.authz import is_admin, require_owner_or_admin
+from upstage_backend.global_config.helpers.background import spawn
 from upstage_backend.global_config.helpers.object import convert_keys_to_camel_case
+from upstage_backend.global_config.helpers.paths import (
+    is_safe_relative_path,
+    safe_join,
+    try_safe_join,
+)
 from upstage_backend.assets.db_models.asset import (
     AssetModel,
     AvatarVoice,
@@ -56,6 +62,10 @@ storagePath = UPLOAD_USER_CONTENT_FOLDER
 # query, credentials or a non-http scheme.
 _RTMP_ENDPOINT_RE = re.compile(r"^https?://[A-Za-z0-9.-]+(:[0-9]{1,5})?$")
 
+# A media type doubles as the upload sub-folder (AssetTypeModel.file_location),
+# so it must be a single plain path component: no separators, dots or blanks.
+_MEDIA_TYPE_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_-]{0,31}$")
+
 
 def normalise_rtmp_endpoint(value: str) -> str:
     candidate = (value or "").strip().rstrip("/")
@@ -69,7 +79,8 @@ class AssetService:
         self.file_handing = FileHandling()
         pass
 
-    def get_all_medias(self, user: UserModel, filter: dict = None):
+    def get_all_medias(self, user: UserModel, filter: dict | None = None):
+        filter = filter or {}
         session = get_session()
         query = (
             session.query(AssetModel)
@@ -246,10 +257,16 @@ class AssetService:
 
         if input.id:
             asset = session.query(AssetModel).filter(AssetModel.id == input.id).first()
-            if owner.role not in [SUPER_ADMIN, ADMIN] and asset.owner_id != owner.id:
-                raise GraphQLError("You are not allowed to update this asset")
+            if not asset:
+                raise GraphQLError("Media not found")
+            require_owner_or_admin(owner, asset.owner_id, "You are not allowed to update this asset")
         else:
             asset = AssetModel(owner_id=owner.id)
+        # Stage links are rebuilt from input.stageAssignments below; reject the
+        # request before any write if it names a stage the caller cannot use.
+        self.assert_can_assign_to_stages(
+            owner, [assignment.stageId for assignment in input.stageAssignments or []], session
+        )
 
         # Validate + assign file_location BEFORE mutating the asset or adding
         # it to the session. GraphQL errors return HTTP 200, so anything left
@@ -377,11 +394,15 @@ class AssetService:
 
                 asset.size = 0
                 for url in urls:
+                    # Frame locations are user input and are later joined onto
+                    # the uploads root for reads and deletes: confine them now.
+                    if not is_safe_relative_path(url):
+                        raise GraphQLError("Invalid file location")
                     attributes["frames"].append(url)
-                    full_path = os.path.join(storagePath, url)
+                    full_path = safe_join(storagePath, url)
                     try:
                         size = os.path.getsize(full_path)
-                    except Exception:
+                    except OSError:
                         size = 0  # file not exist
                     asset.size += size
 
@@ -446,6 +467,25 @@ class AssetService:
             ],
         )
 
+    def assert_can_assign_to_stages(self, user, stage_ids, local_db_session) -> None:
+        """
+        A media owner may attach media to a stage they own, edit, or have
+        been granted player access to (playerAccess lists); admins anywhere.
+        Previously any authenticated user could link media to any stage.
+        """
+        wanted = {int(stage_id) for stage_id in (stage_ids or []) if stage_id is not None}
+        if not wanted or is_admin(user):
+            return
+        from upstage_backend.stages.services.stage_operation import StageOperationService
+
+        resolve_permission = StageOperationService().resolve_permission
+        stages = local_db_session.query(StageModel).filter(StageModel.id.in_(wanted)).all()
+        for stage in stages:
+            if resolve_permission(user.id, stage) not in ("owner", "editor", "player"):
+                raise GraphQLError(
+                    f'You do not have access to stage "{stage.name}" and cannot assign media to it'
+                )
+
     def change_owner(self, owner: str, local_db_session, asset: AssetModel):
         if owner:
             new_owner = (
@@ -474,8 +514,14 @@ class AssetService:
                 raise GraphQLError("A media file is required")
             return asset.file_location
         file_location = urls[0]
+        if not isinstance(file_location, str):
+            raise GraphQLError("Invalid file location")
         if "?" in file_location:
             file_location = file_location[: file_location.index("?")]
+        # The value is joined onto the uploads root for every later read,
+        # write and delete of this asset: refuse anything that could escape it.
+        if not is_safe_relative_path(file_location):
+            raise GraphQLError("Invalid file location")
         if file_location != asset.file_location and "/" not in file_location:
             existed_asset = (
                 local_db_session.query(AssetModel)
@@ -493,6 +539,8 @@ class AssetService:
 
     def validate_asset_type(self, input, local_db_session):
         media_type = input.mediaType
+        if not isinstance(media_type, str) or not _MEDIA_TYPE_RE.match(media_type):
+            raise GraphQLError("Unsupported media type")
         asset_type = (
             local_db_session.query(AssetTypeModel).filter(AssetTypeModel.name == media_type).first()
         )
@@ -545,12 +593,15 @@ class AssetService:
 
             if not asset:
                 raise GraphQLError("Media not found")
+            require_owner_or_admin(
+                owner, asset.owner_id, "Only media owner or admin can update this media!"
+            )
 
             asset.dormant = input.status.value == MediaStatusEnum.DORMANT.value
             session.flush()
 
             if input.status.value == MediaStatusEnum.ACTIVE.value:
-                asyncio.create_task(
+                spawn(
                     send(
                         [asset.owner.email],
                         "Your dormant media item has been reactivated",
@@ -580,9 +631,9 @@ class AssetService:
                         .first()
                     )
                     if not frame_asset:
-                        self.file_handing.delete_file(os.path.join(storagePath, frame))
+                        self.file_handing.delete_file(try_safe_join(storagePath, frame))
 
-        physical_path = os.path.join(storagePath, asset.file_location)
+        physical_path = try_safe_join(storagePath, asset.file_location or "")
         local_db_session.query(ParentStageModel).filter(
             ParentStageModel.child_asset_id == asset.id
         ).delete(synchronize_session=False)

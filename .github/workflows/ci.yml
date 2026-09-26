@@ -76,9 +76,13 @@ jobs:
 
     env:
       # Pointed at the `services:` Postgres above; matches what the
-      # autouse `db_engine` fixture in `/conftest.py` imports.
-      DATABASE_URL: postgresql+psycopg2://postgres:postgres@localhost:5432/upstage
+      # autouse `db_engine` fixture in `/conftest.py` imports. Driver-less
+      # URL on purpose: event_archive derives its asyncpg URL from it.
+      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/upstage
       DATABASE_NAME: upstage
+      # The src-tree suites refuse to run against a DB unless told it is
+      # disposable (conftest.py::_guard_against_real_db).
+      UPSTAGE_TESTS_ALLOW_REAL_DB: "1"
       ALGORITHM: HS256
       SECRET_KEY: ci-secret
       REFRESH_SECRET_KEY: ci-refresh-secret
@@ -105,6 +109,9 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           pip install -e .[dev]
+
+      - name: Apply database migrations
+        run: alembic -c alembic.ini upgrade head
 
       - name: Run full pytest
         run: pytest

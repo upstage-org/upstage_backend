@@ -1,5 +1,7 @@
 # -*- coding: iso8859-15 -*-
 
+import uuid
+
 import pytest
 
 from upstage_backend.authentication.tests.auth_test import TestAuthenticationController as _TestAuthenticationController
@@ -22,7 +24,9 @@ class TestStageController:
 
         variables = {
             "input": {
-                "fileLocation": "path/to/file",
+                # Unique per call: the slug is validated (letters/digits/-/_)
+                # and must be unique, and this fixture is created many times.
+                "fileLocation": f"path-to-file-{uuid.uuid4().hex[:8]}",
                 "status": "active",
                 "visibility": True,
                 "cover": "http://example.com/cover.jpg",
@@ -65,7 +69,6 @@ class TestStageController:
         variables = {
             "input": {
                 "id": id,
-                "fileLocation": "path/to/file",
                 "status": "active",
                 "visibility": True,
                 "cover": "http://example.com/cover.jpg",
@@ -102,11 +105,11 @@ class TestStageController:
         # Only ever touch the fixture stage test_01 created. An unfiltered
         # .first() picks whatever stage sorts first in the configured database
         # and overwrites it with these placeholder values - on dev that was the
-        # Demo Stage (renamed to "Stage Name" / "path/to/file", 2026-09-10).
+        # Demo Stage (renamed to "Stage Name" / "path/to/file", 2026-09-10; slugs are now path-to-file-<hex>).
         stage = (
             get_session()
             .query(StageModel)
-            .filter(StageModel.name == "Stage Name", StageModel.file_location == "path/to/file")
+            .filter(StageModel.name == "Stage Name", StageModel.file_location.like("path-to-file%"))
             .order_by(StageModel.id.desc())
             .first()
         )

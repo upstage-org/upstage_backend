@@ -88,7 +88,15 @@ def on_message(client: mqtt.Client, userdata, msg: mqtt.MQTTMessage):
 
     if not msg.retain:
         client_id = client._client_id.decode("utf-8")
-        payload = json.loads(msg.payload)
+        # Anyone holding the shared broker login can publish here; a
+        # malformed body must not take the stats worker down.
+        try:
+            payload = json.loads(msg.payload)
+        except (ValueError, TypeError):
+            logger.warning("upstage_stats: ignoring non-JSON payload on {}", msg.topic)
+            return
+        if not isinstance(payload, dict):
+            return
         if client_id not in client_messages:
             client_messages[client_id] = 0
         if "connected" in payload:

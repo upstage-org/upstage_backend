@@ -39,3 +39,32 @@ class UserModel(BaseModel):
     intro = Column(Text, default=None)
     can_send_email = Column(Boolean, default=False)
     last_login = Column(TIMESTAMP(timezone=True), default=None)
+
+    # Fields that any authenticated user may see about another user (player
+    # pickers in Media permissions / Stage filters). Everything else (email,
+    # intro, upload limit, ...) is admin-only.
+    PUBLIC_FIELDS = (
+        "id",
+        "username",
+        "display_name",
+        "first_name",
+        "last_name",
+        "role",
+        "active",
+        "created_on",
+    )
+
+    def to_dict(self, visited=None):
+        """
+        Never serialise the password hash. `BaseModel.to_dict` walks every
+        column, and User dicts end up in GraphQL responses through
+        `Stage.owner`, `Asset.owner`, `adminPlayers`, `users` and `whoami`.
+        """
+        data = super().to_dict(visited)
+        if data is not None:
+            data.pop("password", None)
+        return data
+
+    def to_public_dict(self):
+        data = self.to_dict() or {}
+        return {key: data.get(key) for key in self.PUBLIC_FIELDS}
