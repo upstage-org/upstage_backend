@@ -106,6 +106,10 @@ jobs:
       MQTT_TRANSPORT: tcp
       PERFORMANCE_TOPIC_RULE: "+/+/+"
       STRICT_DB_CONTEXT: "0"
+      # The default (/usr/app/uploads) is the container's bind mount. The
+      # runner is not root and cannot create /usr/app, so every test that
+      # uploads a file failed with "Permission denied: '/usr/app'".
+      UPLOAD_USER_CONTENT_FOLDER: /tmp/upstage-ci-uploads
 
     steps:
       - uses: actions/checkout@v7
