@@ -26,10 +26,10 @@ class AssetModel(BaseModel):
     __tablename__ = "asset"
     id = Column(BigInteger().with_variant(Integer, "sqlite"), primary_key=True)
     name = Column(String, nullable=False)
-    asset_type_id = Column(Integer, ForeignKey("asset_type.id"), nullable=False, default=0)
-    owner_id = Column(Integer, ForeignKey("upstage_user.id"), nullable=False, default=0)
+    asset_type_id = Column(Integer, ForeignKey("asset_type.id"), nullable=False, default=0, index=True)
+    owner_id = Column(Integer, ForeignKey("upstage_user.id"), nullable=False, default=0, index=True)
     description = Column(Text, nullable=True)
-    file_location = Column(Text, nullable=False)
+    file_location = Column(Text, nullable=False, index=True)
     created_on = Column(TIMESTAMP(timezone=True), default=datetime.now)
     updated_on = Column(TIMESTAMP(timezone=True), default=datetime.now)
     size = Column(BigInteger, nullable=False, default=0)

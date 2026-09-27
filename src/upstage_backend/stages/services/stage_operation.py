@@ -60,7 +60,16 @@ class StageOperationService:
             .all()
         )
 
-    def resolve_permission(self, user_id: int, stage: StageModel | None):
+    # Sentinel: "caller did not pre-fetch the playerAccess attribute".
+    _UNSET = object()
+
+    def resolve_permission(self, user_id: int, stage: StageModel | None, player_access=_UNSET):
+        """
+        `player_access` may carry the stage's playerAccess attribute value
+        (the JSON string, or None when the row does not exist) when the
+        caller already loaded the attributes in bulk (StageService list
+        paths); otherwise it is read here, one query per stage.
+        """
         if stage is None:
             return "audience"
         if not user_id:
@@ -70,13 +79,13 @@ class StageOperationService:
 
         user_id = str(user_id)
 
-        player_access = stage.attributes.filter(
-            StageAttributeModel.name == "playerAccess"
-        ).first()
+        if player_access is self._UNSET:
+            row = stage.attributes.filter(StageAttributeModel.name == "playerAccess").first()
+            player_access = row.description if row else None
 
-        if player_access:
+        if player_access is not None:
             try:
-                accesses = json.loads(player_access.description)
+                accesses = json.loads(player_access)
             except (json.JSONDecodeError, TypeError):
                 return "audience"
             if isinstance(accesses, list) and len(accesses) == 2:

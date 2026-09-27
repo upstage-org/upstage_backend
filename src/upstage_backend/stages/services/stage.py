@@ -4,6 +4,7 @@ from graphql import GraphQLError
 import jwt
 from starlette.requests import Request
 from sqlalchemy import and_, nulls_last, exists, or_, update
+from sqlalchemy.orm import joinedload, selectinload
 from upstage_backend.global_config import get_session
 from upstage_backend.global_config.env import ALGORITHM, SECRET_KEY
 from upstage_backend.global_config.helpers.bearer import parse_bearer_token
@@ -50,6 +51,65 @@ class StageService:
         )
         return {row.stage_url: {"players": row.players, "audiences": row.audiences} for row in rows}
 
+    # The four stage_attribute rows the list responses expose (StageModel's
+    # cover / visibility / status / playerAccess hybrids read the same rows,
+    # one query each, per stage).
+    _LIST_ATTRIBUTES = ("cover", "visibility", "status", "playerAccess")
+
+    def _stage_attribute_map(self, session, stage_ids):
+        """{stage_id: {name: description}} for the list attributes, one query.
+        Lowest row id wins when a name is duplicated (the hybrids' `.first()`
+        made no such promise)."""
+        if not stage_ids:
+            return {}
+        rows = (
+            session.query(StageAttributeModel)
+            .filter(
+                StageAttributeModel.stage_id.in_(stage_ids),
+                StageAttributeModel.name.in_(self._LIST_ATTRIBUTES),
+            )
+            .order_by(StageAttributeModel.id)
+            .all()
+        )
+        out = {}
+        for row in rows:
+            out.setdefault(row.stage_id, {}).setdefault(row.name, row.description)
+        return out
+
+    @staticmethod
+    def _attribute_fields(attrs):
+        """The same values StageModel.cover/visibility/status/playerAccess
+        produce, from one stage's pre-fetched attribute map."""
+        return {
+            "cover": attrs.get("cover"),
+            "visibility": attrs.get("visibility") == "true",
+            "status": attrs.get("status"),
+            "playerAccess": attrs.get("playerAccess"),
+        }
+
+    def _stage_assets_map(self, session, stage_ids):
+        """{stage_id: [ParentStageModel, ...]} in assignment order, with each
+        child asset and the relationships its to_dict() walks (type, owner,
+        license) loaded in the same round-trip. Iterating `stage.assets`
+        (dynamic) and lazy-loading per asset cost 1 + 4 queries per asset."""
+        if not stage_ids:
+            return {}
+        rows = (
+            session.query(ParentStageModel)
+            .filter(ParentStageModel.stage_id.in_(stage_ids))
+            .options(
+                joinedload(ParentStageModel.child_asset).joinedload(AssetModel.asset_type),
+                joinedload(ParentStageModel.child_asset).joinedload(AssetModel.owner),
+                joinedload(ParentStageModel.child_asset).joinedload(AssetModel.asset_license),
+            )
+            .order_by(ParentStageModel.id)
+            .all()
+        )
+        out = {}
+        for row in rows:
+            out.setdefault(row.stage_id, []).append(row)
+        return out
+
     def get_all_stages(self, user: UserModel, input: SearchStageInput):
         session = get_session()
         query = (
@@ -58,6 +118,8 @@ class StageService:
             .outerjoin(ParentStageModel)
             .outerjoin(AssetModel)
             .group_by(StageModel.id)
+            # to_dict() walks `owner`; load it for the whole page at once.
+            .options(selectinload(StageModel.owner))
         )
 
         if input.name:
@@ -106,6 +168,7 @@ class StageService:
             query = query.order_by(StageModel.name.asc())
 
         data = query.all()
+        attribute_map = self._stage_attribute_map(session, [stage.id for stage in data])
 
         access = (
             input.access if input.access and len(input.access) else ["owner", "editor", "player"]
@@ -113,16 +176,16 @@ class StageService:
 
         stages = []
         for stage in data:
-            permission = self.stage_operation_service.resolve_permission(user.id, stage)
+            attrs = attribute_map.get(stage.id, {})
+            permission = self.stage_operation_service.resolve_permission(
+                user.id, stage, player_access=attrs.get("playerAccess")
+            )
             if permission in access:
                 stages.append(
                     convert_keys_to_camel_case(
                         {
                             **stage.to_dict(),
-                            "cover": stage.cover,
-                            "visibility": stage.visibility,
-                            "status": stage.status,
-                            "playerAccess": stage.playerAccess,
+                            **self._attribute_fields(attrs),
                             "permission": permission,
                         }
                     )
@@ -143,6 +206,7 @@ class StageService:
         stats_map = self._stage_stats_map(
             session, [stage.get("fileLocation") for stage in paginated_stages]
         )
+        assets_map = self._stage_assets_map(session, [stage["id"] for stage in paginated_stages])
 
         return {
             "edges": [
@@ -150,7 +214,7 @@ class StageService:
                     **stage,
                     "assets": [
                         convert_keys_to_camel_case(self._asset_with_exit_settings(asset))
-                        for asset in stage["assets"]
+                        for asset in assets_map.get(stage["id"], [])
                     ],
                     "players": stats_map.get(stage.get("fileLocation"), {}).get("players", 0),
                     "audiences": stats_map.get(stage.get("fileLocation"), {}).get("audiences", 0),
@@ -194,6 +258,7 @@ class StageService:
             .outerjoin(ParentStageModel)
             .outerjoin(AssetModel)
             .group_by(StageModel.id)
+            .options(selectinload(StageModel.owner))
         )
 
         if input.fileLocation:
@@ -201,20 +266,25 @@ class StageService:
 
         query = query.order_by(StageModel.id)
         stages = query.all()
+        stage_ids = [stage.id for stage in stages]
+        attribute_map = self._stage_attribute_map(session, stage_ids)
+        assets_map = self._stage_assets_map(session, stage_ids)
 
         return [
             convert_keys_to_camel_case(
                 {
                     **stage.to_dict(),
-                    "assets": [self._asset_with_exit_settings(asset) for asset in stage.assets],
+                    "assets": [
+                        self._asset_with_exit_settings(asset)
+                        for asset in assets_map.get(stage.id, [])
+                    ],
                     "scenes": self.stage_operation_service.get_scene_list(input, stage.id),
                     "events": self.stage_operation_service.get_event_list(input, stage),
-                    "cover": stage.cover,
-                    "visibility": stage.visibility,
-                    "status": stage.status,
-                    "playerAccess": stage.playerAccess,
+                    **self._attribute_fields(attribute_map.get(stage.id, {})),
                     "permission": self.stage_operation_service.resolve_permission(
-                        current_user_id, stage
+                        current_user_id,
+                        stage,
+                        player_access=attribute_map.get(stage.id, {}).get("playerAccess"),
                     ),
                     "performances": [
                         convert_keys_to_camel_case(pf.to_dict())

@@ -8,7 +8,7 @@ class PerformanceConfigModel(BaseModel):
     __tablename__ = "performance_config"
     id = Column(BigInteger().with_variant(Integer, "sqlite"), primary_key=True)
     name = Column(String, nullable=False)
-    owner_id = Column(Integer, ForeignKey("upstage_user.id"), nullable=False, default=0)
+    owner_id = Column(Integer, ForeignKey("upstage_user.id"), nullable=False, default=0, index=True)
     description = Column(Text, nullable=False)
     splash_screen_text = Column(Text, nullable=True, default=None)
     splash_screen_animation_urls = Column(Text, nullable=True, default=None)

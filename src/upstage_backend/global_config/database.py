@@ -1,7 +1,7 @@
 from upstage_backend.global_config.logger import logger
 
 from sqlalchemy import create_engine
-from sqlalchemy.pool import NullPool
+from sqlalchemy.pool import NullPool, QueuePool
 
 from upstage_backend.global_config.env import DATABASE_URL
 
@@ -22,24 +22,38 @@ from upstage_backend.global_config.env import DATABASE_URL
 # instead of freezing prod; idle_in_transaction_session_timeout reaps any
 # transaction a yielded request leaves open (see 2026-09-19 outage).
 #
-# Pooling: still NullPool, deliberately. A QueuePool(5 + 10 overflow,
-# pre_ping) was tried on 2026-09-27 and the src-tree integration suite
-# exhausted it ("QueuePool limit of size 5 overflow 10 reached"): some code
-# path checks connections out without returning them, which NullPool hides
-# by simply opening another socket. Find and fix that leak (likely a Session
-# created outside request_session()/ScopedSession and never closed) before
-# switching pools; until then a pool would turn the leak into stalled
-# requests. `query_cache_size=0` is kept for the same reason: no behaviour
-# change until the pooling work is done.
+# Pooling: a small QueuePool instead of NullPool. NullPool opened a fresh
+# Postgres connection (TLS + auth + the `options` round-trip) for every
+# request, every email and every stats message. `pool_pre_ping` swaps a
+# connection the server dropped (idle timeout, restart) for a fresh one
+# instead of failing the request; `pool_recycle` retires connections before
+# typical server-side idle limits. Returned connections are rolled back by
+# SQLAlchemy, so the timeouts above still see a clean transaction.
+#
+# History: a first attempt (2026-09-27) timed out in the integration suite —
+# not an app leak but the tests' own `get_session()` calls hitting
+# db_context's non-strict fallback (a Session per test, never closed; see
+# conftest.py `_test_body_session`) plus the GraphQL WebSocket fallback
+# session (route removed). With both gone the suite holds ≤2 connections.
 _PG_CONNECT_ARGS = {
     "options": "-c lock_timeout=5000 -c idle_in_transaction_session_timeout=120000"
 }
 _is_postgres = DATABASE_URL.startswith("postgresql")
 engine = create_engine(
     DATABASE_URL,
-    poolclass=NullPool,
-    query_cache_size=0,
-    **(dict(connect_args=_PG_CONNECT_ARGS) if _is_postgres else {}),
+    **(
+        dict(
+            poolclass=QueuePool,
+            pool_size=5,
+            max_overflow=10,
+            pool_timeout=10,
+            pool_pre_ping=True,
+            pool_recycle=1800,
+            connect_args=_PG_CONNECT_ARGS,
+        )
+        if _is_postgres
+        else dict(poolclass=NullPool)
+    ),
 )
 
 

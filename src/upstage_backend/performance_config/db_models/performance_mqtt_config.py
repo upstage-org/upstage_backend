@@ -23,7 +23,7 @@ class PerformanceMQTTConfigModel(BaseModel):
     password = Column(Text, nullable=False)
     created_on = Column(DateTime, nullable=False, default=datetime.now)
     expires_on = Column(DateTime, nullable=False, default=None)
-    performance_id = Column(Integer, ForeignKey("performance_config.id"), nullable=False, default=0)
+    performance_id = Column(Integer, ForeignKey("performance_config.id"), nullable=False, default=0, index=True)
     owner_id = Column(Integer, ForeignKey("upstage_user.id"), nullable=False, default=0)
 
     owner = relationship("UserModel", foreign_keys=[owner_id])

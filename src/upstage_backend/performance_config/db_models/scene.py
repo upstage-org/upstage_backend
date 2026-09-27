@@ -17,6 +17,6 @@ class SceneModel(BaseModel):
     created_on = Column(DateTime, nullable=False, default=datetime.now)
     active = Column(Boolean, nullable=False, default=True)
     owner_id = Column(Integer, ForeignKey(UserModel.id), nullable=False, default=0)
-    stage_id = Column(Integer, ForeignKey(StageModel.id), nullable=False, default=0)
+    stage_id = Column(Integer, ForeignKey(StageModel.id), nullable=False, default=0, index=True)
     owner = relationship("UserModel", foreign_keys=[owner_id])
     stage = relationship("StageModel", foreign_keys=[stage_id])

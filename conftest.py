@@ -227,6 +227,45 @@ def anyio_backend():
     return "asyncio"
 
 
+@pytest.fixture(autouse=True)
+def _test_body_session():
+    """
+    One managed Session for the test body's own `get_session()` calls.
+
+    The src-tree suites read and write rows directly (outside any HTTP
+    request). Before this fixture, each such call hit db_context's
+    non-strict fallback, which opens a Session, binds it to the test's
+    context and never closes it — one leaked Postgres connection per test
+    (39 in a full run; what made a QueuePool time out on 2026-09-27).
+    Requests made through the TestClient still get their own session from
+    the middleware; this one only serves the test code itself.
+
+    Tests that bind their own session first (tests/unit `rebound_db`) are
+    left alone.
+    """
+    from upstage_backend.global_config.db_context import (
+        SessionFactory,
+        current_session_or_none,
+        reset_session,
+        set_session,
+    )
+
+    if current_session_or_none() is not None:
+        yield
+        return
+    session = SessionFactory()
+    token = set_session(session)
+    try:
+        yield
+    finally:
+        for step in (session.rollback, session.close):
+            try:
+                step()
+            except Exception:
+                pass
+        reset_session(token)
+
+
 @pytest.fixture(scope="session", autouse=True)
 def client(request):
     _guard_against_real_db(request)

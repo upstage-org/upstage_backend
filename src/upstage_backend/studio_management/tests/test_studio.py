@@ -217,7 +217,16 @@ class TestStudioController:
         assert response.status_code in (200, 400)  # GraphQL error -> HTTP 400 (older builds: 200)
         assert "errors" in response.json()
 
-        user_2 = get_session().query(UserModel).all()[-1]
+        # A DIFFERENT existing user whose email must be refused as a duplicate.
+        # `.all()[-1]` had no ORDER BY and could hand back `user` itself, whose
+        # own (just updated) email is of course accepted → flaky failure.
+        user_2 = (
+            get_session()
+            .query(UserModel)
+            .filter(UserModel.id != user.id)
+            .order_by(UserModel.id.desc())
+            .first()
+        )
 
         variables = {
             "input": {

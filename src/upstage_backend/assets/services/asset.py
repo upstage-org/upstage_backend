@@ -9,6 +9,7 @@ from typing import Optional
 import time
 from graphql import GraphQLError
 from sqlalchemy import or_
+from sqlalchemy.orm import joinedload, selectinload
 
 
 from upstage_backend.global_config import get_session
@@ -79,6 +80,52 @@ class AssetService:
         self.file_handing = FileHandling()
         pass
 
+    # Relationships AssetModel.to_dict() walks for every listed asset; one
+    # SELECT ... IN each for the whole result instead of three lazy loads per row.
+    _ASSET_EAGER = (
+        selectinload(AssetModel.asset_type),
+        selectinload(AssetModel.owner),
+        selectinload(AssetModel.asset_license),
+    )
+
+    def _prefetch_asset_relations(self, session, assets):
+        """
+        Bulk-load, for a list of assets, everything resolve_fields() and the
+        media table edges read per asset: stage assignments (with the stage
+        and its owner), usage/permission rows (with their user) and tag
+        names. Three queries for the page instead of ~5 per asset.
+        """
+        ids = [asset.id for asset in assets]
+        stages, usages, tags = {}, {}, {}
+        if not ids:
+            return {"stages": stages, "usages": usages, "tags": tags}
+        for row in (
+            session.query(ParentStageModel)
+            .filter(ParentStageModel.child_asset_id.in_(ids))
+            .options(joinedload(ParentStageModel.stage).joinedload(StageModel.owner))
+            .order_by(ParentStageModel.id)
+            .all()
+        ):
+            stages.setdefault(row.child_asset_id, []).append(row)
+        for row in (
+            session.query(AssetUsageModel)
+            .filter(AssetUsageModel.asset_id.in_(ids))
+            .options(joinedload(AssetUsageModel.user), joinedload(AssetUsageModel.asset))
+            .order_by(AssetUsageModel.created_on.desc())
+            .all()
+        ):
+            usages.setdefault(row.asset_id, []).append(row)
+        for asset_id, name in (
+            session.query(MediaTagModel.asset_id, TagModel.name)
+            .join(TagModel, MediaTagModel.tag_id == TagModel.id)
+            .filter(MediaTagModel.asset_id.in_(ids))
+            .order_by(MediaTagModel.id)
+            .all()
+        ):
+            if name:
+                tags.setdefault(asset_id, []).append(name)
+        return {"stages": stages, "usages": usages, "tags": tags}
+
     def get_all_medias(self, user: UserModel, filter: dict | None = None):
         filter = filter or {}
         session = get_session()
@@ -88,9 +135,12 @@ class AssetService:
             .join(UserModel)
             .outerjoin(AssetLicenseModel)
             .outerjoin(ParentStageModel, AssetModel.id == ParentStageModel.child_asset_id)
-            .outerjoin(StageModel, ParentStageModel.stage_id == AssetModel.id)
+            # Was `ParentStageModel.stage_id == AssetModel.id`: a stage joined
+            # to an unrelated asset whenever the ids happened to coincide.
+            .outerjoin(StageModel, ParentStageModel.stage_id == StageModel.id)
             .filter(AssetModel.dormant.is_not(True))
             .order_by(AssetModel.created_on.desc())
+            .options(*self._ASSET_EAGER)
         )
 
         if "mediaType" in filter:
@@ -100,8 +150,9 @@ class AssetService:
             query = query.filter(UserModel.username == filter["owner"])
 
         assets = query.all()
+        prefetched = self._prefetch_asset_relations(session, assets)
 
-        return [self.resolve_fields(asset, user) for asset in assets]
+        return [self.resolve_fields(asset, user, prefetched) for asset in assets]
 
     def search_assets(self, user: UserModel, search_assets: MediaTableInput):
         session = get_session()
@@ -113,6 +164,7 @@ class AssetService:
             .outerjoin(ParentStageModel, AssetModel.id == ParentStageModel.child_asset_id)
             .outerjoin(StageModel, ParentStageModel.stage_id == StageModel.id)
             .group_by(AssetModel.id)
+            .options(*self._ASSET_EAGER)
         )
 
         if user.role not in [SUPER_ADMIN, ADMIN]:
@@ -190,21 +242,25 @@ class AssetService:
                 (search_assets.page - 1) * search_assets.limit
             )
         assets = query.all()
+        prefetched = self._prefetch_asset_relations(session, assets)
 
         return {
             "totalCount": total_count,
             "edges": [
                 {
                     **convert_keys_to_camel_case(asset.to_dict()),
-                    "privilege": self.resolve_privilege(user.id, asset),
+                    "privilege": self.resolve_privilege(
+                        user.id, asset, usages=prefetched["usages"].get(asset.id, [])
+                    ),
                     "stages": [
-                        convert_keys_to_camel_case(item.stage.to_dict()) for item in asset.stages
+                        convert_keys_to_camel_case(item.stage.to_dict())
+                        for item in prefetched["stages"].get(asset.id, [])
                     ],
                     "permissions": [
                         convert_keys_to_camel_case(permission.to_dict())
-                        for permission in self.resolve_permissions(asset.id)
+                        for permission in prefetched["usages"].get(asset.id, [])
                     ],
-                    "tags": self._tag_names_for_asset(asset),
+                    "tags": prefetched["tags"].get(asset.id, []),
                 }
                 for asset in assets
             ],
@@ -708,32 +764,44 @@ class AssetService:
                 names.append(tag.name)
         return names
 
-    def resolve_fields(self, asset: AssetModel, user: Optional[UserModel] = None):
+    def resolve_fields(self, asset: AssetModel, user: Optional[UserModel] = None, prefetched=None):
+        """
+        `prefetched` (from _prefetch_asset_relations) supplies the stage
+        assignments, usage rows and tag names for list responses; single-asset
+        callers leave it None and the relationships are read per asset.
+        """
         src = self.resolve_src(asset)
         # Publish token: only meaningful (and only revealed) to the asset's
         # owner. resolve_sign returns "" for anyone else.
         sign = self.resolve_sign(user, asset) if user else ""
         user_id = user.id if user else asset.owner_id
         permission = self.resolve_permission(user_id, asset)
+        if prefetched is not None:
+            stage_links = prefetched["stages"].get(asset.id, [])
+            usages = prefetched["usages"].get(asset.id, [])
+            tags = prefetched["tags"].get(asset.id, [])
+        else:
+            stage_links = asset.stages
+            usages = self.resolve_permissions(asset.id)
+            tags = self._tag_names_for_asset(asset)
         return {
             **convert_keys_to_camel_case(asset.to_dict()),
             "src": src,
             "sign": sign,
             "permission": permission,
-            "privilege": self.resolve_privilege(user.id if user else None, asset),
+            "privilege": self.resolve_privilege(
+                user.id if user else None, asset, usages=usages if prefetched is not None else None
+            ),
             "stages": [
                 {
                     **convert_keys_to_camel_case(item.stage.to_dict()),
                     "exitAnimation": item.exit_animation,
                     "exitSpeed": item.exit_speed,
                 }
-                for item in asset.stages
+                for item in stage_links
             ],
-            "permissions": [
-                convert_keys_to_camel_case(permission.to_dict())
-                for permission in self.resolve_permissions(asset.id)
-            ],
-            "tags": self._tag_names_for_asset(asset),
+            "permissions": [convert_keys_to_camel_case(usage.to_dict()) for usage in usages],
+            "tags": tags,
         }
 
     def get_media_types(self):
@@ -777,7 +845,9 @@ class AssetService:
                         voices.append(Voice(avatar=media, voice=av))
         return [convert_keys_to_camel_case(voice) for voice in voices]
 
-    def resolve_privilege(self, user_id: int, asset: AssetModel):
+    def resolve_privilege(self, user_id: int, asset: AssetModel, usages=None):
+        """`usages`: this asset's AssetUsageModel rows when the caller already
+        loaded them in bulk; otherwise the caller's row is looked up here."""
         if not user_id:
             return Previlege.NONE.value
         if asset.owner_id == user_id:
@@ -786,13 +856,16 @@ class AssetService:
             return Previlege.APPROVED.value
         if asset.copyright_level == 3:
             return Previlege.NONE.value
-        session = get_session()
-        usage = (
-            session.query(AssetUsageModel)
-            .filter(AssetUsageModel.asset_id == asset.id)
-            .filter(AssetUsageModel.user_id == user_id)
-            .first()
-        )
+        if usages is not None:
+            usage = next((u for u in usages if u.user_id == user_id), None)
+        else:
+            session = get_session()
+            usage = (
+                session.query(AssetUsageModel)
+                .filter(AssetUsageModel.asset_id == asset.id)
+                .filter(AssetUsageModel.user_id == user_id)
+                .first()
+            )
         if usage:
             if not usage.approved and asset.copyright_level == 2:
                 return Previlege.PENDING_APPROVAL.value

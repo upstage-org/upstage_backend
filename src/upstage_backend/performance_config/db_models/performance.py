@@ -18,7 +18,7 @@ class PerformanceModel(BaseModel):
     id = Column(BigInteger().with_variant(Integer, "sqlite"), primary_key=True)
     name = Column(String, nullable=True)
     description = Column(Text, nullable=True)
-    stage_id = Column(Integer, ForeignKey("stage.id"), nullable=False, default=0)
+    stage_id = Column(Integer, ForeignKey("stage.id"), nullable=False, default=0, index=True)
     created_on = Column(DateTime, nullable=False, default=datetime.now)
     saved_on = Column(DateTime, nullable=True)
     recording = Column(Boolean, nullable=False, default=False)

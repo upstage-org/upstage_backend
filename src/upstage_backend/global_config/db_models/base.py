@@ -1,10 +1,16 @@
 from datetime import datetime
-from sqlalchemy.ext.declarative import declarative_base
-from sqlalchemy.orm import class_mapper, ColumnProperty, RelationshipProperty
-# from global_config import Base
 
-global Base
-Base = declarative_base()
+from sqlalchemy.orm import ColumnProperty, DeclarativeBase, RelationshipProperty, class_mapper
+
+
+class Base(DeclarativeBase):
+    """
+    SQLAlchemy 2.0 declarative base. Replaces the `declarative_base()`
+    call that SQLAlchemy has deprecated since 2.0 (MovedIn20Warning on every
+    import). Models still declare `Column(...)` attributes, which
+    DeclarativeBase accepts unchanged; moving them to `Mapped[]` /
+    `mapped_column()` is a per-module follow-up.
+    """
 
 
 class BaseModel(Base):
