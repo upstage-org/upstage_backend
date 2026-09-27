@@ -149,6 +149,17 @@ class TestRtmpAuth:
         response = client.post("/api/rtmp/auth", json=auth_payload(action="read"))
         assert response.status_code == 204
 
+    async def test_08b_playback_action_allowed_without_token(self, client):
+        response = client.post("/api/rtmp/auth", json=auth_payload(action="playback"))
+        assert response.status_code == 204
+
+    async def test_08c_other_actions_refused(self, client):
+        # api/metrics/pprof are excluded in mediamtx.yml; if that exclusion
+        # ever goes, the backend must not wave them through.
+        for action in ("api", "metrics", "pprof", "", "bogus"):
+            response = client.post("/api/rtmp/auth", json=auth_payload(action=action))
+            assert response.status_code == 401, action
+
     async def test_09_empty_stream_key_fails_closed(self, client, monkeypatch):
         monkeypatch.setattr(rtmp_auth, "STREAM_KEY", "")
         ts = int(time.time()) + 3600
