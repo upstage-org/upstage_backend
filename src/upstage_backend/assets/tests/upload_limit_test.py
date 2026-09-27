@@ -14,11 +14,14 @@ Scenarios (2026-09-05 report):
   * the uploadMedia mutation applies the same cap as uploadFile
 """
 
+from sqlalchemy import update
 import base64
 import os
 
 import pytest
-from upstage_backend.authentication.tests.auth_test import TestAuthenticationController as _TestAuthenticationController
+from upstage_backend.authentication.tests.auth_test import (
+    TestAuthenticationController as _TestAuthenticationController,
+)
 from upstage_backend.global_config import ScopedSession
 from upstage_backend.global_config.env import UPLOAD_USER_CONTENT_FOLDER as storagePath
 from upstage_backend.users.db_models.user import ADMIN, PLAYER, SUPER_ADMIN, UserModel
@@ -116,9 +119,10 @@ class TestUploadLimits:
         me = _whoami(client, headers)
         assert me["uploadLimit"] == MIB, "stored per-user value is untouched (column default)"
         assert me["effectiveUploadLimit"] == SERVER_MAX
-        assert _post(client, headers, CURRENT_USER)["data"]["currentUser"][
-            "effectiveUploadLimit"
-        ] == SERVER_MAX
+        assert (
+            _post(client, headers, CURRENT_USER)["data"]["currentUser"]["effectiveUploadLimit"]
+            == SERVER_MAX
+        )
 
         body = _upload(client, headers, ONE_POINT_TWO_MB)
         assert "errors" not in body, body
@@ -179,8 +183,10 @@ class TestUploadLimits:
         player_headers = test_AuthenticationController.get_headers(client, PLAYER)
         player = _whoami(client, player_headers)
         with ScopedSession() as s:
-            s.query(UserModel).filter(UserModel.id == int(player["id"])).update(
-                {"upload_limit": None}
+            s.execute(
+                update(UserModel)
+                .where(UserModel.id == int(player["id"]))
+                .values({"upload_limit": None})
             )
 
         me = _whoami(client, player_headers)

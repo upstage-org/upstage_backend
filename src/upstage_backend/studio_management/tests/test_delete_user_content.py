@@ -4,6 +4,7 @@ default REASSIGN_TO_ADMIN keeps only avatars/props/backdrops, handing them to
 the canonical admin. Users here live on RFC-2606 example.com addresses so the
 root-conftest sweep owns any leftovers."""
 
+from sqlalchemy import delete, func, select
 import json
 import os
 import random
@@ -15,7 +16,9 @@ from upstage_backend.assets.db_models.asset_usage import AssetUsageModel
 from upstage_backend.assets.tests import asset_test
 from upstage_backend.assets.tests.asset_test import load_base64_from_image
 from upstage_backend.authentication.db_models.user_session import UserSessionModel
-from upstage_backend.authentication.tests.auth_test import TestAuthenticationController as _TestAuthenticationController
+from upstage_backend.authentication.tests.auth_test import (
+    TestAuthenticationController as _TestAuthenticationController,
+)
 from upstage_backend.event_archive.db_models.event import EventModel
 from upstage_backend.global_config import get_session
 from upstage_backend.global_config.database import ScopedSession
@@ -166,7 +169,9 @@ def upload_media(client, headers, name, media_type, filename=None):
     assert "errors" not in data, data
     asset_id = int(data["data"]["uploadMedia"]["id"])
     with ScopedSession() as s:
-        location = s.query(AssetModel).filter_by(id=asset_id).first().file_location
+        location = (
+            s.scalars(select(AssetModel).filter_by(id=asset_id).limit(1)).first().file_location
+        )
     return asset_id, location
 
 
@@ -202,7 +207,9 @@ def record_board_events(client, headers, stage_id, file_location, payload_srcs):
 
 def canonical_admin_id():
     with ScopedSession() as s:
-        admin = s.query(UserModel).filter(UserModel.username == CANONICAL_ADMIN_USERNAME).first()
+        admin = s.scalars(
+            select(UserModel).where(UserModel.username == CANONICAL_ADMIN_USERNAME).limit(1)
+        ).first()
         return admin.id if admin else None
 
 
@@ -269,27 +276,65 @@ class TestDeleteUserContent:
         assert data["data"]["deleteUser"]["success"]
 
         session = get_session()
-        assert session.query(UserModel).filter_by(id=doomed_id).first() is None
-        assert session.query(StageModel).filter_by(id=stage_id).first() is None
-        assert session.query(StageAttributeModel).filter_by(stage_id=stage_id).count() == 0
-        assert session.query(ParentStageModel).filter_by(stage_id=stage_id).count() == 0
-        assert session.query(SceneModel).filter_by(stage_id=stage_id).count() == 0
-        assert session.query(PerformanceModel).filter_by(stage_id=stage_id).count() == 0
+        assert session.scalars(select(UserModel).filter_by(id=doomed_id).limit(1)).first() is None
+        assert session.scalars(select(StageModel).filter_by(id=stage_id).limit(1)).first() is None
         assert (
-            session.query(EventModel).filter(EventModel.performance_id == performance_id).count()
+            session.scalar(
+                select(func.count()).select_from(StageAttributeModel).filter_by(stage_id=stage_id)
+            )
             == 0
         )
         assert (
-            session.query(EventModel)
-            .filter(EventModel.topic.like("%/{}/%".format(stage_loc)))
-            .count()
+            session.scalar(
+                select(func.count()).select_from(ParentStageModel).filter_by(stage_id=stage_id)
+            )
+            == 0
+        )
+        assert (
+            session.scalar(
+                select(func.count()).select_from(SceneModel).filter_by(stage_id=stage_id)
+            )
+            == 0
+        )
+        assert (
+            session.scalar(
+                select(func.count()).select_from(PerformanceModel).filter_by(stage_id=stage_id)
+            )
+            == 0
+        )
+        assert (
+            session.scalar(
+                select(func.count())
+                .select_from(EventModel)
+                .where(EventModel.performance_id == performance_id)
+            )
+            == 0
+        )
+        assert (
+            session.scalar(
+                select(func.count())
+                .select_from(EventModel)
+                .where(EventModel.topic.like("%/{}/%".format(stage_loc)))
+            )
             == 0
         )
         for asset_id, location in media.values():
-            assert session.query(AssetModel).filter_by(id=asset_id).first() is None
+            assert (
+                session.scalars(select(AssetModel).filter_by(id=asset_id).limit(1)).first() is None
+            )
             assert not os.path.exists(os.path.join(UPLOAD_USER_CONTENT_FOLDER, location))
-        assert session.query(AssetUsageModel).filter_by(user_id=doomed_id).count() == 0
-        assert session.query(UserSessionModel).filter_by(user_id=doomed_id).count() == 0
+        assert (
+            session.scalar(
+                select(func.count()).select_from(AssetUsageModel).filter_by(user_id=doomed_id)
+            )
+            == 0
+        )
+        assert (
+            session.scalar(
+                select(func.count()).select_from(UserSessionModel).filter_by(user_id=doomed_id)
+            )
+            == 0
+        )
 
     async def test_02_placeholder_substitution_on_surviving_content(self, client):
         doomed_id, doomed_headers = make_user(client)
@@ -336,34 +381,41 @@ class TestDeleteUserContent:
         assert "errors" not in data, data
 
         session = get_session()
-        placeholder = (
-            session.query(AssetModel)
-            .filter(AssetModel.file_location == PLACEHOLDER_FILE_LOCATION)
-            .first()
-        )
+        placeholder = session.scalars(
+            select(AssetModel).where(AssetModel.file_location == PLACEHOLDER_FILE_LOCATION).limit(1)
+        ).first()
         assert placeholder is not None
         assert placeholder.owner_id == canonical_admin_id()
         assert os.path.exists(os.path.join(UPLOAD_USER_CONTENT_FOLDER, PLACEHOLDER_FILE_LOCATION))
 
         # The surviving stage keeps working: assignment re-pointed, payloads
         # rewritten, nothing else touched.
-        assert session.query(AssetModel).filter_by(id=prop_id).first() is None
-        links = session.query(ParentStageModel).filter_by(stage_id=stage_id).all()
+        assert session.scalars(select(AssetModel).filter_by(id=prop_id).limit(1)).first() is None
+        links = session.scalars(select(ParentStageModel).filter_by(stage_id=stage_id)).all()
         assert [link.child_asset_id for link in links] == [placeholder.id]
 
-        scene = session.query(SceneModel).filter(SceneModel.stage_id == stage_id).first()
+        scene = session.scalars(
+            select(SceneModel).where(SceneModel.stage_id == stage_id).limit(1)
+        ).first()
         assert PLACEHOLDER_FILE_LOCATION in scene.payload
         assert prop_loc not in scene.payload
 
-        events = session.query(EventModel).filter(EventModel.performance_id == performance_id).all()
+        events = session.scalars(
+            select(EventModel).where(EventModel.performance_id == performance_id)
+        ).all()
         assert events
         for event in events:
             serialized = json.dumps(event.payload)
             assert PLACEHOLDER_FILE_LOCATION in serialized
             assert prop_loc not in serialized
 
-        assert session.query(StageModel).filter_by(id=stage_id).first() is not None
-        assert session.query(UserModel).filter_by(id=survivor_id).first() is not None
+        assert (
+            session.scalars(select(StageModel).filter_by(id=stage_id).limit(1)).first() is not None
+        )
+        assert (
+            session.scalars(select(UserModel).filter_by(id=survivor_id).limit(1)).first()
+            is not None
+        )
 
     async def test_03_reassign_keeps_only_avatars_props_backdrops(self, client):
         doomed_id, doomed_headers = make_user(client)
@@ -384,22 +436,25 @@ class TestDeleteUserContent:
 
         session = get_session()
         admin_id = canonical_admin_id()
-        assert session.query(UserModel).filter_by(id=doomed_id).first() is None
-        assert session.query(StageModel).filter_by(id=stage_id).first() is None
+        assert session.scalars(select(UserModel).filter_by(id=doomed_id).limit(1)).first() is None
+        assert session.scalars(select(StageModel).filter_by(id=stage_id).limit(1)).first() is None
         for asset_id, _ in kept.values():
-            survivor = session.query(AssetModel).filter_by(id=asset_id).first()
+            survivor = session.scalars(select(AssetModel).filter_by(id=asset_id).limit(1)).first()
             assert survivor is not None
             assert survivor.owner_id == admin_id
-        assert session.query(AssetModel).filter_by(id=audio_id).first() is None
+        assert session.scalars(select(AssetModel).filter_by(id=audio_id).limit(1)).first() is None
         assert not os.path.exists(os.path.join(UPLOAD_USER_CONTENT_FOLDER, audio_loc))
 
         # Clean up: the survivors now belong to the canonical admin, whom the
         # fixture sweep never touches, so they would pile up in a shared
         # database (three "keep-*" rows per run on dev, 2026-09-10).
         with ScopedSession() as s:
-            s.query(AssetModel).filter(
-                AssetModel.id.in_([asset_id for asset_id, _ in kept.values()])
-            ).delete(synchronize_session=False)
+            s.execute(
+                delete(AssetModel).where(
+                    AssetModel.id.in_([asset_id for asset_id, _ in kept.values()])
+                ),
+                execution_options={"synchronize_session": False},
+            )
         for _, loc in kept.values():
             path = os.path.join(UPLOAD_USER_CONTENT_FOLDER, loc)
             if os.path.exists(path):

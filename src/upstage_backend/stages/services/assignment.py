@@ -1,3 +1,5 @@
+from sqlalchemy import select
+
 from upstage_backend.stages.db_models.parent_stage import ParentStageModel
 
 
@@ -10,14 +12,14 @@ def snapshot_exit_settings(session, stage_id=None, asset_id=None):
     so callers snapshot first and rebuild via make_parent_stage() to keep
     per-assignment exit settings on the stage<->asset pairs that survive.
     """
-    query = session.query(ParentStageModel)
+    statement = select(ParentStageModel)
     if stage_id is not None:
-        query = query.filter(ParentStageModel.stage_id == stage_id)
+        statement = statement.where(ParentStageModel.stage_id == stage_id)
     if asset_id is not None:
-        query = query.filter(ParentStageModel.child_asset_id == asset_id)
+        statement = statement.where(ParentStageModel.child_asset_id == asset_id)
     return {
         (row.stage_id, row.child_asset_id): (row.exit_animation, row.exit_speed)
-        for row in query.all()
+        for row in session.scalars(statement).all()
     }
 
 
@@ -67,12 +69,11 @@ def sync_asset_assignments(session, asset_id, wanted):
     """
     asset_id = int(asset_id)
     existing = {}
-    for row in (
-        session.query(ParentStageModel)
-        .filter(ParentStageModel.child_asset_id == asset_id)
+    for row in session.scalars(
+        select(ParentStageModel)
+        .where(ParentStageModel.child_asset_id == asset_id)
         .order_by(ParentStageModel.id)
-        .all()
-    ):
+    ).all():
         if row.stage_id in existing:
             session.delete(row)
         else:

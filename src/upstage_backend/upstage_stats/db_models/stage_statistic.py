@@ -1,7 +1,9 @@
 from datetime import datetime
 
-from sqlalchemy import Column, DateTime, Integer, String
+from sqlalchemy import DateTime, Integer, String
 
+from sqlalchemy.orm import Mapped, mapped_column
+from upstage_backend.global_config.helpers.clock import utcnow
 from upstage_backend.global_config.db_models.base import BaseModel
 
 
@@ -19,7 +21,9 @@ class StageStatisticModel(BaseModel):
 
     # Keyed by the stage `file_location` (the same value the frontend uses as
     # `stageUrl` and that appears in the MQTT statistics topic).
-    stage_url = Column(String, primary_key=True)
-    players = Column(Integer, nullable=False, default=0)
-    audiences = Column(Integer, nullable=False, default=0)
-    updated_on = Column(DateTime, nullable=False, default=datetime.now)
+    stage_url: Mapped[str] = mapped_column(String, primary_key=True)
+    players: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    audiences: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    updated_on: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, default=utcnow
+    )

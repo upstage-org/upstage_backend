@@ -4,7 +4,7 @@ import os
 import json
 import uuid
 from graphql import GraphQLError
-from sqlalchemy import and_, or_
+from sqlalchemy import and_, delete, or_, select
 from upstage_backend.assets.db_models.asset import AssetModel
 from upstage_backend.assets.db_models.asset_license import AssetLicenseModel
 from upstage_backend.assets.db_models.asset_usage import AssetUsageModel
@@ -46,7 +46,7 @@ class MediaService:
 
     def assign_media(self, input: AssignMediaInput, user: UserModel):
         session = get_session()
-        stage = session.query(StageModel).filter_by(id=input.id).first()
+        stage = session.scalars(select(StageModel).filter_by(id=input.id).limit(1)).first()
         if not stage or not input.id:
             raise GraphQLError("Stage not found")
 
@@ -54,7 +54,7 @@ class MediaService:
             raise GraphQLError("You are not authorized to update this stage")
 
         snapshot = snapshot_exit_settings(session, stage_id=input.id)
-        session.query(ParentStageModel).filter(ParentStageModel.stage_id == input.id).delete()
+        session.execute(delete(ParentStageModel).where(ParentStageModel.stage_id == input.id))
 
         for media_id in input.mediaIds:
             session.add(make_parent_stage(input.id, media_id, snapshot))
@@ -122,7 +122,7 @@ class MediaService:
         finish_request_transaction(commit=True)
 
         asset = self.retrieve_asset(input, session)
-        require_owner_or_admin(user,asset.owner_id, "You are not allowed to update this asset")
+        require_owner_or_admin(user, asset.owner_id, "You are not allowed to update this asset")
         asset.name = input.name
         asset.asset_type_id = asset_type.id
         asset.description = input.description
@@ -165,27 +165,29 @@ class MediaService:
         if processed_description is not None:
             asset.description = processed_description
         session.flush()
-        asset = session.query(AssetModel).filter_by(id=asset.id).first()
+        asset = session.scalars(select(AssetModel).filter_by(id=asset.id).limit(1)).first()
         return self.asset_service.resolve_fields(asset)
 
     def retrieve_asset(self, input, local_db_session):
         asset = None
         if input.id:
-            asset = local_db_session.query(AssetModel).filter_by(id=input.id).first()
+            asset = local_db_session.scalars(
+                select(AssetModel).filter_by(id=input.id).limit(1)
+            ).first()
         if not asset:
             raise GraphQLError("Media not found")
 
         if input.fileLocation:
-            existed_asset = (
-                local_db_session.query(AssetModel)
-                .filter(
+            existed_asset = local_db_session.scalars(
+                select(AssetModel)
+                .where(
                     and_(
                         AssetModel.file_location == input.fileLocation,
                         AssetModel.id != input.id,
                     )
                 )
-                .first()
-            )
+                .limit(1)
+            ).first()
             if existed_asset:
                 raise GraphQLError("Media with the same key already existed, please pick another!")
 
@@ -219,10 +221,12 @@ class MediaService:
         session = get_session()
         # `filter_by` after an outerjoin applied to ParentStageModel.id, not
         # the asset id; look the asset up directly.
-        asset = session.query(AssetModel).filter(AssetModel.id == id).first()
+        asset = session.scalars(select(AssetModel).where(AssetModel.id == id).limit(1)).first()
         if not asset:
             raise GraphQLError("Media not found")
-        require_owner_or_admin(user, asset.owner_id, "Only media owner or admin can delete this media!")
+        require_owner_or_admin(
+            user, asset.owner_id, "Only media owner or admin can delete this media!"
+        )
 
         # `asset.stages` is a dynamic relationship (a Query object, always
         # truthy); ask it whether any assignment exists.
@@ -251,16 +255,16 @@ class MediaService:
 
     def _delete_frames(self, local_db_session, frames):
         for frame in frames:
-            frame_asset = (
-                local_db_session.query(AssetModel)
-                .filter(
+            frame_asset = local_db_session.scalars(
+                select(AssetModel)
+                .where(
                     or_(
                         AssetModel.file_location == frame,
                         AssetModel.description.contains(frame),
                     )
                 )
-                .first()
-            )
+                .limit(1)
+            ).first()
             if not frame_asset:
                 self.file_handling.delete_file(try_safe_join(storagePath, frame))
 
@@ -268,25 +272,21 @@ class MediaService:
         return try_safe_join(storagePath, file_location or "")
 
     def cleanup_related_entities(self, id: int, local_db_session):
-        local_db_session.query(ParentStageModel).filter(
-            ParentStageModel.child_asset_id == id
-        ).delete(synchronize_session=False)
-        local_db_session.query(MediaTagModel).filter(MediaTagModel.asset_id == id).delete(
-            synchronize_session=False
-        )
-        local_db_session.query(AssetLicenseModel).filter(AssetLicenseModel.asset_id == id).delete(
-            synchronize_session=False
-        )
-        local_db_session.query(AssetUsageModel).filter(AssetUsageModel.asset_id == id).delete(
-            synchronize_session=False
-        )
+        for model, column in (
+            (ParentStageModel, ParentStageModel.child_asset_id),
+            (MediaTagModel, MediaTagModel.asset_id),
+            (AssetLicenseModel, AssetLicenseModel.asset_id),
+            (AssetUsageModel, AssetUsageModel.asset_id),
+        ):
+            local_db_session.execute(
+                delete(model).where(column == id),
+                execution_options={"synchronize_session": False},
+            )
 
     def remove_asset_from_frames(self, local_db_session, asset: AssetModel):
-        for multiple_frame_media in (
-            local_db_session.query(AssetModel)
-            .filter(AssetModel.description.ilike(f"%{asset.file_location}%"))
-            .all()
-        ):
+        for multiple_frame_media in local_db_session.scalars(
+            select(AssetModel).where(AssetModel.description.ilike(f"%{asset.file_location}%"))
+        ).all():
             attributes = json.loads(multiple_frame_media.description)
             for i, frame in enumerate(attributes["frames"]):
                 if "?" in frame:
@@ -298,7 +298,7 @@ class MediaService:
 
     def assign_stages(self, input: AssignStagesInput, user: UserModel):
         session = get_session()
-        asset = session.query(AssetModel).filter_by(id=input.id).first()
+        asset = session.scalars(select(AssetModel).filter_by(id=input.id).limit(1)).first()
         if not asset:
             raise GraphQLError("Media not found")
         require_owner_or_admin(user, asset.owner_id, "You are not allowed to assign this media")
@@ -310,19 +310,19 @@ class MediaService:
         )
         session.flush()
 
-        asset = session.query(AssetModel).filter_by(id=input.id).first()
+        asset = session.scalars(select(AssetModel).filter_by(id=input.id).limit(1)).first()
         return self.asset_service.resolve_fields(asset)
 
     def update_stage_assignment(self, input: UpdateStageAssignmentInput, user: UserModel):
         session = get_session()
-        row = (
-            session.query(ParentStageModel)
-            .filter(
+        row = session.scalars(
+            select(ParentStageModel)
+            .where(
                 ParentStageModel.stage_id == input.stageId,
                 ParentStageModel.child_asset_id == input.assetId,
             )
-            .first()
-        )
+            .limit(1)
+        ).first()
         if not row:
             raise GraphQLError("Media is not assigned to this stage")
 

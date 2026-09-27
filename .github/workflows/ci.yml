@@ -25,21 +25,30 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Setup Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v7
         with:
-          # Matches `requires-python = ">=3.12"` in pyproject.toml. We
-          # pin to 3.12 (not 3.13) so CI matches the production
-          # container image; bump in a separate PR alongside the image.
-          python-version: "3.12"
-          cache: pip
+          # Same interpreter as the production container image
+          # (app_containers/docker-compose.yaml); bump both together.
+          # `requires-python` in pyproject.toml stays a lower bound.
+          python-version: "3.14"
 
-      - name: Install dependencies
+      # setup-uv publishes no moving major tag; bump the full version.
+      - name: Setup uv
+        uses: astral-sh/setup-uv@v10.2.0
+        with:
+          enable-cache: true
+          cache-dependency-glob: uv.lock
+
+      # Exactly the versions in uv.lock (the same file the container image
+      # is built from). `--frozen` never re-resolves, so a new upstream
+      # release cannot break CI; versions move only via `uv lock --upgrade`.
+      - name: Install dependencies (from uv.lock)
         run: |
-          python -m pip install --upgrade pip
-          pip install -e .[dev]
+          uv sync --frozen --extra dev --python "$(which python)"
+          echo "$PWD/.venv/bin" >> "$GITHUB_PATH"
 
       - name: Run verify suite
         run: ./scripts/verify.sh
@@ -51,10 +60,13 @@ jobs:
     # `services:` containers run on the GitHub-hosted runner network;
     # the FastAPI app inside the test process reaches them on
     # localhost via the mapped ports. Versions track the dev compose
-    # files in `service_containers/docker-compose-services.yaml`.
+    # files in `service_containers/docker-compose-services.yaml`. Postgres
+    # must not be older than the server the baseline schema was dumped from
+    # (alembic/versions/baseline001_schema.sql, PostgreSQL 18): the dump sets
+    # `transaction_timeout`, which PostgreSQL 16 rejects.
     services:
       postgres:
-        image: postgres:16
+        image: postgres:latest
         env:
           POSTGRES_USER: postgres
           POSTGRES_PASSWORD: postgres
@@ -70,7 +82,7 @@ jobs:
           --health-retries 10
 
       mosquitto:
-        image: eclipse-mosquitto:2
+        image: eclipse-mosquitto:latest
         ports:
           - 1883:1883
 
@@ -85,10 +97,7 @@ jobs:
       # The src-tree suites refuse to run against a DB unless told it is
       # disposable (conftest.py::_guard_against_real_db).
       UPSTAGE_TESTS_ALLOW_REAL_DB: "1"
-      ALGORITHM: HS256
       SECRET_KEY: ci-secret
-      REFRESH_SECRET_KEY: ci-refresh-secret
-      HOSTNAME: localhost
       ENV_TYPE: Test
       MQTT_BROKER: localhost
       MQTT_ADMIN_USER: ci
@@ -99,18 +108,27 @@ jobs:
       STRICT_DB_CONTEXT: "0"
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Setup Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v7
         with:
-          python-version: "3.12"
-          cache: pip
+          python-version: "3.14"
 
-      - name: Install dependencies
+      # setup-uv publishes no moving major tag; bump the full version.
+      - name: Setup uv
+        uses: astral-sh/setup-uv@v10.2.0
+        with:
+          enable-cache: true
+          cache-dependency-glob: uv.lock
+
+      # Exactly the versions in uv.lock (the same file the container image
+      # is built from). `--frozen` never re-resolves, so a new upstream
+      # release cannot break CI; versions move only via `uv lock --upgrade`.
+      - name: Install dependencies (from uv.lock)
         run: |
-          python -m pip install --upgrade pip
-          pip install -e .[dev]
+          uv sync --frozen --extra dev --python "$(which python)"
+          echo "$PWD/.venv/bin" >> "$GITHUB_PATH"
 
       - name: Apply database migrations
         run: alembic -c alembic.ini upgrade head

@@ -1,6 +1,9 @@
+from sqlalchemy import delete, select, update
 from faker import Faker
 import pytest
-from upstage_backend.authentication.tests.auth_test import TestAuthenticationController as _TestAuthenticationController
+from upstage_backend.authentication.tests.auth_test import (
+    TestAuthenticationController as _TestAuthenticationController,
+)
 from upstage_backend.global_config.database import ScopedSession
 from upstage_backend.users.db_models.user import SUPER_ADMIN
 
@@ -103,15 +106,19 @@ class TestUpStageOptionsController:
         from upstage_backend.upstage_options.db_models.config import ConfigModel
 
         with ScopedSession() as s:
-            row = s.query(ConfigModel).filter(ConfigModel.name == "TERMS_OF_SERVICE").first()
+            row = s.scalars(
+                select(ConfigModel).where(ConfigModel.name == "TERMS_OF_SERVICE").limit(1)
+            ).first()
             original = row.value if row else None
         try:
             await self._update_terms_of_service_twice(client, headers)
         finally:
             if original is not None:
                 with ScopedSession() as s:
-                    s.query(ConfigModel).filter(ConfigModel.name == "TERMS_OF_SERVICE").update(
-                        {"value": original}
+                    s.execute(
+                        update(ConfigModel)
+                        .where(ConfigModel.name == "TERMS_OF_SERVICE")
+                        .values({"value": original})
                     )
 
     async def _update_terms_of_service_twice(self, client, headers):
@@ -125,9 +132,7 @@ class TestUpStageOptionsController:
             }
         }
         """
-        response = client.post(
-            "/api/studio_graphql", json={"query": query}, headers=headers
-        )
+        response = client.post("/api/studio_graphql", json={"query": query}, headers=headers)
         assert response.status_code == 200
         data = response.json()["data"]["updateTermsOfService"]
         assert "id" in data
@@ -146,9 +151,7 @@ class TestUpStageOptionsController:
                 }
             }
         """
-        response = client.post(
-            "/api/studio_graphql", json={"query": query}, headers=headers
-        )
+        response = client.post("/api/studio_graphql", json={"query": query}, headers=headers)
         assert response.status_code == 200
         data = response.json()["data"]["updateTermsOfService"]
         assert "id" in data
@@ -165,7 +168,7 @@ class TestUpStageOptionsController:
         finally:
             # Never leave the throwaway "test" row behind in a shared database.
             with ScopedSession() as s:
-                s.query(ConfigModel).filter(ConfigModel.name == "test").delete()
+                s.execute(delete(ConfigModel).where(ConfigModel.name == "test"))
 
     async def _save_config_twice(self, client):
         headers = test_AuthenticationController.get_headers(client, SUPER_ADMIN)
@@ -179,9 +182,7 @@ class TestUpStageOptionsController:
                 }
             }
         """
-        response = client.post(
-            "/api/studio_graphql", json={"query": query}, headers=headers
-        )
+        response = client.post("/api/studio_graphql", json={"query": query}, headers=headers)
         assert response.status_code == 200
         data = response.json()["data"]["saveConfig"]
         assert "id" in data
@@ -200,9 +201,7 @@ class TestUpStageOptionsController:
                 }
             }
         """
-        response = client.post(
-            "/api/studio_graphql", json={"query": query}, headers=headers
-        )
+        response = client.post("/api/studio_graphql", json={"query": query}, headers=headers)
         assert response.status_code == 200
         data = response.json()["data"]["saveConfig"]
         assert "id" in data
@@ -211,7 +210,17 @@ class TestUpStageOptionsController:
         assert "createdOn" in data
         assert "errors" not in response.json()
 
-    async def test_06_send_email(self, client):
+    async def test_06_send_email(self, client, monkeypatch):
+        # SMTP is stubbed: the suite must run without a mail server.
+        from upstage_backend.mails.helpers import mail
+
+        sent = []
+
+        async def fake_send_async(msg, *args, **kwargs):
+            sent.append(msg)
+
+        monkeypatch.setattr(mail, "send_async", fake_send_async)
+
         headers = test_AuthenticationController.get_headers(client, SUPER_ADMIN)
         query = """
             mutation ($input: SystemEmailInput!) {
@@ -238,5 +247,7 @@ class TestUpStageOptionsController:
 
         assert response.status_code == 200
         data = response.json()["data"]["sendSystemEmail"]
-        assert "success" in data
+        assert data["success"] is True
         assert "errors" not in response.json()
+        assert len(sent) == 1
+        assert "Test" in sent[0]["Subject"]

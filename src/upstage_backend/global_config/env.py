@@ -1,105 +1,108 @@
-import os
+"""
+Application configuration as module-level constants.
 
+The values are resolved once, by ``app_settings.Settings`` (typed, validated):
+``load_env.py`` overrides > process environment (``.env`` included) >
+defaults. Code imports the constants from here.
+"""
+
+import os
 import socket
+
 from dotenv import load_dotenv
 
 from upstage_backend.global_config.logger import logger
+from upstage_backend.global_config.app_settings import (
+    Settings,
+    load_env_overrides,
+    settings_kwargs,
+)
 
+# Into os.environ, so the direct os.getenv() readers elsewhere
+# (STRICT_DB_CONTEXT, EVENT_ARCHIVE_*, ...) see .env values too.
 load_dotenv()
-ENV_TYPE = os.getenv("ENV_TYPE")
-
-DATABASE_CONNECT = os.getenv("DATABASE_CONNECT")
-DATABASE_HOST = os.getenv("DATABASE_HOST")
-DATABASE_PORT = os.getenv("DATABASE_PORT")
-DATABASE_USER = os.getenv("DATABASE_USER")
-DATABASE_PASSWORD = os.getenv("DATABASE_PASSWORD")
-DATABASE_NAME = os.getenv("DATABASE_NAME")
-
-# payment
-STRIPE_KEY = ""
-STRIPE_PRODUCT_ID = ""
-
-
-# JWT. No built-in default: an unset key is refused on deployed hosts (see the
-# check after the load_env import below), so a checkout that forgot its
-# load_env.py can never sign tokens with a publicly known secret.
-SECRET_KEY = os.getenv("SECRET_KEY", "")
-ALGORITHM = "HS256"
-JWT_ACCESS_TOKEN_MINUTES = os.getenv("JWT_ACCESS_TOKEN_MINUTES", "15")
-JWT_REFRESH_TOKEN_DAYS = os.getenv("JWT_REFRESH_TOKEN_DAYS", "30")
-
-
-# Apple
-APPLE_ACCESS_TOKEN_CREATE = os.getenv("APPLE_ACCESS_TOKEN_CREATE")
-APPLE_APP_ID = os.getenv("APPLE_APP_ID")
-APPLE_APP_SECRET = os.getenv("APPLE_APP_SECRET")
-APPLE_TEAM_ID = os.getenv("APPLE_TEAM_ID")
-
-JWT_HEADER_NAME = "X-Access-Token"
-
-CLOUDFLARE_CAPTCHA_SECRETKEY = os.getenv("CLOUDFLARE_CAPTCHA_SECRETKEY")
-CLOUDFLARE_CAPTCHA_VERIFY_ENDPOINT = os.getenv("CLOUDFLARE_CAPTCHA_VERIFY_ENDPOINT")
-
-
-HOSTNAME = os.getenv("HOSTNAME")
-logger.info("Hostname is: {}", HOSTNAME)
-EMAIL_HOST_FROM = os.getenv("EMAIL_HOST_FROM")
-EMAIL_HOST_LOGIN = os.getenv("EMAIL_HOST_LOGIN")
-SUPPORT_EMAILS = os.getenv("SUPPORT_EMAILS", "support@upstage.live").split(",")
-EMAIL_HOST_DISPLAY_NAME = os.getenv("EMAIL_HOST_DISPLAY_NAME", "UpStage")
-DOMAIN = os.getenv("DOMAIN", "upstage.live")
-
-EMAIL_HOST_PASSWORD = os.getenv("EMAIL_HOST_PASSWORD")
-EMAIL_USE_TLS = True
-EMAIL_HOST = os.getenv("EMAIL_HOST")
-EMAIL_PORT = int(os.getenv("EMAIL_PORT", 465))
-EMAIL_HOST_DISPLAY_NAME = os.getenv("EMAIL_HOST_DISPLAY_NAME", "UpStage")
-EMAIL_TIME_TRIGGER_SECONDS = 60 * 1  # 1 minute
-STREAM_EXPIRY_DAYS = 180
-STREAM_KEY = os.getenv("STREAM_KEY", "")
-
-MQTT_BROKER = os.getenv("MQTT_BROKER")
-MQTT_ADMIN_PORT = int(os.getenv("MQTT_ADMIN_PORT", "1883"))
-MQTT_TRANSPORT = "tcp"
-MQTT_ADMIN_USER = os.getenv("MQTT_ADMIN_USER")
-MQTT_ADMIN_PASSWORD = os.getenv("MQTT_ADMIN_PASSWORD")
-# Browser-facing broker account. Served to clients at runtime on `Stage.mqtt`
-# so the credential is not compiled into the frontend bundle. Deployed hosts
-# already define these in `load_env.py` (star-imported below, so their values
-# win); declared here so a bare checkout/CI import does not blow up.
-MQTT_USER = os.getenv("MQTT_USER")
-MQTT_PASSWORD = os.getenv("MQTT_PASSWORD")
-PERFORMANCE_TOPIC_RULE = os.getenv("PERFORMANCE_TOPIC_RULE", "#")
-
-EVENT_COLLECTION = os.getenv("EVENT_COLLECTION")
-
-CLIENT_MAX_BODY_SIZE = os.getenv("CLIENT_MAX_BODY_SIZE", 0)
-
-if "HARDCODED_HOSTNAME" in os.environ:
-    ORIG_HOSTNAME = HOSTNAME = os.environ["HARDCODED_HOSTNAME"]
-else:
-    ORIG_HOSTNAME = socket.gethostname()
-    HOSTNAME = socket.gethostname().replace(".", "_").replace("-", "_")
-logger.info("Hostname is now: {}", HOSTNAME)
-
-UPLOAD_USER_CONTENT_FOLDER = "/usr/app/uploads"  # This is mounted here by docker-compose file.
-DEMO_MEDIA_FOLDER = "./dashboard/demo"
-
-UPSTAGE_FRONTEND_URL = os.getenv("UPSTAGE_FRONTEND_URL", "http://localhost:3000")
-ENV_TYPE = os.getenv("ENV_TYPE", "development")
-
-VIDEO_MAX_SIZE = 500 * 1024 * 1024  # KB
-OTHER_MEDIA_MAX_SIZE = 500 * 1024 * 1024  # KB
 
 # `load_env.py` is a machine-specific, git-ignored overrides file generated at
 # install time (installation/phases/45_sync_load_env.sh) and present only on
-# deployed hosts. It is absent in CI and on fresh checkouts, so its import is
-# optional: when missing we fall back to the process environment already read
-# via os.getenv above. The GitHub pipeline must never depend on local vars.
-try:
-    from .load_env import *  # noqa: F401,F403
-except ModuleNotFoundError:
-    logger.info("load_env.py not present; using environment configuration only")
+# deployed hosts. It is absent in CI and on fresh checkouts, where the process
+# environment alone applies. The GitHub pipeline must never depend on local vars.
+_overrides = load_env_overrides()
+if not _overrides:
+    logger.info("load_env.py not present or empty; using environment configuration only")
+
+settings = Settings(**settings_kwargs(_overrides))
+
+# Fixed values (not configurable through the environment).
+ALGORITHM = "HS256"
+JWT_HEADER_NAME = "X-Access-Token"
+EMAIL_TIME_TRIGGER_SECONDS = 60 * 1  # 1 minute
+STREAM_EXPIRY_DAYS = 180
+VIDEO_MAX_SIZE = 500 * 1024 * 1024  # KB
+OTHER_MEDIA_MAX_SIZE = 500 * 1024 * 1024  # KB
+ORIG_HOSTNAME = os.environ.get("HARDCODED_HOSTNAME") or socket.gethostname()
+
+ENV_TYPE = settings.ENV_TYPE
+
+DATABASE_CONNECT = settings.DATABASE_CONNECT
+DATABASE_HOST = settings.DATABASE_HOST
+DATABASE_PORT = settings.DATABASE_PORT
+DATABASE_USER = settings.DATABASE_USER
+DATABASE_PASSWORD = settings.DATABASE_PASSWORD
+DATABASE_NAME = settings.DATABASE_NAME
+
+STRIPE_KEY = settings.STRIPE_KEY
+STRIPE_PRODUCT_ID = settings.STRIPE_PRODUCT_ID
+
+SECRET_KEY = settings.SECRET_KEY
+JWT_ADMIN_TOKEN_DAYS = settings.JWT_ADMIN_TOKEN_DAYS
+JWT_USER_TOKEN_DAYS = settings.JWT_USER_TOKEN_DAYS
+
+APPLE_ACCESS_TOKEN_CREATE = settings.APPLE_ACCESS_TOKEN_CREATE
+APPLE_APP_ID = settings.APPLE_APP_ID
+APPLE_APP_SECRET = settings.APPLE_APP_SECRET
+APPLE_TEAM_ID = settings.APPLE_TEAM_ID
+
+CLOUDFLARE_CAPTCHA_SECRETKEY = settings.CLOUDFLARE_CAPTCHA_SECRETKEY
+CLOUDFLARE_CAPTCHA_VERIFY_ENDPOINT = settings.CLOUDFLARE_CAPTCHA_VERIFY_ENDPOINT
+
+HOSTNAME = settings.HOSTNAME
+logger.info("Hostname is: {}", HOSTNAME)
+DOMAIN = settings.DOMAIN
+UPSTAGE_FRONTEND_URL = settings.UPSTAGE_FRONTEND_URL
+
+EMAIL_HOST = settings.EMAIL_HOST
+EMAIL_PORT = settings.EMAIL_PORT
+EMAIL_USE_TLS = settings.EMAIL_USE_TLS
+EMAIL_HOST_FROM = settings.EMAIL_HOST_FROM
+EMAIL_HOST_LOGIN = settings.EMAIL_HOST_LOGIN
+EMAIL_HOST_PASSWORD = settings.EMAIL_HOST_PASSWORD
+EMAIL_HOST_DISPLAY_NAME = settings.EMAIL_HOST_DISPLAY_NAME
+SUPPORT_EMAILS = settings.SUPPORT_EMAILS
+
+STREAM_KEY = settings.STREAM_KEY
+
+MQTT_BROKER = settings.MQTT_BROKER
+MQTT_ADMIN_PORT = settings.MQTT_ADMIN_PORT
+MQTT_TRANSPORT = settings.MQTT_TRANSPORT
+MQTT_ADMIN_USER = settings.MQTT_ADMIN_USER
+MQTT_ADMIN_PASSWORD = settings.MQTT_ADMIN_PASSWORD
+MQTT_USER = settings.MQTT_USER
+MQTT_PASSWORD = settings.MQTT_PASSWORD
+PERFORMANCE_TOPIC_RULE = settings.PERFORMANCE_TOPIC_RULE
+
+EVENT_COLLECTION = settings.EVENT_COLLECTION
+
+CLIENT_MAX_BODY_SIZE = settings.CLIENT_MAX_BODY_SIZE
+
+UPLOAD_USER_CONTENT_FOLDER = settings.UPLOAD_USER_CONTENT_FOLDER
+DEMO_MEDIA_FOLDER = settings.DEMO_MEDIA_FOLDER
+
+# Everything else load_env.py defines (names this module does not know, or
+# replacements for the fixed values above) is exported as-is, exactly as the
+# former `from .load_env import *` did.
+globals().update(
+    {name: value for name, value in _overrides.items() if name not in Settings.model_fields}
+)
 
 # Browsers get their broker credential from `Stage.mqtt` at runtime and have no
 # build-time fallback (by design — a Vite fallback would re-inline the secret).
@@ -130,7 +133,6 @@ if not SECRET_KEY:
     )
 
 
-
 def with_psycopg2_driver(url: str) -> str:
     """
     Name the sync driver explicitly on Postgres URLs.
@@ -154,5 +156,5 @@ if DATABASE_CONNECT:
 else:
     # No DB parts configured (CI / DB-free unit tests): honor a full
     # DATABASE_URL from the environment, defaulting to in-memory SQLite.
-    DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///:memory:")
+    DATABASE_URL = settings.DATABASE_URL
 DATABASE_URL = with_psycopg2_driver(DATABASE_URL)

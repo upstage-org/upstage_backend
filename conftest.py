@@ -3,12 +3,10 @@ Root pytest conftest.
 
 Keep this file's top-level imports stdlib-only. Anything that pulls in
 ``upstage_backend.global_config`` (or transitively ``upstage_backend.main``)
-forces ``global_config.database.create_engine(DATABASE_URL)`` and
-``metadata.create_all(engine)`` to run at import time, which fails immediately
-on hosts where ``postgres_container_dev`` is not resolvable (anywhere outside
-the docker-compose network). That broke ``pytest --collect-only`` from the
-host, which in turn made it impossible to lint or count tests without bringing
-the whole stack up.
+resolves the settings and builds the engine for whatever DATABASE_URL this
+host is configured with. Collection (``pytest --collect-only``) must work
+without that: from a host outside the docker-compose network, and in CI's
+database-free job.
 
 The actual ``app``/``DATABASE_URL`` imports are pushed into the fixtures that
 need them so collection only requires the upstage_backend package to be

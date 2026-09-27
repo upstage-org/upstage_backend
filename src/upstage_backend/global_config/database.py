@@ -35,9 +35,7 @@ from upstage_backend.global_config.env import DATABASE_URL
 # db_context's non-strict fallback (a Session per test, never closed; see
 # conftest.py `_test_body_session`) plus the GraphQL WebSocket fallback
 # session (route removed). With both gone the suite holds ≤2 connections.
-_PG_CONNECT_ARGS = {
-    "options": "-c lock_timeout=5000 -c idle_in_transaction_session_timeout=120000"
-}
+_PG_CONNECT_ARGS = {"options": "-c lock_timeout=5000 -c idle_in_transaction_session_timeout=120000"}
 _is_postgres = DATABASE_URL.startswith("postgresql")
 engine = create_engine(
     DATABASE_URL,
@@ -70,7 +68,7 @@ class ScopedSession(object):
         with ScopedSession() as local_db_session:
            local_db_session.add(some_obj)
            local_db_session.flush()  # if you need the ID right away
-           rows = local_db_session.query(Model).filter(...).all()
+           rows = local_db_session.scalars(select(Model).where(...)).all()
 
     Session will be committed and closed when you fall out of scope.
     Rollback on exception is default; pass rollback_upon_failure=False

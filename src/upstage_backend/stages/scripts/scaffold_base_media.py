@@ -28,12 +28,14 @@ import json
 import shutil
 import time
 
+from sqlalchemy import select
+
 from upstage_backend.assets.db_models.asset_type import AssetTypeModel
 from upstage_backend.assets.db_models.asset import AssetModel
 
 # AssetModel declares string-name relationships to AssetLicenseModel and
 # MediaTagModel. SQLAlchemy resolves those strings the first time the mapper
-# configures (i.e. the first session.query(...) call below), and resolution
+# configures (i.e. the first select(...) executed below), and resolution
 # fails unless both classes have been imported so they are present in
 # Base.registry. The web process picks them up transitively via HTTP/service
 # modules, but this standalone scaffold does not.
@@ -79,7 +81,9 @@ def copy_file(rel_path):
 
 
 def get_or_create_asset_type(session, name):
-    asset_type = session.query(AssetTypeModel).filter(AssetTypeModel.name == name).first()
+    asset_type = session.scalars(
+        select(AssetTypeModel).where(AssetTypeModel.name == name).limit(1)
+    ).first()
     if not asset_type:
         asset_type = AssetTypeModel(name=name, file_location="")
         session.add(asset_type)
@@ -97,9 +101,9 @@ def create_asset(session, owner_id, spec):
     # Dedupe by file_location alone: a re-run (or a re-seed after the demo
     # stage was deleted) must reuse the original asset rows so archived
     # performances keep pointing at valid assets.
-    asset = (
-        session.query(AssetModel).filter(AssetModel.file_location == spec["file_location"]).first()
-    )
+    asset = session.scalars(
+        select(AssetModel).where(AssetModel.file_location == spec["file_location"]).limit(1)
+    ).first()
     if asset:
         logger.warning(
             '⏩ Reusing existing demo {} "{}" (asset id={})'.format(
@@ -143,13 +147,13 @@ def create_demo_stage(session, owner_id, media, seed):
     Returns the stage (existing or new); when it already exists nothing is
     touched — the scene/event seeders below have their own skip guards."""
     spec = seed["stage"]
-    existing = (
-        session.query(StageModel)
-        .filter(
+    existing = session.scalars(
+        select(StageModel)
+        .where(
             (StageModel.name == spec["name"]) | (StageModel.file_location == spec["file_location"])
         )
-        .first()
-    )
+        .limit(1)
+    ).first()
     if existing:
         logger.warning(
             '⏩ Stage "{}" (file_location="{}") already exists; not recreating.'.format(
@@ -163,7 +167,9 @@ def create_demo_stage(session, owner_id, media, seed):
     # a generated slug only if something else already claimed it (possible
     # because the name check above matches on EITHER name or slug).
     file_location = spec["file_location"]
-    if session.query(StageModel).filter(StageModel.file_location == file_location).first():
+    if session.scalars(
+        select(StageModel).where(StageModel.file_location == file_location).limit(1)
+    ).first():
         file_location = StageService().get_short_name(spec["name"], session)
 
     stage = StageModel(
@@ -200,7 +206,7 @@ def create_demo_stage(session, owner_id, media, seed):
 
 
 def create_demo_scene(session, stage, owner_id, seed):
-    if session.query(SceneModel).filter(SceneModel.stage_id == stage.id).first():
+    if session.scalars(select(SceneModel).where(SceneModel.stage_id == stage.id).limit(1)).first():
         logger.warning("⏩ Stage already has scenes; not seeding the demo scene.")
         return
     spec = seed["scene"]
@@ -223,14 +229,14 @@ def seed_board_events(session, stage, seed):
     """Put the initial objects on the board. Board state is materialised by
     replaying live events (get_event_list matches topic %/<slug>/% with any
     prefix), so plain event rows with a fixed prefix work on any install."""
-    existing = (
-        session.query(EventModel)
-        .filter(
+    existing = session.scalars(
+        select(EventModel)
+        .where(
             EventModel.performance_id == None,  # noqa: E711  (SQLAlchemy column NULL comparison)
             EventModel.topic.like("%/{}/%".format(stage.file_location)),
         )
-        .first()
-    )
+        .limit(1)
+    ).first()
     if existing:
         logger.warning("⏩ Stage already has live events; not seeding the board.")
         return
@@ -285,9 +291,9 @@ def ensure_admin_user(session):
     email, and a foreign account holding one of the legacy admin emails must
     not be mistaken for it. An existing row is never modified — operators own
     its password and role."""
-    existing = (
-        session.query(UserModel).filter(UserModel.username == CANONICAL_ADMIN_USERNAME).first()
-    )
+    existing = session.scalars(
+        select(UserModel).where(UserModel.username == CANONICAL_ADMIN_USERNAME).limit(1)
+    ).first()
     if existing:
         return existing
     # Not get_or_create_user: that helper also matches by email, and a foreign
@@ -314,11 +320,9 @@ def ensure_placeholder_asset(session, owner_id):
     create_asset this must run at request time too (StudioService.delete_user
     calls it), where dashboard/demo may not be shipped — so a failed copy is
     tolerated as long as the asset row already exists."""
-    asset = (
-        session.query(AssetModel)
-        .filter(AssetModel.file_location == PLACEHOLDER_FILE_LOCATION)
-        .first()
-    )
+    asset = session.scalars(
+        select(AssetModel).where(AssetModel.file_location == PLACEHOLDER_FILE_LOCATION).limit(1)
+    ).first()
     dest = os.path.join(UPLOAD_USER_CONTENT_FOLDER, PLACEHOLDER_FILE_LOCATION)
     if not os.path.exists(dest):
         try:
@@ -349,11 +353,11 @@ def ensure_placeholder_asset(session, owner_id):
 
 
 def get_or_create_user(session, username, email, role, password=None):
-    existing = (
-        session.query(UserModel)
-        .filter((UserModel.username == username) | (UserModel.email == email))
-        .first()
-    )
+    existing = session.scalars(
+        select(UserModel)
+        .where((UserModel.username == username) | (UserModel.email == email))
+        .limit(1)
+    ).first()
     if existing:
         logger.warning('⏩ A user "{}" / "{}" already exists.'.format(username, email))
         return existing
@@ -421,7 +425,7 @@ def save_config(session, name, value):
     """Fill in a default ONLY when the key is missing. Existing values are
     operator configuration (foyer text, T&Cs, ...) that a re-run — manual or
     --force — must never clobber."""
-    config = session.query(ConfigModel).filter(ConfigModel.name == name).first()
+    config = session.scalars(select(ConfigModel).where(ConfigModel.name == name).limit(1)).first()
     if config:
         logger.warning('⏩ Config "{}" already set; keeping existing value.'.format(name))
         return
@@ -456,7 +460,9 @@ def main():
         # Users first, so the admin lookup below finds the account this very
         # run created on a fresh database.
         create_demo_users(s)
-        owner = s.query(UserModel).filter(UserModel.username == CANONICAL_ADMIN_USERNAME).first()
+        owner = s.scalars(
+            select(UserModel).where(UserModel.username == CANONICAL_ADMIN_USERNAME).limit(1)
+        ).first()
         owner_id = owner.id if owner else 0
 
         ensure_placeholder_asset(s, owner_id)
@@ -467,7 +473,7 @@ def main():
         # Every user existing at seed time gets player access on the demo
         # stage (on a fresh install that's admin/guest/Demo1). Users created
         # later via the API get theirs from assign_user_to_default_stage.
-        grant_player_access(s, stage, s.query(UserModel).all())
+        grant_player_access(s, stage, s.scalars(select(UserModel)).all())
         scaffold_foyer(s)
         scaffold_system_configuration(s)
 

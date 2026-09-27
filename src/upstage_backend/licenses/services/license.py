@@ -1,6 +1,7 @@
 from secrets import token_urlsafe
 
 from graphql import GraphQLError
+from sqlalchemy import select
 from upstage_backend.global_config import get_session
 from upstage_backend.global_config.helpers.object import convert_keys_to_camel_case
 from upstage_backend.licenses.http.validation import LicenseInput
@@ -22,7 +23,9 @@ class LicenseService:
         )
         session.add(license)
         session.flush()
-        license = session.query(AssetLicenseModel).filter_by(id=license.id).first()
+        license = session.scalars(
+            select(AssetLicenseModel).filter_by(id=license.id).limit(1)
+        ).first()
 
         return {
             **convert_keys_to_camel_case(license.to_dict()),
@@ -32,7 +35,7 @@ class LicenseService:
     def get_license(self, l_id, session=None):
         if session is None:
             session = get_session()
-        return session.query(AssetLicenseModel).filter_by(id=l_id).first()
+        return session.scalars(select(AssetLicenseModel).filter_by(id=l_id).limit(1)).first()
 
     async def revoke_license(self, license_id: int):
         session = get_session()

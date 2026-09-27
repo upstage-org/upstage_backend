@@ -3,7 +3,7 @@ import sys
 
 import pathlib
 
-from sqlalchemy import not_
+from sqlalchemy import delete, not_, select
 from terminal_colors import bcolors
 from upstage_backend.global_config import (
     UPLOAD_USER_CONTENT_FOLDER,
@@ -43,24 +43,28 @@ logger.info(bcolors.OKGREEN + "Start cleaning up..." + bcolors.ENDC)
 
 with ScopedSession() as session:
     keep_ids = []
-    for stage in session.query(StageModel).all():
+    for stage in session.scalars(select(StageModel)).all():
         if stage.file_location in stages_to_be_kepts:
             keep_ids.append(stage.id)
 
-    session.query(ParentStageModel).filter(
-        ParentStageModel.stage_id.notin_(keep_ids)
-    ).delete(synchronize_session=False)
+    session.execute(
+        delete(ParentStageModel).where(ParentStageModel.stage_id.notin_(keep_ids)),
+        execution_options={"synchronize_session": False},
+    )
 
-    for asset in session.query(AssetModel).filter(not_(AssetModel.stages.any())).all():
+    for asset in session.scalars(select(AssetModel).where(not_(AssetModel.stages.any()))).all():
         logger.info("🗑️ Deleting asset: {}".format(asset.name))
-        session.query(AssetLicenseModel).filter(
-            AssetLicenseModel.asset_id == asset.id
-        ).delete(synchronize_session=False)
-        session.query(AssetUsageModel).filter(
-            AssetUsageModel.asset_id == asset.id
-        ).delete(synchronize_session=False)
-        session.query(MediaTagModel).filter(MediaTagModel.asset_id == asset.id).delete(
-            synchronize_session=False
+        session.execute(
+            delete(AssetLicenseModel).where(AssetLicenseModel.asset_id == asset.id),
+            execution_options={"synchronize_session": False},
+        )
+        session.execute(
+            delete(AssetUsageModel).where(AssetUsageModel.asset_id == asset.id),
+            execution_options={"synchronize_session": False},
+        )
+        session.execute(
+            delete(MediaTagModel).where(MediaTagModel.asset_id == asset.id),
+            execution_options={"synchronize_session": False},
         )
         session.delete(asset)
 
@@ -69,58 +73,58 @@ with ScopedSession() as session:
     for ftype in os.listdir(upload_assets_folder):
         if ("." not in ftype) and (".." not in ftype) and os.path.isdir(ftype):
             for media in os.listdir("{}/{}".format(upload_assets_folder, ftype)):
-                if (
-                    not session.query(AssetModel)
-                    .filter(AssetModel.file_location == "{}/{}".format(ftype, media))
-                    .first()
-                ):
+                if not session.scalars(
+                    select(AssetModel)
+                    .where(AssetModel.file_location == "{}/{}".format(ftype, media))
+                    .limit(1)
+                ).first():
                     logger.info("🗑️ Deleting file {}/{}".format(ftype, media))
                     try:
-                        pathlib.Path(
-                            "{}/{}/{}".format(upload_assets_folder, ftype, media)
-                        ).unlink()
+                        pathlib.Path("{}/{}/{}".format(upload_assets_folder, ftype, media)).unlink()
                     except Exception:
                         logger.error(
-                            "Failed to remove {}/{}/{}".format(
-                                upload_assets_folder, ftype, media
-                            )
+                            "Failed to remove {}/{}/{}".format(upload_assets_folder, ftype, media)
                         )
 
-    for stage in session.query(StageModel).all():
+    for stage in session.scalars(select(StageModel)).all():
         if stage.file_location not in stages_to_be_kepts:
             logger.info("🗑️ Deleting stage: {}".format(stage.name))
-            session.query(StageAttributeModel).filter(
-                StageAttributeModel.stage_id == stage.id
-            ).delete(synchronize_session=False)
-            sample_event = (
-                session.query(EventModel)
-                .filter(
+            session.execute(
+                delete(StageAttributeModel).where(StageAttributeModel.stage_id == stage.id),
+                execution_options={"synchronize_session": False},
+            )
+            sample_event = session.scalars(
+                select(EventModel)
+                .where(
                     EventModel.performance_id.in_(
-                        session.query(PerformanceModel.id).filter(
-                            PerformanceModel.stage_id == stage.id
-                        )
+                        select(PerformanceModel.id).where(PerformanceModel.stage_id == stage.id)
                     )
                 )
-                .first()
-            )
+                .limit(1)
+            ).first()
             if sample_event:
-                session.query(EventModel).filter(
-                    EventModel.topic == sample_event.topic
-                ).delete(synchronize_session=False)
-            session.query(PerformanceModel).filter(
-                PerformanceModel.stage_id == stage.id
-            ).delete(synchronize_session=False)
-            session.query(SceneModel).filter(SceneModel.stage_id == stage.id).delete(
-                synchronize_session=False
+                session.execute(
+                    delete(EventModel).where(EventModel.topic == sample_event.topic),
+                    execution_options={"synchronize_session": False},
+                )
+            session.execute(
+                delete(PerformanceModel).where(PerformanceModel.stage_id == stage.id),
+                execution_options={"synchronize_session": False},
+            )
+            session.execute(
+                delete(SceneModel).where(SceneModel.stage_id == stage.id),
+                execution_options={"synchronize_session": False},
             )
             session.delete(stage)
         else:
             logger.info("🗑️ Clearing replays and scenes of {}".format(stage.name))
-            session.query(PerformanceModel).filter(
-                PerformanceModel.stage_id == stage.id
-            ).delete(synchronize_session=False)
-            session.query(SceneModel).filter(SceneModel.stage_id == stage.id).delete(
-                synchronize_session=False
+            session.execute(
+                delete(PerformanceModel).where(PerformanceModel.stage_id == stage.id),
+                execution_options={"synchronize_session": False},
+            )
+            session.execute(
+                delete(SceneModel).where(SceneModel.stage_id == stage.id),
+                execution_options={"synchronize_session": False},
             )
 
     session.commit()

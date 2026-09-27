@@ -5,7 +5,7 @@ Importing this package eagerly registers every asset model class on
 ``Base.registry``. This matters because ``AssetModel`` uses string class
 names in its ``relationship(...)`` declarations (e.g. ``"AssetLicenseModel"``,
 ``"MediaTagModel"``) which SQLAlchemy resolves at mapper-configuration time,
-i.e. on the first ``session.query(...)``. Any standalone entry point
+i.e. on the first ORM statement executed. Any standalone entry point
 (scripts, workers, ad-hoc jobs) that only imports a subset of the asset
 models risks hitting ``InvalidRequestError: failed to locate a name
 ('AssetLicenseModel')`` when the mapper tries to resolve those strings.

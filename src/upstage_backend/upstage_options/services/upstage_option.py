@@ -1,3 +1,5 @@
+from sqlalchemy import select
+
 from upstage_backend.global_config.env import CLIENT_MAX_BODY_SIZE
 
 from upstage_backend.global_config.helpers.object import convert_keys_to_camel_case
@@ -26,7 +28,7 @@ class SettingService:
     def get_config(self, name: str, session=None):
         if session is None:
             session = get_session()
-        return session.query(ConfigModel).filter_by(name=name).first()
+        return session.scalars(select(ConfigModel).filter_by(name=name).limit(1)).first()
 
     def upload_limit(self):
         """

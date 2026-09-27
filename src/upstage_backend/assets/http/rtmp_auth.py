@@ -33,6 +33,7 @@ from urllib.parse import parse_qs
 
 from fastapi import APIRouter, HTTPException, Response
 from pydantic import BaseModel, ConfigDict
+from sqlalchemy import select
 
 from upstage_backend.assets.db_models.asset import AssetModel
 from upstage_backend.global_config import get_session
@@ -103,7 +104,9 @@ async def rtmp_auth(payload: MtxAuthPayload):
     if payload.ip in LOOPBACK_IPS and key.endswith(OPUS_MIRROR_SUFFIX):
         base_key = key[: -len(OPUS_MIRROR_SUFFIX)]
         base_asset = (
-            get_session().query(AssetModel).filter(AssetModel.file_location == base_key).first()
+            get_session()
+            .scalars(select(AssetModel).where(AssetModel.file_location == base_key).limit(1))
+            .first()
         )
         if (
             base_asset is not None
@@ -118,7 +121,11 @@ async def rtmp_auth(payload: MtxAuthPayload):
         logger.warning("rtmp_auth: rejected publish for {} from {}", payload.path, payload.ip)
         raise HTTPException(status_code=401, detail="Invalid or expired token")
 
-    asset = get_session().query(AssetModel).filter(AssetModel.file_location == key).first()
+    asset = (
+        get_session()
+        .scalars(select(AssetModel).where(AssetModel.file_location == key).limit(1))
+        .first()
+    )
     if asset is None or not asset.asset_type or asset.asset_type.name != "stream":
         logger.warning("rtmp_auth: no stream asset for key {}", key)
         raise HTTPException(status_code=401, detail="Unknown stream key")

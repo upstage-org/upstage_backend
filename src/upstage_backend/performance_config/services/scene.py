@@ -1,4 +1,5 @@
 from graphql import GraphQLError
+from sqlalchemy import func, select
 from upstage_backend.global_config import get_session
 from upstage_backend.global_config.helpers.object import convert_keys_to_camel_case
 from upstage_backend.performance_config.db_models.scene import SceneModel
@@ -14,7 +15,7 @@ class SceneService:
         session = get_session()
         return [
             convert_keys_to_camel_case(scene.to_dict())
-            for scene in session.query(SceneModel).all()
+            for scene in session.scalars(select(SceneModel)).all()
         ]
 
     def create_scene(self, user: UserModel, input: SceneInput):
@@ -24,7 +25,9 @@ class SceneService:
         from upstage_backend.stages.db_models.stage import StageModel
         from upstage_backend.stages.services.stage import StageService
 
-        stage = session.query(StageModel).filter(StageModel.id == input.stageId).first()
+        stage = session.scalars(
+            select(StageModel).where(StageModel.id == input.stageId).limit(1)
+        ).first()
         # Owner / editor / admin only (raises "Stage not found" for None).
         StageService().extract_permission(user, stage)
 
@@ -36,27 +39,27 @@ class SceneService:
         )
 
         scene_order = (
-            session.query(SceneModel)
-            .filter(SceneModel.stage_id == input.stageId)
-            .count()
+            session.scalar(
+                select(func.count())
+                .select_from(SceneModel)
+                .where(SceneModel.stage_id == input.stageId)
+            )
             + 1
         )
 
         scene.scene_order = scene_order
 
         if input.name:
-            existed_scene = (
-                session.query(SceneModel)
-                .filter(SceneModel.stage_id == input.stageId)
-                .filter(SceneModel.active == True)  # noqa: E712  (SQLAlchemy column comparison)
-                .filter(SceneModel.name == input.name)
-                .first()
-            )
+            existed_scene = session.scalars(
+                select(SceneModel)
+                .where(SceneModel.stage_id == input.stageId)
+                .where(SceneModel.active == True)  # noqa: E712  (SQLAlchemy column comparison)
+                .where(SceneModel.name == input.name)
+                .limit(1)
+            ).first()
             if existed_scene:
                 raise GraphQLError(
-                    'Scene "{}" already existed. Please choose another name!'.format(
-                        input.name
-                    )
+                    'Scene "{}" already existed. Please choose another name!'.format(input.name)
                 )
             scene.name = input.name
         else:
@@ -64,12 +67,12 @@ class SceneService:
 
         session.add(scene)
         session.flush()
-        scene = session.query(SceneModel).filter_by(id=scene.id).first()
+        scene = session.scalars(select(SceneModel).filter_by(id=scene.id).limit(1)).first()
         return convert_keys_to_camel_case(scene)
 
     def delete_scene(self, user: UserModel, id: int):
         session = get_session()
-        scene = session.query(SceneModel).filter_by(id=id).first()
+        scene = session.scalars(select(SceneModel).filter_by(id=id).limit(1)).first()
         if not scene:
             raise GraphQLError("Scene not found")
 

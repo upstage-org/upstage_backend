@@ -267,9 +267,7 @@ def media_service(monkeypatch):
     )
     session = SimpleNamespace(
         flush=step("db:flush"),
-        query=lambda *_: SimpleNamespace(
-            filter_by=lambda **_: SimpleNamespace(first=lambda: asset)
-        ),
+        scalars=lambda *_: SimpleNamespace(first=lambda: asset),
     )
     monkeypatch.setattr(media_module, "get_session", lambda: session)
     monkeypatch.setattr(media_module, "finish_request_transaction", step("db:locks-released"))

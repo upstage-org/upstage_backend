@@ -15,6 +15,7 @@ These tests pin the rule: an assignment that survives a media save keeps its
 row (and so its position); only genuinely new assignments go to the end.
 """
 
+from sqlalchemy import select
 import random
 
 import pytest
@@ -38,19 +39,18 @@ test_MediaController = _TestMediaController()
 def _stage_order(stage_id):
     session = get_session()
     session.expire_all()
-    stage_row = session.query(StageModel).filter_by(id=stage_id).first()
+    stage_row = session.scalars(select(StageModel).filter_by(id=stage_id).limit(1)).first()
     return [row.child_asset_id for row in stage_row.assets]
 
 
 def _rows(stage_id, asset_id):
     session = get_session()
     session.expire_all()
-    return (
-        session.query(ParentStageModel)
+    return session.scalars(
+        select(ParentStageModel)
         .filter_by(stage_id=int(stage_id), child_asset_id=int(asset_id))
         .order_by(ParentStageModel.id)
-        .all()
-    )
+    ).all()
 
 
 @pytest.mark.anyio
@@ -189,7 +189,7 @@ class TestAssignmentOrder:
         stage, (a, b, c) = await self._stage_with_three_assets(client)
         other = await test_StageController.test_01_create_stage(client)
         session = get_session()
-        asset = session.query(AssetModel).filter_by(id=a).first()
+        asset = session.scalars(select(AssetModel).filter_by(id=a).limit(1)).first()
         row_id = _rows(stage["id"], a)[0].id
 
         mutation_query = """

@@ -1,5 +1,9 @@
+from sqlalchemy import select
 import pytest
-from upstage_backend.assets.tests.asset_test import TestAssetController as _TestAssetController, newest_test_asset
+from upstage_backend.assets.tests.asset_test import (
+    TestAssetController as _TestAssetController,
+    newest_test_asset,
+)
 from upstage_backend.assets.db_models.asset_license import AssetLicenseModel
 from upstage_backend.authentication.tests.auth_test import (
     TestAuthenticationController as _TestAuthenticationController,
@@ -20,7 +24,9 @@ class TestLicenseController:
                 revokeLicense(id: $id)
             }
         """
-        anonymous = client.post("/api/studio_graphql", json={"query": query, "variables": {"id": 1}})
+        anonymous = client.post(
+            "/api/studio_graphql", json={"query": query, "variables": {"id": 1}}
+        )
         assert anonymous.json()["errors"][0]["message"] == "Authenticated Failed"
 
         player_headers = test_AuthenticationController.get_headers(client, PLAYER)
@@ -69,9 +75,12 @@ class TestLicenseController:
         asset = newest_test_asset()
         license = (
             get_session()
-            .query(AssetLicenseModel)
-            .filter_by(asset_id=asset.id)
-            .order_by(AssetLicenseModel.id.desc())
+            .scalars(
+                select(AssetLicenseModel)
+                .filter_by(asset_id=asset.id)
+                .order_by(AssetLicenseModel.id.desc())
+                .limit(1)
+            )
             .first()
         )
         query = """
@@ -86,18 +95,16 @@ class TestLicenseController:
             "/api/studio_graphql", json={"query": query, "variables": variables}, headers=headers
         )
         assert response.status_code == 200
-        assert response.json()["data"]["revokeLicense"] == "License revoked {}".format(
-            license.id
-        )
+        assert response.json()["data"]["revokeLicense"] == "License revoked {}".format(license.id)
 
         response = client.post(
             "/api/studio_graphql", json={"query": query, "variables": variables}, headers=headers
         )
-        assert response.status_code == 200
-        assert response.json()["data"][
-            "revokeLicense"
-        ] == "Failed to revoke license {}".format(license.id)
+        # Already gone: the service reports it as a GraphQL error.
+        assert response.json()["errors"][0]["message"] == "License not found"
         license = (
-            get_session().query(AssetLicenseModel).filter_by(id=license.id).first()
+            get_session()
+            .scalars(select(AssetLicenseModel).filter_by(id=license.id).limit(1))
+            .first()
         )
         assert license is None

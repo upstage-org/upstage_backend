@@ -5,7 +5,7 @@ name: upstage-backend-${SITE}
 # ====================== Common Build (Simplified & Reliable) ======================
 x-common-build: &common_build |
   # syntax=docker/dockerfile:1
-  FROM python:3.12-slim-bookworm AS builder
+  FROM python:3.14-slim-trixie AS builder
 
   # uv: copied only into this builder stage; removed again before this stage ends (see RUN below).
   # No BuildKit cache mounts — deps resolve inside the ephemeral build layer only (no host-backed uv cache dir).
@@ -16,7 +16,7 @@ x-common-build: &common_build |
   WORKDIR /usr/app
 
   # Use the base image CPython only (portable across multi-stage COPY); not uv-managed Python under /root or $HOME.
-  ENV UV_PYTHON=/usr/local/bin/python3.12 \
+  ENV UV_PYTHON=/usr/local/bin/python3.14 \
       UV_COMPILE_BYTECODE=1 \
       UV_LINK_MODE=copy \
       UV_PYTHON_DOWNLOADS=never \
@@ -27,8 +27,8 @@ x-common-build: &common_build |
   COPY pyproject.toml ./
   COPY uv.lock* ./
 
-  RUN ( uv sync --python /usr/local/bin/python3.12 --frozen --no-dev --no-install-project \
-        || uv sync --python /usr/local/bin/python3.12 --no-dev --no-install-project ) \
+  RUN ( uv sync --python /usr/local/bin/python3.14 --frozen --no-dev --no-install-project \
+        || uv sync --python /usr/local/bin/python3.14 --no-dev --no-install-project ) \
       && test -d /usr/app/.venv \
       && test -x /usr/app/.venv/bin/python \
       && P=$$(readlink -f /usr/app/.venv/bin/python) \
@@ -37,7 +37,7 @@ x-common-build: &common_build |
       && rm -rf /root/.local/share/uv /root/.cache/uv 2>/dev/null || true
 
   # === Runtime stage ===
-  FROM python:3.12-slim-bookworm
+  FROM python:3.14-slim-trixie
 
   WORKDIR /usr/app
 
@@ -56,7 +56,7 @@ x-common-build: &common_build |
       PYTHONDONTWRITEBYTECODE=1 \
       PYTHONUNBUFFERED=1
 
-  # bookworm: shadow-utils; binaries live in /usr/sbin (PATH in RUN can omit it → 127)
+  # Debian: shadow-utils; binaries live in /usr/sbin (PATH in RUN can omit it → 127)
       RUN /usr/sbin/groupadd --gid ${APP_GROUP:?APP_GROUP is not set} appuser && \
       /usr/sbin/useradd --uid ${APP_USER:?APP_USER is not set} --gid ${APP_GROUP:?APP_GROUP is not set} \
               --create-home --shell /bin/bash appuser && \
@@ -70,7 +70,6 @@ x-common-build: &common_build |
   COPY --chown=appuser:appuser alembic ./alembic
   COPY --chown=appuser:appuser migration_scripts ./migration_scripts
   COPY --chown=appuser:appuser tests ./tests
-  COPY --chown=appuser:appuser general_tests ./general_tests
   COPY --chown=appuser:appuser dashboard/demo ./dashboard/demo
   RUN chown -R appuser:appuser uploads /usr/app/dashboard/demo
 

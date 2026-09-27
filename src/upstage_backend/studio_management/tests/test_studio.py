@@ -1,8 +1,11 @@
+from sqlalchemy import select
 import random
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from faker import Faker
 import pytest
-from upstage_backend.authentication.tests.auth_test import TestAuthenticationController as _TestAuthenticationController
+from upstage_backend.authentication.tests.auth_test import (
+    TestAuthenticationController as _TestAuthenticationController,
+)
 from upstage_backend.assets.db_models.asset import AssetModel
 from upstage_backend.assets.db_models.asset_usage import AssetUsageModel
 from upstage_backend.stages.db_models.stage import StageModel
@@ -103,15 +106,14 @@ class TestStudioController:
         # harness 2026-09-05).
         test_AuthenticationController.get_headers(client, PLAYER)
         with ScopedSession() as session:
-            user = session.query(UserModel).order_by(UserModel.id.desc()).first()
+            user = session.scalars(select(UserModel).order_by(UserModel.id.desc()).limit(1)).first()
             user.active = False
             username = user.username
             session.flush()
 
         user = (
             get_session()
-            .query(UserModel)
-            .filter(UserModel.username == username)
+            .scalars(select(UserModel).where(UserModel.username == username).limit(1))
             .first()
         )
 
@@ -166,10 +168,7 @@ class TestStudioController:
         assert "updateUser" in response.json()["data"]
         assert "email" in response.json()["data"]["updateUser"]
 
-        assert (
-            response.json()["data"]["updateUser"]["lastName"]
-            == variables["input"]["lastName"]
-        )
+        assert response.json()["data"]["updateUser"]["lastName"] == variables["input"]["lastName"]
 
         variables = {
             "input": {
@@ -222,9 +221,12 @@ class TestStudioController:
         # own (just updated) email is of course accepted → flaky failure.
         user_2 = (
             get_session()
-            .query(UserModel)
-            .filter(UserModel.id != user.id)
-            .order_by(UserModel.id.desc())
+            .scalars(
+                select(UserModel)
+                .where(UserModel.id != user.id)
+                .order_by(UserModel.id.desc())
+                .limit(1)
+            )
             .first()
         )
 
@@ -271,7 +273,7 @@ class TestStudioController:
             "usernameLike": "@",
             "createdBetween": [
                 "2021-01-01",
-                (datetime.now() + timedelta(days=365)).strftime("%Y-%m-%d"),
+                (datetime.now(timezone.utc) + timedelta(days=365)).strftime("%Y-%m-%d"),
             ],
         }
 
@@ -293,7 +295,9 @@ class TestStudioController:
         # A separate throwaway account: an unordered .all()[-1] may hand back
         # the super admin created just above, and deleting yourself is refused.
         test_AuthenticationController.get_headers(client, PLAYER)
-        user = get_session().query(UserModel).order_by(UserModel.id.desc()).first()
+        user = (
+            get_session().scalars(select(UserModel).order_by(UserModel.id.desc()).limit(1)).first()
+        )
 
         query = """
             mutation deleteUser($id: ID!) {
@@ -326,8 +330,14 @@ class TestStudioController:
         assert "errors" in response.json()
 
     async def test_05_change_password(self, client):
+        # A throwaway account with the known test password, as in test_02:
+        # `.all()[-1]` had no ORDER BY, so which account it returned (and
+        # whether its password was "testpassword") was up to the database.
+        test_AuthenticationController.get_headers(client, PLAYER)
+        user = (
+            get_session().scalars(select(UserModel).order_by(UserModel.id.desc()).limit(1)).first()
+        )
         headers = test_AuthenticationController.get_headers(client, SUPER_ADMIN)
-        user = get_session().query(UserModel).all()[-1]
 
         query = """
             mutation changePassword($input: ChangePasswordInput!) {
@@ -439,7 +449,7 @@ class TestStudioController:
         from upstage_backend.stages.tests.test_media import TestMediaController as _MediaFixtures
 
         asset_id = int(await _MediaFixtures().test_03_upload_media(client))
-        asset = get_session().query(AssetModel).get(asset_id)
+        asset = get_session().get(AssetModel, asset_id)
         variables = {
             "assetId": asset.id,
             "note": "This is a permission request",
@@ -472,7 +482,7 @@ class TestStudioController:
         assert "errors" in response.json()
 
         with ScopedSession() as session:
-            asset = session.query(AssetModel).get(asset_id)
+            asset = session.get(AssetModel, asset_id)
             asset.copyright_level = 2
             session.flush()
             variables = {
@@ -515,7 +525,11 @@ class TestStudioController:
                 }
         """
 
-        asset = get_session().query(AssetUsageModel).all()[-1]
+        asset = (
+            get_session()
+            .scalars(select(AssetUsageModel).order_by(AssetUsageModel.id.desc()).limit(1))
+            .first()
+        )
 
         variables = {
             "id": asset.id,
@@ -583,7 +597,9 @@ class TestStudioController:
         # Fixtures only: the newest test asset and the newest "Stage Name"
         # stage. An unfiltered .first() would quick-assign onto a real stage.
         from upstage_backend.assets.tests.asset_test import newest_test_asset
-        from upstage_backend.stages.tests.test_stage import TestStageController as _TestStageController
+        from upstage_backend.stages.tests.test_stage import (
+            TestStageController as _TestStageController,
+        )
 
         asset = newest_test_asset()
         if asset is None:
@@ -593,7 +609,7 @@ class TestStudioController:
             asset = newest_test_asset()
 
         stage = await _TestStageController().test_01_create_stage(client)
-        stage = get_session().query(StageModel).get(int(stage["id"]))
+        stage = get_session().get(StageModel, int(stage["id"]))
 
         variables = {
             "stageIds": [stage.id],

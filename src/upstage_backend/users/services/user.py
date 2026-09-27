@@ -2,12 +2,13 @@ import asyncio
 import hashlib
 import hmac
 import secrets
-from datetime import datetime, timedelta
+from datetime import timedelta
 
 from fastapi import Request
 from graphql import GraphQLError
 import requests
-from sqlalchemy import or_
+from sqlalchemy import delete, or_, select
+from upstage_backend.global_config.helpers.clock import as_utc, utcnow
 from upstage_backend.authentication.db_models.user_session import UserSessionModel
 from upstage_backend.global_config import get_session, logger
 from upstage_backend.global_config.db_context import finish_request_transaction
@@ -56,19 +57,17 @@ def _lookup_user(session, email_or_username: str):
     value = (email_or_username or "").strip()
     if not value:
         return None
-    return (
-        session.query(UserModel)
-        .filter(or_(UserModel.email == value, UserModel.username == value))
-        .first()
-    )
+    return session.scalars(
+        select(UserModel).where(or_(UserModel.email == value, UserModel.username == value)).limit(1)
+    ).first()
 
 
 def revoke_user_sessions(session, user_id: int, keep_access_token: str | None = None) -> None:
     """Delete every login session of `user_id` (after a password change/reset)."""
-    query = session.query(UserSessionModel).filter(UserSessionModel.user_id == user_id)
+    statement = delete(UserSessionModel).where(UserSessionModel.user_id == user_id)
     if keep_access_token:
-        query = query.filter(UserSessionModel.access_token != keep_access_token)
-    query.delete(synchronize_session=False)
+        statement = statement.where(UserSessionModel.access_token != keep_access_token)
+    session.execute(statement, execution_options={"synchronize_session": False})
 
 
 class UserService:
@@ -77,19 +76,17 @@ class UserService:
 
     def find_one(self, username: str, email: str):
         session = get_session()
-        return (
-            session.query(UserModel)
-            .filter(or_(UserModel.username == username, UserModel.email == email))
-            .first()
-        )
+        return session.scalars(
+            select(UserModel)
+            .where(or_(UserModel.username == username, UserModel.email == email))
+            .limit(1)
+        ).first()
 
     def find_by_id(self, user_id: int):
         session = get_session()
-        return (
-            session.query(UserModel)
-            .filter(UserModel.id == user_id, UserModel.active.is_(True))
-            .first()
-        )
+        return session.scalars(
+            select(UserModel).where(UserModel.id == user_id, UserModel.active.is_(True)).limit(1)
+        ).first()
 
     # `data` is the already-validated CreateUserInput as a plain dict
     # (the resolver runs the pydantic validation and passes model_dump()).
@@ -119,7 +116,9 @@ class UserService:
         session.add(user)
         session.flush()
 
-        user = session.query(UserModel).filter(UserModel.username == data["username"]).first()
+        user = session.scalars(
+            select(UserModel).where(UserModel.username == data["username"]).limit(1)
+        ).first()
 
         spawn(send([user.email], "Welcome to UpStage!", user_registration(user)))
         admin_emails = SUPPORT_EMAILS
@@ -182,7 +181,7 @@ class UserService:
             logger.warning("Cloudflare Turnstile verification unavailable: {}", error)
             raise GraphQLError(
                 "We could not verify the captcha right now. Please try again in a moment."
-            )
+            ) from None
         remoteip = cf_ip or ip
 
         if outcome.get("success"):
@@ -208,14 +207,14 @@ class UserService:
         if user and user.email:
             code = f"{secrets.randbelow(10**PASSWORD_RESET_CODE_DIGITS):0{PASSWORD_RESET_CODE_DIGITS}d}"
 
-            session.query(OneTimeTOTPModel).filter(OneTimeTOTPModel.user_id == user.id).delete()
+            session.execute(delete(OneTimeTOTPModel).where(OneTimeTOTPModel.user_id == user.id))
             session.flush()
             session.add(
                 OneTimeTOTPModel(
                     user_id=user.id,
                     code=_hash_reset_code(code),
                     url="0",
-                    recorded_time=datetime.now(),
+                    recorded_time=utcnow(),
                 )
             )
             session.flush()
@@ -241,15 +240,16 @@ class UserService:
         """
         user = _lookup_user(session, email)
         otp = (
-            session.query(OneTimeTOTPModel).filter(OneTimeTOTPModel.user_id == user.id).first()
+            session.scalars(
+                select(OneTimeTOTPModel).where(OneTimeTOTPModel.user_id == user.id).limit(1)
+            ).first()
             if user
             else None
         )
         if not user or not otp:
             raise GraphQLError(PASSWORD_RESET_INVALID)
 
-        issued = otp.recorded_time or datetime.min
-        if issued < datetime.now() - PASSWORD_RESET_TTL:
+        if not otp.recorded_time or as_utc(otp.recorded_time) < utcnow() - PASSWORD_RESET_TTL:
             session.delete(otp)
             session.flush()
             finish_request_transaction(commit=True)

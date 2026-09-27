@@ -7,13 +7,9 @@ rather than trying to connect to a real Postgres at import time.
 """
 
 import os
-import sys
 
 os.environ.setdefault("DATABASE_URL", "sqlite:///:memory:")
-os.environ.setdefault("ALGORITHM", "HS256")
 os.environ.setdefault("SECRET_KEY", "test-secret")
-os.environ.setdefault("REFRESH_SECRET_KEY", "test-refresh-secret")
-os.environ.setdefault("HOSTNAME", "localhost")
 os.environ.setdefault("ENV_TYPE", "Test")
 os.environ.setdefault("MQTT_BROKER", "localhost")
 os.environ.setdefault("MQTT_ADMIN_USER", "test")
@@ -22,24 +18,6 @@ os.environ.setdefault("MQTT_ADMIN_PORT", "1883")
 os.environ.setdefault("MQTT_TRANSPORT", "tcp")
 os.environ.setdefault("PERFORMANCE_TOPIC_RULE", "+/+/+")
 os.environ.setdefault("STRICT_DB_CONTEXT", "0")
-
-import types as _types  # noqa: E402
-
-if "databases" not in sys.modules:
-    _stub = _types.ModuleType("databases")
-
-    class _DatabaseStub:
-        def __init__(self, *args, **kwargs):
-            pass
-
-        async def connect(self):
-            return None
-
-        async def disconnect(self):
-            return None
-
-    _stub.Database = _DatabaseStub
-    sys.modules["databases"] = _stub
 
 import pytest  # noqa: E402
 from sqlalchemy import JSON as GenericJSON, create_engine, event  # noqa: E402

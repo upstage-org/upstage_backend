@@ -5,6 +5,8 @@ heads — so every new deployment gets a default stage for new players (the
 assign_user_to_default_stage hook adds them to it by its exact name).
 """
 
+from sqlalchemy import func, select
+
 from upstage_backend.global_config import logger
 from upstage_backend.global_config.database import ScopedSession
 from upstage_backend.stages.db_models.stage import StageModel
@@ -12,7 +14,7 @@ from upstage_backend.stages.scripts import scaffold_base_media
 
 
 def is_new_installation(session) -> bool:
-    return session.query(StageModel).count() == 0
+    return session.scalar(select(func.count()).select_from(StageModel)) == 0
 
 
 def bootstrap(force: bool = False) -> bool:

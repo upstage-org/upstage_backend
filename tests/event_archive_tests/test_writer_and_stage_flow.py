@@ -4,6 +4,7 @@ against the downstream consumers StageOperationService.get_event_list and
 StageService.sweep_stage.
 """
 
+from sqlalchemy import select
 import json
 import types
 
@@ -120,9 +121,7 @@ class TestWriterPersistAndRead:
 
         setup_session = rebound_db["db_session"]
         stage = _seed_stage(setup_session, file_location=WRITER_ID)
-        other_stage = _seed_stage(
-            setup_session, file_location=OTHER_WRITER_ID, name="Other"
-        )
+        other_stage = _seed_stage(setup_session, file_location=OTHER_WRITER_ID, name="Other")
 
         chat_payload = {"id": "u1", "nickname": "alice", "text": "hello", "at": 100}
         bg_payload = {"type": "changeBackground", "background": "b1.png", "at": 101}
@@ -171,14 +170,12 @@ class TestWriterPersistAndRead:
         stage_file_location = stage.file_location
         other_stage_id = other_stage.id
 
-        assert dropped == 1, (
-            "malformed payload should be dropped, matching legacy worker"
-        )
+        assert dropped == 1, "malformed payload should be dropped, matching legacy worker"
         assert len(persisted_ids) == 4
 
         from upstage_backend.event_archive.db_models.event import EventModel
 
-        rows = get_session().query(EventModel).order_by(EventModel.mqtt_timestamp).all()
+        rows = get_session().scalars(select(EventModel).order_by(EventModel.mqtt_timestamp)).all()
         assert [r.performance_id for r in rows] == [None, None, None, None]
         for r in rows:
             assert isinstance(r.payload, (dict, list)), (
@@ -213,9 +210,7 @@ class TestWriterPersistAndRead:
         assert live_events[2]["payload"] == board_payload
         assert all(e["performanceId"] is None for e in live_events)
 
-        other_live = op.get_event_list(
-            StageStreamInput(performanceId=None, cursor=None), other_ref
-        )
+        other_live = op.get_event_list(StageStreamInput(performanceId=None, cursor=None), other_ref)
         assert len(other_live) == 1, "file_location LIKE must isolate stages"
 
         from upstage_backend.stages.services.stage import StageService
@@ -231,8 +226,7 @@ class TestWriterPersistAndRead:
             StageStreamInput(performanceId=None, cursor=None), stage_ref
         )
         assert live_after_sweep == [], (
-            "after sweep, no events should remain with performance_id=NULL for "
-            "this stage"
+            "after sweep, no events should remain with performance_id=NULL for this stage"
         )
 
         archived = op.get_event_list(

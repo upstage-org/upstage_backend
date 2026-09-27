@@ -1,5 +1,8 @@
+from sqlalchemy import func, select
 import pytest
-from upstage_backend.authentication.tests.auth_test import TestAuthenticationController as _TestAuthenticationController
+from upstage_backend.authentication.tests.auth_test import (
+    TestAuthenticationController as _TestAuthenticationController,
+)
 from upstage_backend.global_config import get_session
 from upstage_backend.global_config.database import ScopedSession
 from upstage_backend.event_archive.db_models.event import EventModel
@@ -25,19 +28,20 @@ class TestPerformanceController:
 
         return (
             get_session()
-            .query(PerformanceModel)
-            .join(StageModel, StageModel.id == PerformanceModel.stage_id)
-            .filter(StageModel.name == "Stage Name")
-            .order_by(PerformanceModel.id.desc())
+            .scalars(
+                select(PerformanceModel)
+                .join(StageModel, StageModel.id == PerformanceModel.stage_id)
+                .where(StageModel.name == "Stage Name")
+                .order_by(PerformanceModel.id.desc())
+                .limit(1)
+            )
             .first()
         )
 
     async def test_01_start_recording(self, client):
         stage = await test_StageController.test_01_create_stage(client)
         headers = test_AuthenticationController.get_headers(client, SUPER_ADMIN)
-        variables = {
-            "input": {"stageId": stage["id"], "name": "Test", "description": "Test"}
-        }
+        variables = {"input": {"stageId": stage["id"], "name": "Test", "description": "Test"}}
 
         query = """
             mutation startRecording($input: RecordInput!) {
@@ -82,9 +86,7 @@ class TestPerformanceController:
         assert data["errors"][0]["message"] == "Stage not found"
 
         stage = await test_StageController.test_01_create_stage(client)
-        variables = {
-            "input": {"stageId": stage["id"], "name": "Test", "description": "Test"}
-        }
+        variables = {"input": {"stageId": stage["id"], "name": "Test", "description": "Test"}}
 
         headers = test_AuthenticationController.get_headers(client, PLAYER)
         response = client.post(
@@ -95,17 +97,12 @@ class TestPerformanceController:
         assert response.status_code == 200
         data = response.json()
         assert "errors" in data
-        assert (
-            data["errors"][0]["message"]
-            == "You are not allowed to record for this stage"
-        )
+        assert data["errors"][0]["message"] == "You are not allowed to record for this stage"
 
     async def test_03_update_recording(self, client):
         headers = test_AuthenticationController.get_headers(client, SUPER_ADMIN)
         stage = await test_StageController.test_01_create_stage(client)
-        variables = {
-            "input": {"stageId": stage["id"], "name": "Test", "description": "Test"}
-        }
+        variables = {"input": {"stageId": stage["id"], "name": "Test", "description": "Test"}}
 
         query = """
             mutation startRecording($input: RecordInput!) {
@@ -128,9 +125,7 @@ class TestPerformanceController:
         assert data["data"]["startRecording"] is not None
 
         performance = data["data"]["startRecording"]
-        variables = {
-            "input": {"id": performance["id"], "name": "Test", "description": "Test"}
-        }
+        variables = {"input": {"id": performance["id"], "name": "Test", "description": "Test"}}
 
         query = """
             mutation updatePerformance($input: PerformanceInput!) {
@@ -192,10 +187,7 @@ class TestPerformanceController:
         assert response.status_code == 200
         data = response.json()
         assert "errors" in data
-        assert (
-            data["errors"][0]["message"]
-            == "You are not allowed to update this performance"
-        )
+        assert data["errors"][0]["message"] == "You are not allowed to update this performance"
 
     async def test_05_save_recording(self, client):
         headers = test_AuthenticationController.get_headers(client, SUPER_ADMIN)
@@ -221,7 +213,9 @@ class TestPerformanceController:
         assert data["errors"][0]["message"] == "Nothing to record!"
 
         stage = (
-            get_session().query(StageModel).filter_by(id=performance.stage_id).first()
+            get_session()
+            .scalars(select(StageModel).filter_by(id=performance.stage_id).limit(1))
+            .first()
         )
         with ScopedSession() as session:
             event = EventModel(
@@ -278,10 +272,7 @@ class TestPerformanceController:
         assert response.status_code == 200
         data = response.json()
         assert "errors" in data
-        assert (
-            data["errors"][0]["message"]
-            == "Only stage owner or Admin can save a recording!"
-        )
+        assert data["errors"][0]["message"] == "Only stage owner or Admin can save a recording!"
 
     async def test_07_delete_performance(self, client):
         headers = test_AuthenticationController.get_headers(client, SUPER_ADMIN)
@@ -342,17 +333,12 @@ class TestPerformanceController:
         assert response.status_code == 200
         data = response.json()
         assert "errors" in data
-        assert (
-            data["errors"][0]["message"]
-            == "You are not allowed to delete this performance"
-        )
+        assert data["errors"][0]["message"] == "You are not allowed to delete this performance"
 
     async def test_09_duplicate_performance_with_trimmed_pauses(self, client):
         headers = test_AuthenticationController.get_headers(client, SUPER_ADMIN)
         stage = await test_StageController.test_01_create_stage(client)
-        variables = {
-            "input": {"stageId": stage["id"], "name": "Source", "description": "d"}
-        }
+        variables = {"input": {"stageId": stage["id"], "name": "Source", "description": "d"}}
         query_rec = """
             mutation startRecording($input: RecordInput!) {
                 startRecording(input: $input) { id }
@@ -369,7 +355,9 @@ class TestPerformanceController:
         performance_id = int(data["data"]["startRecording"]["id"])
 
         stage_row = (
-            get_session().query(StageModel).filter_by(id=int(stage["id"])).first()
+            get_session()
+            .scalars(select(StageModel).filter_by(id=int(stage["id"])).limit(1))
+            .first()
         )
         with ScopedSession() as session:
             loc = stage_row.file_location
@@ -411,18 +399,19 @@ class TestPerformanceController:
 
         cloned = (
             get_session()
-            .query(EventModel)
-            .filter(EventModel.performance_id == new_id)
-            .order_by(EventModel.mqtt_timestamp.asc())
+            .scalars(
+                select(EventModel)
+                .where(EventModel.performance_id == new_id)
+                .order_by(EventModel.mqtt_timestamp.asc())
+            )
             .all()
         )
         assert [e.mqtt_timestamp for e in cloned] == [1000.0, 1010.0, 1040.0]
 
-        source_left = (
-            get_session()
-            .query(EventModel)
-            .filter(EventModel.performance_id == performance_id)
-            .count()
+        source_left = get_session().scalar(
+            select(func.count())
+            .select_from(EventModel)
+            .where(EventModel.performance_id == performance_id)
         )
         assert source_left == 3
 
@@ -504,9 +493,12 @@ class TestPerformanceController:
         # whole table (that soft-deleted the dev Demo Stage's scene, 2026-09-10).
         return (
             get_session()
-            .query(SceneModel)
-            .filter(SceneModel.name == "Test")
-            .order_by(SceneModel.id.desc())
+            .scalars(
+                select(SceneModel)
+                .where(SceneModel.name == "Test")
+                .order_by(SceneModel.id.desc())
+                .limit(1)
+            )
             .first()
         )
 
@@ -570,6 +562,4 @@ class TestPerformanceController:
         assert response.status_code == 200
         data = response.json()
         assert "errors" in data
-        assert (
-            data["errors"][0]["message"] == "You are not allowed to delete this scene"
-        )
+        assert data["errors"][0]["message"] == "You are not allowed to delete this scene"

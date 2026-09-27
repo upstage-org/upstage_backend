@@ -1,8 +1,11 @@
+from sqlalchemy import select
 import os
 
 import pytest
 from upstage_backend.assets.db_models.asset import AssetModel
-from upstage_backend.authentication.tests.auth_test import TestAuthenticationController as _TestAuthenticationController
+from upstage_backend.authentication.tests.auth_test import (
+    TestAuthenticationController as _TestAuthenticationController,
+)
 from upstage_backend.global_config import get_session
 from upstage_backend.global_config.env import UPLOAD_USER_CONTENT_FOLDER
 from upstage_backend.stages.tests.test_stage import TestStageController as _TestStageController
@@ -44,7 +47,7 @@ class TestMediaController:
     async def test_01_assign_media(self, client):
         stage = await test_StageController.test_01_create_stage(client)
         await test_AssetController.test_03_save_media_successfully(client)
-        assets = get_session().query(AssetModel).filter(AssetModel.name == "test").all()
+        assets = get_session().scalars(select(AssetModel).where(AssetModel.name == "test")).all()
         response = await self.assign_media(client, stage["id"], [asset.id for asset in assets])
 
         assert "data" in response.json()
@@ -54,7 +57,7 @@ class TestMediaController:
         assert response.json()["data"]["assignMedia"]["id"] == stage["id"]
 
     async def test_02_assign_media_stage_not_found(self, client):
-        assets = get_session().query(AssetModel).filter(AssetModel.name == "test").all()
+        assets = get_session().scalars(select(AssetModel).where(AssetModel.name == "test")).all()
         response = await self.assign_media(client, 0, [asset.id for asset in assets])
         data = response.json()
         assert "errors" in data
@@ -116,10 +119,13 @@ class TestMediaController:
         # update must be refused (never the second row of the whole table).
         asset = (
             get_session()
-            .query(AssetModel)
-            .filter(AssetModel.name == "test")
-            .order_by(AssetModel.id.desc())
-            .offset(1)
+            .scalars(
+                select(AssetModel)
+                .where(AssetModel.name == "test")
+                .order_by(AssetModel.id.desc())
+                .offset(1)
+                .limit(1)
+            )
             .first()
         )
         response = self.update_media(client, headers, asset.id, file_location)
@@ -274,12 +280,14 @@ class TestMediaController:
         session.add(extra)
         session.commit()
 
-        ids = [asset.id for asset in session.query(AssetModel).order_by(AssetModel.id).all()]
+        ids = [
+            asset.id for asset in session.scalars(select(AssetModel).order_by(AssetModel.id)).all()
+        ]
         assert len(ids) >= 2
         reordered = list(reversed(ids))
 
         response = await self.assign_media(client, stage["id"], reordered)
         assert "errors" not in response.json()
 
-        stage_row = session.query(StageModel).filter_by(id=stage["id"]).first()
+        stage_row = session.scalars(select(StageModel).filter_by(id=stage["id"]).limit(1)).first()
         assert [row.child_asset_id for row in stage_row.assets] == reordered

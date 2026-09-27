@@ -1,17 +1,17 @@
 import asyncio
 import os
 
-from datetime import datetime, timedelta
+from datetime import timedelta
 import hashlib
 import json
 import re
 from typing import Optional
-import time
 from graphql import GraphQLError
-from sqlalchemy import or_
+from sqlalchemy import delete, func, or_, select
 from sqlalchemy.orm import joinedload, selectinload
 
 
+from upstage_backend.global_config.helpers.clock import as_utc, utcnow
 from upstage_backend.global_config import get_session
 from upstage_backend.global_config.env import (
     UPLOAD_USER_CONTENT_FOLDER,
@@ -99,29 +99,26 @@ class AssetService:
         stages, usages, tags = {}, {}, {}
         if not ids:
             return {"stages": stages, "usages": usages, "tags": tags}
-        for row in (
-            session.query(ParentStageModel)
-            .filter(ParentStageModel.child_asset_id.in_(ids))
+        for row in session.scalars(
+            select(ParentStageModel)
+            .where(ParentStageModel.child_asset_id.in_(ids))
             .options(joinedload(ParentStageModel.stage).joinedload(StageModel.owner))
             .order_by(ParentStageModel.id)
-            .all()
-        ):
+        ).all():
             stages.setdefault(row.child_asset_id, []).append(row)
-        for row in (
-            session.query(AssetUsageModel)
-            .filter(AssetUsageModel.asset_id.in_(ids))
+        for row in session.scalars(
+            select(AssetUsageModel)
+            .where(AssetUsageModel.asset_id.in_(ids))
             .options(joinedload(AssetUsageModel.user), joinedload(AssetUsageModel.asset))
             .order_by(AssetUsageModel.created_on.desc())
-            .all()
-        ):
+        ).all():
             usages.setdefault(row.asset_id, []).append(row)
-        for asset_id, name in (
-            session.query(MediaTagModel.asset_id, TagModel.name)
+        for asset_id, name in session.execute(
+            select(MediaTagModel.asset_id, TagModel.name)
             .join(TagModel, MediaTagModel.tag_id == TagModel.id)
-            .filter(MediaTagModel.asset_id.in_(ids))
+            .where(MediaTagModel.asset_id.in_(ids))
             .order_by(MediaTagModel.id)
-            .all()
-        ):
+        ).all():
             if name:
                 tags.setdefault(asset_id, []).append(name)
         return {"stages": stages, "usages": usages, "tags": tags}
@@ -129,8 +126,8 @@ class AssetService:
     def get_all_medias(self, user: UserModel, filter: dict | None = None):
         filter = filter or {}
         session = get_session()
-        query = (
-            session.query(AssetModel)
+        statement = (
+            select(AssetModel)
             .join(AssetTypeModel)
             .join(UserModel)
             .outerjoin(AssetLicenseModel)
@@ -138,39 +135,38 @@ class AssetService:
             # Was `ParentStageModel.stage_id == AssetModel.id`: a stage joined
             # to an unrelated asset whenever the ids happened to coincide.
             .outerjoin(StageModel, ParentStageModel.stage_id == StageModel.id)
-            .filter(AssetModel.dormant.is_not(True))
+            .where(AssetModel.dormant.is_not(True))
             .order_by(AssetModel.created_on.desc())
             .options(*self._ASSET_EAGER)
         )
 
         if "mediaType" in filter:
-            query = query.filter(AssetTypeModel.name == filter["mediaType"])
+            statement = statement.where(AssetTypeModel.name == filter["mediaType"])
 
         if "owner" in filter:
-            query = query.filter(UserModel.username == filter["owner"])
+            statement = statement.where(UserModel.username == filter["owner"])
 
-        assets = query.all()
+        assets = session.scalars(statement).all()
         prefetched = self._prefetch_asset_relations(session, assets)
 
         return [self.resolve_fields(asset, user, prefetched) for asset in assets]
 
     def search_assets(self, user: UserModel, search_assets: MediaTableInput):
         session = get_session()
-        query = (
-            session.query(AssetModel)
+        statement = (
+            select(AssetModel)
             .join(UserModel)
             .join(AssetTypeModel)
             .outerjoin(AssetLicenseModel)
             .outerjoin(ParentStageModel, AssetModel.id == ParentStageModel.child_asset_id)
             .outerjoin(StageModel, ParentStageModel.stage_id == StageModel.id)
             .group_by(AssetModel.id)
-            .options(*self._ASSET_EAGER)
         )
 
         if user.role not in [SUPER_ADMIN, ADMIN]:
-            query = query.filter(AssetModel.dormant.is_not(True))
+            statement = statement.where(AssetModel.dormant.is_not(True))
         elif search_assets.dormant is not None:
-            query = query.filter(AssetModel.dormant.is_(search_assets.dormant))
+            statement = statement.where(AssetModel.dormant.is_(search_assets.dormant))
 
         if search_assets.name:
             # The search box matches media name, tags, and the note/attributes
@@ -180,38 +176,38 @@ class AssetService:
             # would not surface (e.g. searching "helen" when "helen" is a tag).
             term = f"%{search_assets.name}%"
             tag_matches = (
-                session.query(MediaTagModel.asset_id)
+                select(MediaTagModel.asset_id)
                 .join(TagModel, MediaTagModel.tag_id == TagModel.id)
-                .filter(TagModel.name.ilike(term))
+                .where(TagModel.name.ilike(term))
             )
-            query = query.filter(
+            statement = statement.where(
                 AssetModel.name.ilike(term)
                 | AssetModel.description.ilike(term)
                 | AssetModel.id.in_(tag_matches)
             )
         if search_assets.mediaTypes:
-            query = query.filter(AssetTypeModel.name.in_(search_assets.mediaTypes))
+            statement = statement.where(AssetTypeModel.name.in_(search_assets.mediaTypes))
         if search_assets.owners:
-            query = query.filter(UserModel.username.in_(search_assets.owners))
+            statement = statement.where(UserModel.username.in_(search_assets.owners))
 
         if search_assets.stages:
-            query = query.filter(
+            statement = statement.where(
                 AssetModel.stages.any(ParentStageModel.stage_id.in_(search_assets.stages))
             )
         if search_assets.tags:
-            query = (
-                query.join(MediaTagModel)
+            statement = (
+                statement.join(MediaTagModel)
                 .join(TagModel)
-                .filter(TagModel.name.in_(search_assets.tags))
+                .where(TagModel.name.in_(search_assets.tags))
             )
         if search_assets.createdBetween:
-            query = query.filter(
+            statement = statement.where(
                 AssetModel.created_on.between(
                     search_assets.createdBetween[0], search_assets.createdBetween[1]
                 )
             )
 
-        total_count = query.count()
+        total_count = session.scalar(select(func.count()).select_from(statement.subquery()))
 
         if search_assets.sort:
             # The table sends an ordered list of sort keys for multi-column
@@ -233,15 +229,15 @@ class AssetService:
                 sort_field = sort_field_map.get(field)
                 if sort_field is None:
                     continue
-                query = query.order_by(
+                statement = statement.order_by(
                     sort_field.asc() if direction == "ASC" else sort_field.desc()
                 )
 
         if search_assets.page and search_assets.limit:
-            query = query.limit(search_assets.limit).offset(
+            statement = statement.limit(search_assets.limit).offset(
                 (search_assets.page - 1) * search_assets.limit
             )
-        assets = query.all()
+        assets = session.scalars(statement.options(*self._ASSET_EAGER)).all()
         prefetched = self._prefetch_asset_relations(session, assets)
 
         return {
@@ -312,10 +308,14 @@ class AssetService:
         asset_type = self.validate_asset_type(input, session)
 
         if input.id:
-            asset = session.query(AssetModel).filter(AssetModel.id == input.id).first()
+            asset = session.scalars(
+                select(AssetModel).where(AssetModel.id == input.id).limit(1)
+            ).first()
             if not asset:
                 raise GraphQLError("Media not found")
-            require_owner_or_admin(owner, asset.owner_id, "You are not allowed to update this asset")
+            require_owner_or_admin(
+                owner, asset.owner_id, "You are not allowed to update this asset"
+            )
         else:
             asset = AssetModel(owner_id=owner.id)
         # Stage links are rebuilt from input.stageAssignments below; reject the
@@ -356,7 +356,9 @@ class AssetService:
             tags = input.tags
             asset.tags.delete()
             for tag in tags:
-                tag_model = local_db_session.query(TagModel).filter(TagModel.name == tag).first()
+                tag_model = local_db_session.scalars(
+                    select(TagModel).where(TagModel.name == tag).limit(1)
+                ).first()
                 if not tag_model:
                     tag_model = TagModel(name=tag)
                     local_db_session.add(tag_model)
@@ -364,7 +366,9 @@ class AssetService:
                 asset.tags.append(MediaTagModel(tag_id=tag_model.id))
 
             local_db_session.flush()
-            asset = local_db_session.query(AssetModel).filter(AssetModel.id == asset.id).first()
+            asset = local_db_session.scalars(
+                select(AssetModel).where(AssetModel.id == asset.id).limit(1)
+            ).first()
 
         return asset
 
@@ -404,14 +408,14 @@ class AssetService:
                         asset.permissions.remove(permission)
                         local_db_session.delete(permission)
             for user_id in user_ids:
-                permission = (
-                    local_db_session.query(AssetUsageModel)
-                    .filter(
+                permission = local_db_session.scalars(
+                    select(AssetUsageModel)
+                    .where(
                         AssetUsageModel.asset_id == asset.id,
                         AssetUsageModel.user_id == user_id,
                     )
-                    .first()
-                )
+                    .limit(1)
+                ).first()
                 if not permission:
                     permission = AssetUsageModel(user_id=user_id)
                     asset.permissions.append(permission)
@@ -535,7 +539,7 @@ class AssetService:
         from upstage_backend.stages.services.stage_operation import StageOperationService
 
         resolve_permission = StageOperationService().resolve_permission
-        stages = local_db_session.query(StageModel).filter(StageModel.id.in_(wanted)).all()
+        stages = local_db_session.scalars(select(StageModel).where(StageModel.id.in_(wanted))).all()
         for stage in stages:
             if resolve_permission(user.id, stage) not in ("owner", "editor", "player"):
                 raise GraphQLError(
@@ -544,9 +548,9 @@ class AssetService:
 
     def change_owner(self, owner: str, local_db_session, asset: AssetModel):
         if owner:
-            new_owner = (
-                local_db_session.query(UserModel).filter(UserModel.username == owner).first()
-            )
+            new_owner = local_db_session.scalars(
+                select(UserModel).where(UserModel.username == owner).limit(1)
+            ).first()
             if new_owner:
                 if new_owner.id != asset.owner_id and new_owner.role in (
                     ADMIN,
@@ -556,7 +560,7 @@ class AssetService:
                     asset.owner_id = new_owner.id
             else:
                 raise GraphQLError("Owner not found")
-        asset.updated_on = datetime.now()
+        asset.updated_on = utcnow()
         local_db_session.flush()
 
     def process_file_location(self, input, local_db_session, asset):
@@ -579,12 +583,12 @@ class AssetService:
         if not is_safe_relative_path(file_location):
             raise GraphQLError("Invalid file location")
         if file_location != asset.file_location and "/" not in file_location:
-            existed_asset = (
-                local_db_session.query(AssetModel)
-                .filter(AssetModel.file_location == file_location)
-                .filter(AssetModel.id != asset.id)
-                .first()
-            )
+            existed_asset = local_db_session.scalars(
+                select(AssetModel)
+                .where(AssetModel.file_location == file_location)
+                .where(AssetModel.id != asset.id)
+                .limit(1)
+            ).first()
             if existed_asset:
                 raise GraphQLError(
                     "Stream with the same key already existed, please pick another unique key!"
@@ -597,9 +601,9 @@ class AssetService:
         media_type = input.mediaType
         if not isinstance(media_type, str) or not _MEDIA_TYPE_RE.match(media_type):
             raise GraphQLError("Unsupported media type")
-        asset_type = (
-            local_db_session.query(AssetTypeModel).filter(AssetTypeModel.name == media_type).first()
-        )
+        asset_type = local_db_session.scalars(
+            select(AssetTypeModel).where(AssetTypeModel.name == media_type).limit(1)
+        ).first()
 
         if not asset_type:
             asset_type = AssetTypeModel(name=media_type, file_location=media_type)
@@ -610,12 +614,9 @@ class AssetService:
 
     def delete_media(self, owner: UserModel, id: int):
         session = get_session()
-        asset = (
-            session.query(AssetModel)
-            .outerjoin(ParentStageModel)
-            .filter(AssetModel.id == id)
-            .first()
-        )
+        asset = session.scalars(
+            select(AssetModel).outerjoin(ParentStageModel).where(AssetModel.id == id).limit(1)
+        ).first()
 
         if not asset:
             raise GraphQLError("Media not found")
@@ -640,12 +641,12 @@ class AssetService:
             input.status.value == MediaStatusEnum.DORMANT.value
         ):
             session = get_session()
-            asset = (
-                session.query(AssetModel)
+            asset = session.scalars(
+                select(AssetModel)
                 .outerjoin(ParentStageModel)
-                .filter(AssetModel.id == input.id)
-                .first()
-            )
+                .where(AssetModel.id == input.id)
+                .limit(1)
+            ).first()
 
             if not asset:
                 raise GraphQLError("Media not found")
@@ -676,38 +677,34 @@ class AssetService:
             attributes = json.loads(asset.description)
             if "frames" in attributes:
                 for frame in attributes["frames"]:
-                    frame_asset = (
-                        local_db_session.query(AssetModel)
-                        .filter(
+                    frame_asset = local_db_session.scalars(
+                        select(AssetModel)
+                        .where(
                             or_(
                                 AssetModel.file_location == frame,
                                 AssetModel.description.contains(frame),
                             )
                         )
-                        .first()
-                    )
+                        .limit(1)
+                    ).first()
                     if not frame_asset:
                         self.file_handing.delete_file(try_safe_join(storagePath, frame))
 
         physical_path = try_safe_join(storagePath, asset.file_location or "")
-        local_db_session.query(ParentStageModel).filter(
-            ParentStageModel.child_asset_id == asset.id
-        ).delete(synchronize_session=False)
-        local_db_session.query(MediaTagModel).filter(MediaTagModel.asset_id == asset.id).delete(
-            synchronize_session=False
-        )
-        local_db_session.query(AssetLicenseModel).filter(
-            AssetLicenseModel.asset_id == asset.id
-        ).delete(synchronize_session=False)
-        local_db_session.query(AssetUsageModel).filter(AssetUsageModel.asset_id == asset.id).delete(
-            synchronize_session=False
-        )
-
-        for multiframe_media in (
-            local_db_session.query(AssetModel)
-            .filter(AssetModel.description.like(f"%{asset.file_location}%"))
-            .all()
+        for model, column in (
+            (ParentStageModel, ParentStageModel.child_asset_id),
+            (MediaTagModel, MediaTagModel.asset_id),
+            (AssetLicenseModel, AssetLicenseModel.asset_id),
+            (AssetUsageModel, AssetUsageModel.asset_id),
         ):
+            local_db_session.execute(
+                delete(model).where(column == asset.id),
+                execution_options={"synchronize_session": False},
+            )
+
+        for multiframe_media in local_db_session.scalars(
+            select(AssetModel).where(AssetModel.description.like(f"%{asset.file_location}%"))
+        ).all():
             attributes = json.loads(multiframe_media.description)
             for i, frame in enumerate(attributes["frames"]):
                 if "?" in frame:
@@ -721,14 +718,14 @@ class AssetService:
 
     def resolve_sign(self, user: UserModel, asset: AssetModel):
         if asset.owner_id == user.id:
-            timestamp = int((datetime.now() + timedelta(days=STREAM_EXPIRY_DAYS)).timestamp())
+            timestamp = int((utcnow() + timedelta(days=STREAM_EXPIRY_DAYS)).timestamp())
             payload = "/live/{0}-{1}-{2}".format(asset.file_location, timestamp, STREAM_KEY)
             hashvalue = hashlib.md5(payload.encode("utf-8")).hexdigest()
             return "{0}-{1}".format(timestamp, hashvalue)
         return ""
 
     def resolve_src(self, asset: AssetModel):
-        timestamp = int(time.mktime(asset.updated_on.timetuple()))
+        timestamp = int(as_utc(asset.updated_on).timestamp())
         return asset.file_location + "?t=" + str(timestamp)
 
     def resolve_permission(self, user_id: int, asset: AssetModel):
@@ -808,24 +805,24 @@ class AssetService:
         session = get_session()
         return [
             convert_keys_to_camel_case(type.to_dict())
-            for type in session.query(AssetTypeModel).order_by(AssetTypeModel.name.asc()).all()
+            for type in session.scalars(
+                select(AssetTypeModel).order_by(AssetTypeModel.name.asc())
+            ).all()
         ]
 
     def get_tags(self):
         session = get_session()
         return [
             convert_keys_to_camel_case(tag.to_dict())
-            for tag in session.query(TagModel).order_by(TagModel.name.asc()).all()
+            for tag in session.scalars(select(TagModel).order_by(TagModel.name.asc())).all()
         ]
 
     def get_voices(self):
         session = get_session()
         voices = []
-        for media in (
-            session.query(AssetModel)
-            .filter(AssetModel.asset_type.has(AssetTypeModel.name == "avatar"))
-            .all()
-        ):
+        for media in session.scalars(
+            select(AssetModel).where(AssetModel.asset_type.has(AssetTypeModel.name == "avatar"))
+        ).all():
             if media.description:
                 attributes = json.loads(media.description)
                 if "voice" in attributes:
@@ -860,12 +857,12 @@ class AssetService:
             usage = next((u for u in usages if u.user_id == user_id), None)
         else:
             session = get_session()
-            usage = (
-                session.query(AssetUsageModel)
-                .filter(AssetUsageModel.asset_id == asset.id)
-                .filter(AssetUsageModel.user_id == user_id)
-                .first()
-            )
+            usage = session.scalars(
+                select(AssetUsageModel)
+                .where(AssetUsageModel.asset_id == asset.id)
+                .where(AssetUsageModel.user_id == user_id)
+                .limit(1)
+            ).first()
         if usage:
             if not usage.approved and asset.copyright_level == 2:
                 return Previlege.PENDING_APPROVAL.value
@@ -876,9 +873,8 @@ class AssetService:
 
     def resolve_permissions(self, asset_id: int):
         session = get_session()
-        return (
-            session.query(AssetUsageModel)
-            .filter(AssetUsageModel.asset_id == asset_id)
+        return session.scalars(
+            select(AssetUsageModel)
+            .where(AssetUsageModel.asset_id == asset_id)
             .order_by(AssetUsageModel.created_on.desc())
-            .all()
-        )
+        ).all()

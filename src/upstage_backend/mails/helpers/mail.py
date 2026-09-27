@@ -7,6 +7,7 @@ from email.utils import formatdate, getaddresses, make_msgid
 import re
 import ssl
 import aiosmtplib
+from sqlalchemy import select
 
 from upstage_backend.global_config import ScopedSession
 from upstage_backend.global_config.logger import logger
@@ -120,11 +121,9 @@ def create_email(
     filenames, cc, bcc = list(filenames or []), list(cc or []), list(bcc or [])
     msg = MIMEMultipart("fixed")
     with ScopedSession() as local_db_session:
-        subject_prefix = (
-            local_db_session.query(ConfigModel)
-            .filter(ConfigModel.name == "EMAIL_SUBJECT_PREFIX")
-            .first()
-        )
+        subject_prefix = local_db_session.scalars(
+            select(ConfigModel).where(ConfigModel.name == "EMAIL_SUBJECT_PREFIX").limit(1)
+        ).first()
         if subject_prefix:
             subject = f"{subject_prefix.value}: {subject}"
     # The MIME preamble is emitted as raw ASCII by the generator, so it must

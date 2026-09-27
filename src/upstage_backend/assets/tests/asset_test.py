@@ -1,10 +1,13 @@
+from sqlalchemy import select
 import base64
 import os
 
 import pytest
 from upstage_backend.global_config.env import JWT_HEADER_NAME, UPLOAD_USER_CONTENT_FOLDER
 from upstage_backend.global_config import get_session
-from upstage_backend.authentication.tests.auth_test import TestAuthenticationController as _TestAuthenticationController
+from upstage_backend.authentication.tests.auth_test import (
+    TestAuthenticationController as _TestAuthenticationController,
+)
 from upstage_backend.assets.db_models.asset import AssetModel
 from upstage_backend.stages.tests.test_stage import TestStageController as _TestStageController
 from upstage_backend.stages.db_models.stage import StageModel
@@ -32,11 +35,16 @@ def newest_test_asset():
     streams and audio that way on 2026-09-10)."""
     return (
         get_session()
-        .query(AssetModel)
-        .filter(AssetModel.name == "test")
-        .order_by(AssetModel.id.desc())
+        .scalars(
+            select(AssetModel)
+            .where(AssetModel.name == "test")
+            .order_by(AssetModel.id.desc())
+            .limit(1)
+        )
         .first()
     )
+
+
 test_stageController = _TestStageController()
 
 
@@ -156,8 +164,8 @@ class TestAssetController:
             }
         """
 
-        stages = get_session().query(StageModel).all()
-        users = get_session().query(UserModel).all()
+        stages = get_session().scalars(select(StageModel)).all()
+        users = get_session().scalars(select(UserModel)).all()
 
         variables = {
             "input": {
@@ -186,7 +194,7 @@ class TestAssetController:
 
     async def test_05_search_assets(self, client):
         data = await test_AuthenticationController.test_02_login_successfully(client)
-        _ = get_session().query(AssetModel).join(UserModel).first()
+        _ = get_session().scalars(select(AssetModel).join(UserModel).limit(1)).first()
         headers = {
             "Authorization": f"Bearer {data['data']['login']['access_token']}",
             JWT_HEADER_NAME: data["data"]["login"]["refresh_token"],
@@ -204,8 +212,8 @@ class TestAssetController:
             }
         """
 
-        users = get_session().query(UserModel).all()
-        stages = get_session().query(StageModel).all()
+        users = get_session().scalars(select(UserModel)).all()
+        stages = get_session().scalars(select(StageModel)).all()
 
         response = client.post(
             "/api/studio_graphql",
@@ -444,7 +452,7 @@ class TestAssetController:
         )
         assert response.status_code == 200
 
-        asset = get_session().query(AssetModel).filter_by(id=asset.id).first()
+        asset = get_session().scalars(select(AssetModel).filter_by(id=asset.id).limit(1)).first()
         assert asset is None
 
     async def test_11_upload_file_with_large_file(self, client):

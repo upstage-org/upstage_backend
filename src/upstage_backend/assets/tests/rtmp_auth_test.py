@@ -11,12 +11,22 @@ import time
 import pytest
 
 from upstage_backend.assets.http import rtmp_auth
-from upstage_backend.authentication.tests.auth_test import TestAuthenticationController as _TestAuthenticationController
+from upstage_backend.authentication.tests.auth_test import (
+    TestAuthenticationController as _TestAuthenticationController,
+)
 from upstage_backend.global_config.env import JWT_HEADER_NAME
 
 test_AuthenticationController = _TestAuthenticationController()
 
 STREAM_ASSET_KEY = "rtmpauthtestkey"
+
+
+@pytest.fixture(autouse=True)
+def _stream_key(monkeypatch):
+    # The endpoint answers 503 without a STREAM_KEY, and CI configures none;
+    # the suite must not depend on the host's secret being present.
+    if not rtmp_auth.STREAM_KEY:
+        monkeypatch.setattr(rtmp_auth, "STREAM_KEY", "rtmp-auth-test-stream-key")
 
 
 def make_token(key: str, ts: int, stream_key: str) -> str:

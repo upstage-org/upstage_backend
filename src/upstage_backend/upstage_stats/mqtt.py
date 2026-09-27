@@ -2,11 +2,12 @@ from upstage_backend.global_config import logger
 
 import json
 import secrets
-from datetime import datetime
 
 import paho.mqtt.client as mqtt
+from sqlalchemy import select, update
 
 from upstage_backend.global_config.env import MQTT_TRANSPORT
+from upstage_backend.global_config.helpers.clock import utcnow
 from upstage_backend.global_config.database import ScopedSession
 from upstage_backend.upstage_stats.db_models.receive_stat import ReceiveStatModel
 from upstage_backend.upstage_stats.db_models.connection_stat import ConnectionStatModel
@@ -31,7 +32,7 @@ def on_connect(client: mqtt.Client, userdata, flags, rc):
         client.subscribe(CONNECTION_TOPIC)
         connection_payload = {
             "connected": client._client_id.decode("utf-8"),
-            "timestamp": datetime.now().isoformat(),
+            "timestamp": utcnow().isoformat(),
             "channel": CONNECTION_TOPIC,
         }
         client.publish(CONNECTION_TOPIC, payload=json.dumps(connection_payload))
@@ -53,22 +54,22 @@ def record_stage_statistics(msg: mqtt.MQTTMessage):
         players = int(payload.get("players", 0) or 0)
         audiences = int(payload.get("audiences", 0) or 0)
         with ScopedSession() as session:
-            row = (
-                session.query(StageStatisticModel)
-                .filter(StageStatisticModel.stage_url == stage_url)
-                .first()
-            )
+            row = session.scalars(
+                select(StageStatisticModel)
+                .where(StageStatisticModel.stage_url == stage_url)
+                .limit(1)
+            ).first()
             if row:
                 row.players = players
                 row.audiences = audiences
-                row.updated_on = datetime.now()
+                row.updated_on = utcnow()
             else:
                 session.add(
                     StageStatisticModel(
                         stage_url=stage_url,
                         players=players,
                         audiences=audiences,
-                        updated_on=datetime.now(),
+                        updated_on=utcnow(),
                     )
                 )
     except Exception as error:
@@ -116,24 +117,23 @@ def on_message(client: mqtt.Client, userdata, msg: mqtt.MQTTMessage):
             client_messages[client_id] = 0
             try:
                 with ScopedSession() as session:
-                    receive_stat = session.query(ReceiveStatModel).filter(
-                        ReceiveStatModel.received_id == client_id
-                    )
-                    if not receive_stat.first():
+                    received = ReceiveStatModel.received_id == client_id
+                    if not session.scalars(
+                        select(ReceiveStatModel).where(received).limit(1)
+                    ).first():
                         receive_stat = ReceiveStatModel(
                             received_id=client_id,
-                            mqtt_timestamp=datetime.now(),
+                            mqtt_timestamp=utcnow(),
                             topic=LIVE_CLIENT_TOPIC,
                             payload=payload,
                         )
                         session.add(receive_stat)
                     else:
-                        receive_stat.update(
-                            {
-                                ReceiveStatModel.mqtt_timestamp: datetime.now(),
-                                ReceiveStatModel.payload: payload,
-                            },
-                            synchronize_session=False,
+                        session.execute(
+                            update(ReceiveStatModel)
+                            .where(received)
+                            .values(mqtt_timestamp=utcnow(), payload=payload),
+                            execution_options={"synchronize_session": False},
                         )
             except Exception as error:
                 logger.error(error)
@@ -156,4 +156,3 @@ def build_client(client_id=None, transport=MQTT_TRANSPORT):
     client.on_message = on_message
     client.on_disconnect = on_disconnect
     return client
-

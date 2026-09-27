@@ -1,4 +1,7 @@
 import json
+
+from sqlalchemy import select
+
 from upstage_backend.event_archive.db_models.event import EventModel
 from upstage_backend.performance_config.db_models.performance import PerformanceModel
 from upstage_backend.performance_config.db_models.scene import SceneModel
@@ -15,16 +18,14 @@ class StageOperationService:
 
     def assign_user_to_default_stage(self, user_ids: list[int]):
         session = get_session()
-        stage = (
-            session.query(StageModel).filter(StageModel.name == "Demo Stage").first()
-        )
+        stage = session.scalars(
+            select(StageModel).where(StageModel.name == "Demo Stage").limit(1)
+        ).first()
 
         if not stage:
             return
 
-        playerAccess = stage.attributes.filter(
-            StageAttributeModel.name == "playerAccess"
-        ).first()
+        playerAccess = stage.attributes.filter(StageAttributeModel.name == "playerAccess").first()
 
         if not playerAccess or not playerAccess.description:
             return
@@ -45,20 +46,17 @@ class StageOperationService:
 
     def resolve_performances(self, stage_id: int):
         session = get_session()
-        return (
-            session.query(PerformanceModel)
-            .filter(PerformanceModel.stage_id == stage_id)
-            .all()
-        )
+        return session.scalars(
+            select(PerformanceModel).where(PerformanceModel.stage_id == stage_id)
+        ).all()
 
     def resolve_chats(self, file_location: str):
         session = get_session()
-        return (
-            session.query(EventModel)
-            .filter(EventModel.topic.like("%/{}/chat".format(file_location)))
+        return session.scalars(
+            select(EventModel)
+            .where(EventModel.topic.like("%/{}/chat".format(file_location)))
             .order_by(EventModel.mqtt_timestamp.asc())
-            .all()
-        )
+        ).all()
 
     # Sentinel: "caller did not pre-fetch the playerAccess attribute".
     _UNSET = object()
@@ -99,24 +97,23 @@ class StageOperationService:
     def get_event_list(self, input: StageStreamInput, stage: StageModel):
         session = get_session()
         cursor = input.cursor if input.cursor else 0
-        events = (
-            session.query(EventModel)
-            .filter(EventModel.performance_id == input.performanceId)
-            .filter(EventModel.topic.like("%/{}/%".format(stage.file_location)))
-            .filter(EventModel.id > cursor)
+        events = session.scalars(
+            select(EventModel)
+            .where(EventModel.performance_id == input.performanceId)
+            .where(EventModel.topic.like("%/{}/%".format(stage.file_location)))
+            .where(EventModel.id > cursor)
             .order_by(EventModel.mqtt_timestamp.asc())
-            .all()
-        )
+        ).all()
         return [convert_keys_to_camel_case(event.to_dict()) for event in events]
 
     def get_scene_list(self, input: StageStreamInput, stage_id: int):
         session = get_session()
-        query = (
-            session.query(SceneModel)
-            .filter(SceneModel.stage_id == stage_id)
+        statement = (
+            select(SceneModel)
+            .where(SceneModel.stage_id == stage_id)
             .order_by(SceneModel.scene_order.asc())
         )
         if not input.performanceId:  # Only fetch disabled scene in performance replay
-            query = query.filter(SceneModel.active == True)  # noqa: E712  (SQLAlchemy column comparison)
-        scenes = query.all()
+            statement = statement.where(SceneModel.active == True)  # noqa: E712  (SQLAlchemy column comparison)
+        scenes = session.scalars(statement).all()
         return [convert_keys_to_camel_case(scene.to_dict()) for scene in scenes]

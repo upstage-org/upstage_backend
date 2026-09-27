@@ -1,5 +1,7 @@
 import html
 
+from sqlalchemy import select
+
 from upstage_backend.global_config.env import EMAIL_HOST_FROM
 from upstage_backend.global_config import get_session
 
@@ -12,17 +14,15 @@ def get_footer():
     )
 
     session = get_session()
-    addingSignatureEmail = (
-        session.query(ConfigModel)
-        .filter(ConfigModel.name == ADDING_EMAIL_SIGNATURE)
-        .first()
-    )
+    addingSignatureEmail = session.scalars(
+        select(ConfigModel).where(ConfigModel.name == ADDING_EMAIL_SIGNATURE).limit(1)
+    ).first()
     if addingSignatureEmail and addingSignatureEmail.value != "true":
         return ""
 
-    signature = (
-        session.query(ConfigModel).filter(ConfigModel.name == EMAIL_SIGNATURE).first()
-    )
+    signature = session.scalars(
+        select(ConfigModel).where(ConfigModel.name == EMAIL_SIGNATURE).limit(1)
+    ).first()
     return signature.value if signature else ""
 
 

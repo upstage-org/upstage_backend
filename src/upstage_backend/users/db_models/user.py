@@ -1,5 +1,7 @@
-from sqlalchemy import TIMESTAMP, BigInteger, Boolean, Column, Integer, String, Text, text
+from sqlalchemy import TIMESTAMP, BigInteger, Boolean, Integer, String, Text, text
 from datetime import datetime
+from sqlalchemy.orm import Mapped, mapped_column
+from upstage_backend.global_config.helpers.clock import utcnow
 from upstage_backend.global_config.db_models.base import BaseModel
 
 
@@ -18,25 +20,29 @@ ROLES = {
 class UserModel(BaseModel):
     __tablename__ = "upstage_user"
 
-    id = Column(BigInteger().with_variant(Integer, "sqlite"), primary_key=True, autoincrement=True)
-    username = Column(Text, nullable=False, unique=True, default="")
-    password = Column(Text, nullable=False, default="")
-    email = Column(Text, nullable=True, default="")
-    bin_name = Column(Text, nullable=True, default="")
-    role = Column(Integer, nullable=False, default=0)
-    first_name = Column(String, default="")
-    last_name = Column(String, default="")
-    display_name = Column(String, default="")
-    active = Column(Boolean, nullable=False, default=False)
-    firebase_pushnot_id = Column(String, default=None)
-    created_on = Column(TIMESTAMP(timezone=True), default=datetime.now)
-    deactivated_on = Column(TIMESTAMP(timezone=True), default=None)
+    id: Mapped[int] = mapped_column(
+        BigInteger().with_variant(Integer, "sqlite"), primary_key=True, autoincrement=True
+    )
+    username: Mapped[str] = mapped_column(Text, nullable=False, unique=True, default="")
+    password: Mapped[str] = mapped_column(Text, nullable=False, default="")
+    email: Mapped[str | None] = mapped_column(Text, nullable=True, default="")
+    bin_name: Mapped[str | None] = mapped_column(Text, nullable=True, default="")
+    role: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    first_name: Mapped[str | None] = mapped_column(String, default="")
+    last_name: Mapped[str | None] = mapped_column(String, default="")
+    display_name: Mapped[str | None] = mapped_column(String, default="")
+    active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    firebase_pushnot_id: Mapped[str | None] = mapped_column(String, default=None)
+    created_on: Mapped[datetime | None] = mapped_column(TIMESTAMP(timezone=True), default=utcnow)
+    deactivated_on: Mapped[datetime | None] = mapped_column(TIMESTAMP(timezone=True), default=None)
     # server_default mirrors alembic c3d5e7f9a1b2: NULL is never "unlimited"
     # (users.services.upload_limit reads it as this default anyway).
-    upload_limit = Column(Integer, default=1024 * 1024, server_default=text("1048576"))
-    intro = Column(Text, default=None)
-    can_send_email = Column(Boolean, default=False)
-    last_login = Column(TIMESTAMP(timezone=True), default=None)
+    upload_limit: Mapped[int | None] = mapped_column(
+        Integer, default=1024 * 1024, server_default=text("1048576")
+    )
+    intro: Mapped[str | None] = mapped_column(Text, default=None)
+    can_send_email: Mapped[bool | None] = mapped_column(Boolean, default=False)
+    last_login: Mapped[datetime | None] = mapped_column(TIMESTAMP(timezone=True), default=None)
 
     # Fields that any authenticated user may see about another user (player
     # pickers in Media permissions / Stage filters). Everything else (email,

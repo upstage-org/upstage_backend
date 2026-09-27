@@ -1,8 +1,12 @@
-from datetime import datetime, timedelta, timezone
+from datetime import timedelta
 from graphql import GraphQLError
+import uuid
+
 import jwt
 from fastapi import Request
+from sqlalchemy import delete, select, update
 from email.utils import parseaddr
+from upstage_backend.global_config.helpers.clock import utcnow
 from upstage_backend.authentication.http.validation import LoginInput
 from upstage_backend.users.db_models.user import (
     ADMIN,
@@ -15,9 +19,9 @@ from upstage_backend.users.services.user import UserService
 from upstage_backend.global_config.helpers.password import verify_password
 from upstage_backend.global_config.env import (
     ENV_TYPE,
-    JWT_ACCESS_TOKEN_MINUTES,
+    JWT_ADMIN_TOKEN_DAYS,
     JWT_HEADER_NAME,
-    JWT_REFRESH_TOKEN_DAYS,
+    JWT_USER_TOKEN_DAYS,
     SECRET_KEY,
     ALGORITHM,
 )
@@ -40,13 +44,7 @@ class AuthenticationService:
             raise GraphQLError("Incorrect username or password. Please try again.")
 
         self.validate_password(password, user)
-        access_token = self.create_token(
-            {"user_id": user.id}, timedelta(minutes=int(JWT_ACCESS_TOKEN_MINUTES))
-        )
-        refresh_token = self.create_token(
-            {"user_id": user.id, "type": "refresh"},
-            timedelta(days=int(JWT_REFRESH_TOKEN_DAYS) if user.role == SUPER_ADMIN else 1),
-        )
+        access_token, refresh_token = self.create_token_pair(user)
 
         user_session = UserSessionModel(
             user_id=user.id,
@@ -58,13 +56,13 @@ class AuthenticationService:
             app_device=request.headers.get("X-Upstage-Device-Model"),
         )
 
-        user.last_login = datetime.now()
+        user.last_login = utcnow()
 
         db = get_request_session()
         db.add(user_session)
         db.flush()
 
-        db.query(UserModel).filter(UserModel.id == user.id).update({"last_login": datetime.now()})
+        db.execute(update(UserModel).where(UserModel.id == user.id).values(last_login=utcnow()))
 
         title_prefix = "" if ENV_TYPE == "Production" else "DEV "
         default_title = title_prefix + "Upstage"
@@ -109,14 +107,35 @@ class AuthenticationService:
                 "Your account has been successfully created but not approved yet.<br/>Please wait for approval or contact UpStage Admin for support!"
             )
 
-    def create_token(self, data: dict, exp: timedelta | None = None):
-        if exp is None:
-            exp = timedelta(minutes=int(JWT_ACCESS_TOKEN_MINUTES))
+    @staticmethod
+    def token_lifetime(role) -> timedelta:
+        """
+        How long a login lasts: JWT_ADMIN_TOKEN_DAYS for admins and super
+        admins, JWT_USER_TOKEN_DAYS for everyone else.
+        """
+        days = JWT_ADMIN_TOKEN_DAYS if role in (ADMIN, SUPER_ADMIN) else JWT_USER_TOKEN_DAYS
+        return timedelta(days=days)
+
+    def create_token_pair(self, user: UserModel) -> tuple[str, str]:
+        """
+        A fresh (access token, refresh token) pair for `user`, both valid for
+        the user's role lifetime. The refresh token does not outlive the
+        access token: the client renews the pair while it is still valid (it
+        schedules that ahead of the expiry); once the lifetime has passed
+        without a renewal, the user logs in again.
+        """
+        lifetime = self.token_lifetime(user.role)
+        access_token = self.create_token({"user_id": user.id}, lifetime)
+        refresh_token = self.create_token({"user_id": user.id, "type": "refresh"}, lifetime)
+        return access_token, refresh_token
+
+    def create_token(self, data: dict, exp: timedelta):
         to_encode = data.copy()
-        # PyJWT reads naive datetimes as UTC; an aware value is correct on any
-        # host timezone.
-        expire = datetime.now(timezone.utc) + exp
-        to_encode.update({"exp": expire})
+        # `jti` makes every token distinct. Without it two tokens issued to
+        # one user within the same second were identical, so a refresh right
+        # after a login "rotated" the refresh token into itself and the used
+        # token stayed valid.
+        to_encode.update({"exp": utcnow() + exp, "jti": uuid.uuid4().hex})
         encoded_jwt = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
         return encoded_jwt
 
@@ -127,9 +146,9 @@ class AuthenticationService:
 
         access_token = bearer_token[1]
         db = get_request_session()
-        user_session = (
-            db.query(UserSessionModel).filter(UserSessionModel.access_token == access_token).first()
-        )
+        user_session = db.scalars(
+            select(UserSessionModel).where(UserSessionModel.access_token == access_token).limit(1)
+        ).first()
         if not user_session:
             raise GraphQLError("Invalid access token")
         db.delete(user_session)
@@ -154,33 +173,25 @@ class AuthenticationService:
             raise GraphQLError("Invalid refresh token")
 
         db = get_request_session()
-        session = (
-            db.query(UserSessionModel)
-            .filter(UserSessionModel.refresh_token == current_refresh_token)
-            .first()
-        )
+        session = db.scalars(
+            select(UserSessionModel)
+            .where(UserSessionModel.refresh_token == current_refresh_token)
+            .limit(1)
+        ).first()
 
         if not session or session.user_id != claims.get("user_id"):
             raise GraphQLError("Invalid refresh token")
 
-        user = db.query(UserModel).filter(UserModel.id == session.user_id).first()
+        user = db.scalars(select(UserModel).where(UserModel.id == session.user_id).limit(1)).first()
         if not user or not user.active:
             db.delete(session)
             raise GraphQLError("Invalid refresh token")
 
-        access_token = self.create_token(
-            {"user_id": session.user_id},
-            timedelta(minutes=int(JWT_ACCESS_TOKEN_MINUTES)),
-        )
+        access_token, refresh_token = self.create_token_pair(user)
 
-        refresh_token = self.create_token(
-            {"user_id": user.id, "type": "refresh"},
-            timedelta(days=int(JWT_REFRESH_TOKEN_DAYS) if user.role == SUPER_ADMIN else 1),
+        db.execute(
+            delete(UserSessionModel).where(UserSessionModel.refresh_token == current_refresh_token)
         )
-
-        db.query(UserSessionModel).filter(
-            UserSessionModel.refresh_token == current_refresh_token
-        ).delete()
 
         user_session = UserSessionModel(
             user_id=user.id,
@@ -194,17 +205,17 @@ class AuthenticationService:
         db.add(user_session)
         db.flush()
 
-        db.query(UserModel).filter(UserModel.id == user.id).update({"last_login": datetime.now()})
+        db.execute(update(UserModel).where(UserModel.id == user.id).values(last_login=utcnow()))
 
         return {"access_token": access_token, "refresh_token": refresh_token}
 
     def get_session(self, token: str, user_id: int):
         db = get_request_session()
-        return (
-            db.query(UserSessionModel)
-            .filter(
+        return db.scalars(
+            select(UserSessionModel)
+            .where(
                 UserSessionModel.user_id == user_id,
                 UserSessionModel.access_token == token,
             )
-            .first()
-        )
+            .limit(1)
+        ).first()

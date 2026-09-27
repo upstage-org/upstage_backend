@@ -1,10 +1,36 @@
-### 4. Application API Endpoints
+### Application API Endpoints
 
-- Endpoint: `domain.com/api/studio_graphql`
+- Endpoint: `POST <host>/api/studio_graphql` (HTTP only; there is no GraphQL WebSocket route and the schema has no `Subscription` type).
+- The schema (SDL) is the `type_defs` string in `src/upstage_backend/studio_management/http/graphql.py`. That file is the authoritative reference for every type, input and enum; this document lists the operations, who may call them, and an example request for each. The examples below are validated against that SDL.
+- Resolvers are in each module's `http/schema.py` and are bound to the schema in `config_graphql_endpoints` (`src/upstage_backend/global_config/schema.py`).
+
+The only other HTTP route is `POST /api/rtmp/auth` (`src/upstage_backend/assets/http/rtmp_auth.py`), which is called by the MediaMTX streaming server, not by API clients.
+
+### Authentication
+
+- `login` returns `access_token` and `refresh_token` (JWTs).
+- Authenticated operations need the header `Authorization: Bearer <access_token>`.
+- `refreshToken` reads the refresh token from the header `X-Access-Token`.
+- `logout` reads the access token from the `Authorization` header.
+
+Roles (`src/upstage_backend/users/db_models/user.py`): Player = `1`, Guest = `4`, Admin = `8`, Super admin = `32`.
+
+The "Access" line of each operation below is what the resolver's `@authenticated(allowed_roles=...)` decorator enforces:
+
+| Access | Meaning |
+|---|---|
+| Public | No decorator; no token needed |
+| Any logged-in user | `@authenticated()` with no role list |
+| Player, Admin, Super admin | `allowed_roles=[SUPER_ADMIN, ADMIN, PLAYER]` |
+| Admin, Super admin | `allowed_roles=[SUPER_ADMIN, ADMIN]` |
+
+Services may apply further checks (ownership, stage permission) on top of the decorator; those noted below are the ones stated in the code that was read for this document, not a complete list.
+
+Authentication failures are GraphQL errors with one of these messages: `Authenticated Failed`, `Signature has expired`, `Permission denied`.
 
 ### Common Error Response Structure
 
-In case of an error, the API will return a response with the following structure:
+In case of an error, the API returns the standard GraphQL error structure:
 
 ```json
 {
@@ -16,16 +42,13 @@ In case of an error, the API will return a response with the following structure
             "message": "Error message describing the issue.",
             "locations": [
                 {
-                    "line": lineNumber,
-                    "column": columnNumber
+                    "line": 2,
+                    "column": 3
                 }
             ],
             "path": [
                 "operationName"
-            ],
-            "extensions": {
-                "exception": null
-            }
+            ]
         }
     ]
 }
@@ -40,7 +63,7 @@ Example Error Response:
     },
     "errors": [
         {
-            "message": "Signature did not match digest. Please contact admin to make sure that cipher key is correctly set up.",
+            "message": "Incorrect username or password. Please try again.",
             "locations": [
                 {
                     "line": 2,
@@ -49,138 +72,24 @@ Example Error Response:
             ],
             "path": [
                 "login"
-            ],
-            "extensions": {
-                "exception": null
-            }
+            ]
         }
     ]
 }
 ```
- 
-**currentUser**
-Example Query:
-```graphql
-query {
-    currentUser {
-        id
-        name
-        email
-    }
-}
-```
 
-Example Response:
-```json
-{
-    "data": {
-        "currentUser": {
-            "id": "1",
-            "name": "John Doe",
-            "email": "john.doe@example.com"
-        }
-    }
-}
-```
+A request that fails validation against the schema has no `data` key and its errors have no `path`. When `ENV_TYPE` is neither `"Production"` nor `"Dev"`, the GraphQL app runs in debug mode and errors carry additional debug information.
 
-**createUser**
-Example Mutation:
-```graphql
-mutation {
-    createUser(input: {
-        name: "Jane Doe",
-        email: "jane.doe@example.com",
-        password: "password123"
-    }) {
-        user {
-            id
-            name
-            email
-        }
-    }
-}
-```
+Timestamps serialised from the database models carry the UTC offset, for example `2024-11-26T17:42:04.545183+00:00`.
 
-Example Response:
-```json
-{
-    "data": {
-        "createUser": {
-            "user": {
-                "id": "2",
-                "name": "Jane Doe",
-                "email": "jane.doe@example.com"
-            }
-        }
-    }
-}
-```
+---
 
-**requestPasswordReset**
-Example Mutation:
-```graphql
-mutation {
-    requestPasswordReset(email: "jane.doe@example.com") {
-        message
-    }
-}
-```
+## Users and authentication
 
-Example Response:
-```json
-{
-    "data": {
-        "requestPasswordReset": {
-            "message": "Password reset link sent to your email."
-        }
-    }
-}
-```
-
-**verifyPasswordReset**
-Example Mutation:
-```graphql
-mutation {
-    verifyPasswordReset(token: "reset-token") {
-        message
-    }
-}
-```
-
-Example Response:
-```json
-{
-    "data": {
-        "verifyPasswordReset": {
-            "success": true
-        }
-    }
-}
-```
-
-**resetPassword**
-Example Mutation:
-```graphql
-mutation {
-    resetPassword(token: "reset-token", newPassword: "newPassword123") {
-        success
-        message
-    }
-}
-```
-
-Example Response:
-```json
-{
-    "data": {
-        "resetPassword": {
-            "success": true
-        }
-    }
-}
-```
 **login**
-Example Mutation:
+
+`login(payload: LoginInput!): TokenType` — Access: Public. `LoginInput.token` is the captcha token, verified only when `ENV_TYPE` is `"Production"`.
+
 ```graphql
 mutation {
     login(payload: {
@@ -202,31 +111,10 @@ mutation {
 }
 ```
 
-Example Response:
-```json
-{
-    "data": {
-        "login": {
-            "user_id": 1,
-            "access_token": "access-token",
-            "refresh_token": "refresh-token",
-            "role": 2,
-            "first_name": "John",
-            "groups": [
-                {
-                    "id": 1,
-                    "name": "Admin"
-                }
-            ],
-            "username": "user123",
-            "title": "Mr."
-        }
-    }
-}
-```
-
 **refreshToken**
-Example Mutation:
+
+`refreshToken: RefreshTokenResponse` — Access: Public (needs a valid refresh token in the `X-Access-Token` header).
+
 ```graphql
 mutation {
     refreshToken {
@@ -236,43 +124,264 @@ mutation {
 }
 ```
 
-Example Response:
-```json
-{
-    "data": {
-        "refreshToken": {
-            "access_token": "new-access-token",
-            "refresh_token": "new-refresh_token"
-        }
-    }
-}
-```
-
 **logout**
-Example Mutation:
+
+`logout: String` — Access: Public (needs the access token in the `Authorization` header). Returns `"Logged out"`.
+
 ```graphql
 mutation {
     logout
 }
 ```
 
-Example Response:
-```json
-{
-    "data": {
-        "logout": "Successfully logged out"
+**currentUser**
+
+`currentUser: User` — Access: Any logged-in user.
+
+```graphql
+query {
+    currentUser {
+        id
+        username
+        email
+        effectiveUploadLimit
     }
 }
 ```
 
-**stages**
-Example Mutation:
+**whoami**
+
+`whoami: User` — Access: Any logged-in user. Also fills `roleName`.
+
 ```graphql
 query {
-    stages(input: SearchStageInput) {
+    whoami {
+        id
+        username
+        email
+        roleName
+        effectiveUploadLimit
+    }
+}
+```
+
+**createUser**
+
+`createUser(inbound: CreateUserInput!): CreateUserPayload` — Access: Public. The resolver validates the input further (`users/http/validation.py`): `email` and `intro` are required, `password` has a minimum length of 8, `username` a minimum length of 2.
+
+```graphql
+mutation {
+    createUser(inbound: {
+        username: "janedoe",
+        password: "password123",
+        email: "jane.doe@example.com",
+        intro: "Hello"
+    }) {
+        user {
+            id
+            username
+            email
+        }
+    }
+}
+```
+
+**requestPasswordReset**
+
+`requestPasswordReset(email: String!): CommonResponse` — Access: Public.
+
+```graphql
+mutation {
+    requestPasswordReset(email: "jane.doe@example.com") {
+        success
+        message
+    }
+}
+```
+
+**verifyPasswordReset**
+
+`verifyPasswordReset(input: ResetPasswordInput!): CommonResponse` — Access: Public. Uses `email` and `token` of the input.
+
+```graphql
+mutation {
+    verifyPasswordReset(input: {
+        email: "jane.doe@example.com",
+        token: "123456"
+    }) {
+        success
+        message
+    }
+}
+```
+
+**resetPassword**
+
+`resetPassword(input: ResetPasswordInput!): CommonResponse` — Access: Public. `password` is nullable in the SDL but required by the resolver's validation (minimum length 8).
+
+```graphql
+mutation {
+    resetPassword(input: {
+        email: "jane.doe@example.com",
+        token: "123456",
+        password: "newPassword123"
+    }) {
+        success
+        message
+    }
+}
+```
+
+**changePassword**
+
+`changePassword(input: ChangePasswordInput!): CommonResponse` — Access: Any logged-in user.
+
+```graphql
+mutation {
+    changePassword(input: {
+        oldPassword: "oldPassword123",
+        newPassword: "newPassword123",
+        id: "1"
+    }) {
+        success
+        message
+    }
+}
+```
+
+## Studio: user administration
+
+**users**
+
+`users(active: Boolean): [User!]!` — Access: Player, Admin, Super admin. For callers who are not admins the service trims the result to the public user fields.
+
+```graphql
+query {
+    users(active: true) {
+        id
+        username
+        displayName
+    }
+}
+```
+
+**adminPlayers**
+
+`adminPlayers(limit: Int, page: Int, sort: [AdminPlayerSortEnum], usernameLike: String, createdBetween: [String]): AdminPlayerConnection` — Access: Any logged-in user. For callers who are not admins the service trims the result to the public user fields.
+
+```graphql
+query {
+    adminPlayers(limit: 10, page: 1, sort: [USERNAME_ASC]) {
         totalCount
         edges {
-             id
+            id
+            username
+            displayName
+        }
+    }
+}
+```
+
+**batchUserCreation**
+
+`batchUserCreation(users: [BatchUserInput]!): BatchUserCreationPayload` — Access: Admin, Super admin.
+
+```graphql
+mutation {
+    batchUserCreation(users: [
+        {
+            username: "user1",
+            password: "password1",
+            email: "user1@example.com"
+        },
+        {
+            username: "user2",
+            password: "password2",
+            email: "user2@example.com"
+        }
+    ]) {
+        users {
+            id
+            username
+            email
+        }
+    }
+}
+```
+
+**updateUser**
+
+`updateUser(input: UpdateUserInput!): User` — Access: Player, Admin, Super admin.
+
+```graphql
+mutation {
+    updateUser(input: {
+        id: "1",
+        username: "updatedUser",
+        email: "updated@example.com"
+    }) {
+        id
+        username
+        email
+    }
+}
+```
+
+**deleteUser**
+
+`deleteUser(id: ID!, contentAction: UserContentAction = REASSIGN_TO_ADMIN): CommonResponse` — Access: Admin, Super admin. `contentAction` is `REASSIGN_TO_ADMIN` or `DELETE_ALL`.
+
+```graphql
+mutation {
+    deleteUser(id: "1", contentAction: REASSIGN_TO_ADMIN) {
+        success
+        message
+    }
+}
+```
+
+**sendEmail**
+
+`sendEmail(input: SendEmailInput!): CommonResponse` — Access: Any logged-in user; the resolver then requires the caller to be an Admin / Super admin or to have `canSendEmail` set. `recipients` and `bcc` are comma-separated; at least one address is required. Returns `success: true`.
+
+```graphql
+mutation {
+    sendEmail(input: {
+        subject: "Test Email",
+        body: "This is a test email.",
+        recipients: "recipient@example.com",
+        bcc: "bcc@example.com"
+    }) {
+        success
+        message
+    }
+}
+```
+
+**calcSizes**
+
+`calcSizes: Size` — Access: Admin, Super admin.
+
+```graphql
+mutation {
+    calcSizes {
+        size
+    }
+}
+```
+
+## Stages
+
+**stages**
+
+`stages(input: SearchStageInput): StagesResponse` — Access: Player, Admin, Super admin.
+
+```graphql
+query {
+    stages(input: { page: 1, limit: 10, sort: [NAME_ASC] }) {
+        totalCount
+        edges {
+            id
             name
             fileLocation
             status
@@ -281,118 +390,167 @@ query {
             description
             playerAccess
             permission
-            owner
-            assets
+            owner {
+                username
+            }
+            assets {
+                id
+                name
+            }
         }
     }
 }
 ```
 
-Example Response:
-```json
-{
-    "data": {
-        "stages": {
-            "totalCount": 2,
-            "edges": [
-                {
-                    "id": "1",
-                    "name": "Stage One",
-                    "fileLocation": "/path/to/file1",
-                    "status": "active",
-                    "visibility": true,
-                    "cover": "cover1.png",
-                    "description": "Description of Stage One",
-                    "playerAccess": "public",
-                    "permission": "read",
-                    "owner": "owner1",
-                    "assets": ["asset1", "asset2"]
-                },
-                {
-                    "id": "2",
-                    "name": "Stage Two",
-                    "fileLocation": "/path/to/file2",
-                    "status": "inactive",
-                    "visibility": false,
-                    "cover": "cover2.png",
-                    "description": "Description of Stage Two",
-                    "playerAccess": "private",
-                    "permission": "write",
-                    "owner": "owner2",
-                    "assets": ["asset3", "asset4"]
-                }
-            ]
-        }
-    }
-}
-```
+**stage**
 
-**stagebyid**
-Example Query:
+`stage(id: ID!): Stage` — Access: Player, Admin, Super admin.
+
 ```graphql
 query {
-    stageById(id: "1") {
+    stage(id: "1") {
         id
         name
         description
         visibility
         createdOn
-        updatedOn
+        lastAccess
     }
 }
 ```
 
-Example Response:
-```json
-{
-    "data": {
-        "stageById": {
-            "id": "1",
-            "name": "Stage One",
-            "description": "Description of Stage One",
-            "visibility": true,
-            "createdOn": "2023-10-01",
-            "updatedOn": "2023-10-02"
+**getAllStages**
+
+`getAllStages: [Stage!]!` — Access: Any logged-in user.
+
+```graphql
+query {
+    getAllStages {
+        id
+        name
+        owner {
+            username
+            displayName
+        }
+        createdOn
+    }
+}
+```
+
+**foyerStageList**
+
+`foyerStageList: [Stage!]!` — Access: Public.
+
+```graphql
+query {
+    foyerStageList {
+        id
+        name
+        owner {
+            displayName
+            username
+        }
+        fileLocation
+        cover
+    }
+}
+```
+
+**stageList**
+
+`stageList(input: StageStreamInput): [Stage!]!` — Access: Public. A bearer token, when sent, identifies the caller. `StageStreamInput` takes `fileLocation`, `performanceId` (replay an archived performance) and `cursor` (only events with a greater id). `mqtt` returns the broker login the browser connects with.
+
+```graphql
+query {
+    stageList(input: { fileLocation: "duplicate-stage17" }) {
+        id
+        name
+        fileLocation
+        owner {
+            id
+            binName
+            username
+        }
+        attributes {
+            id
+            name
+            description
+        }
+        visibility
+        status
+        permission
+        assets {
+            assetType {
+                name
+            }
+            name
+            id
+            fileLocation
+            description
+        }
+        scenes {
+            id
+            name
+        }
+        events {
+            id
+            topic
+            payload
+            mqttTimestamp
+        }
+        mqtt {
+            username
+            password
         }
     }
 }
 ```
 
+**notifications**
+
+`notifications: [Notification]` — Access: Player, Admin, Super admin. `type` is `1` (media usage request), `2` (permission approved) or `3` (media acknowledgement).
+
+```graphql
+query {
+    notifications {
+        type
+        mediaUsage {
+            id
+            assetId
+            userId
+            approved
+            note
+            createdOn
+        }
+    }
+}
+```
 
 **createStage**
-Example Mutation:
+
+`createStage(input: StageInput!): Stage` — Access: Player, Admin, Super admin. `fileLocation` is the stage's URL slug: letters, digits, `-` and `_`, and unique.
+
 ```graphql
 mutation {
     createStage(input: {
         name: "New Stage",
+        fileLocation: "new-stage",
         description: "Stage description",
         visibility: true
     }) {
         id
         name
+        fileLocation
         description
         visibility
-    }
-}
-```
-
-Example Response:
-```json
-{
-    "data": {
-        "createStage": {
-            "id": "1",
-            "name": "New Stage",
-            "description": "Stage description",
-            "visibility": true
-        }
     }
 }
 ```
 
 **updateStage**
 
-Example Mutation:
+`updateStage(input: StageInput!): Stage` — Access: Player, Admin, Super admin.
+
 ```graphql
 mutation {
     updateStage(input: {
@@ -407,21 +565,10 @@ mutation {
 }
 ```
 
-Example Response:
-```json
-{
-    "data": {
-        "updateStage": {
-            "id": "1",
-            "name": "Updated Stage",
-            "description": "Updated description"
-        }
-    }
-}
-```
-
 **duplicateStage**
-Example Mutation:
+
+`duplicateStage(id: ID!, name: String!): Stage` — Access: Player, Admin, Super admin.
+
 ```graphql
 mutation {
     duplicateStage(id: "1", name: "Duplicate Stage") {
@@ -432,21 +579,10 @@ mutation {
 }
 ```
 
-Example Response:
-```json
-{
-    "data": {
-        "duplicateStage": {
-            "id": "2",
-            "name": "Duplicate Stage",
-            "description": "Stage description"
-        }
-    }
-}
-```
-
 **deleteStage**
-Example Mutation:
+
+`deleteStage(id: ID!): CommonResponse` — Access: Player, Admin, Super admin.
+
 ```graphql
 mutation {
     deleteStage(id: "1") {
@@ -456,154 +592,10 @@ mutation {
 }
 ```
 
-Example Response:
-```json
-{
-    "data": {
-        "deleteStage": {
-            "success": true,
-            "message": "Stage deleted successfully"
-        }
-    }
-}
-```
-
-**assignMedia**
-Example Mutation:
-```graphql
-mutation {
-    assignMedia(input: {
-        id: "1",
-        mediaIds: ["1", "2"]
-    }) {
-        id
-        name
-    }
-}
-```
-
-Example Response:
-```json
-{
-    "data": {
-        "assignMedia": {
-            "id": "1",
-            "name": "Media Name"
-        }
-    }
-}
-```
-
-**uploadMedia**
-Example Mutation:
-```graphql
-mutation {
-    uploadMedia(input: {
-        name: "New Media",
-        base64: "base64string",
-        mediaType: "image/png",
-        filename: "media.png"
-    }) {
-        id
-        name
-        src
-    }
-}
-```
-
-Example Response:
-```json
-{
-    "data": {
-        "uploadMedia": {
-            "id": "1",
-            "name": "New Media",
-            "src": "media.png"
-        }
-    }
-}
-```
-
-**updateMedia**
-Example Mutation:
-```graphql
-mutation {
-    updateMedia(input: {
-        id: "1",
-        name: "Updated Media",
-        description: "Updated description"
-    }) {
-        id
-        name
-        description
-    }
-}
-```
-
-Example Response:
-```json
-{
-    "data": {
-        "updateMedia": {
-            "id": "1",
-            "name": "Updated Media",
-            "description": "Updated description"
-        }
-    }
-}
-```
-
-**deleteMedia**
-Example Mutation:
-```graphql
-mutation {
-    deleteMedia(id: "1") {
-        success
-        message
-    }
-}
-```
-
-Example Response:
-```json
-{
-    "data": {
-        "deleteMedia": {
-            "success": true,
-            "message": "Media deleted successfully"
-        }
-    }
-}
-```
-
-**assignStages**
-Example Mutation:
-```graphql
-mutation {
-    assignStages(input: {
-        id: "1",
-        stageIds: ["1", "2"]
-    }) {
-        id
-        name
-    }
-}
-```
-
-Example Response:
-```json
-{
-    "data": {
-        "assignStages": {
-            "id": "1",
-            "name": "Stage Name"
-        }
-    }
-}
-```
-
 **sweepStage**
-Example Mutation:
+
+`sweepStage(id: ID!): SweepResponse` — Access: Player, Admin, Super admin; the service then requires the caller to be the stage owner, an admin, or an editor of the stage. Fails with "The stage is already sweeped!" when there are no live events.
+
 ```graphql
 mutation {
     sweepStage(id: "1") {
@@ -613,25 +605,54 @@ mutation {
 }
 ```
 
-Example Response:
-```json
-{
-    "data": {
-        "sweepStage": {
-            "success": true,
-            "performanceId": "1"
-        }
+**updateStatus**
+
+`updateStatus(id: ID!): UpdateStageResponse` — Access: Player, Admin, Super admin.
+
+```graphql
+mutation {
+    updateStatus(id: "1") {
+        result
     }
 }
 ```
 
+**updateVisibility**
+
+`updateVisibility(id: ID!): UpdateStageResponse` — Access: Player, Admin, Super admin.
+
+```graphql
+mutation {
+    updateVisibility(id: "1") {
+        result
+    }
+}
+```
+
+**updateLastAccess**
+
+`updateLastAccess(id: ID!): UpdateStageResponse` — Access: Public.
+
+```graphql
+mutation {
+    updateLastAccess(id: "1") {
+        result
+    }
+}
+```
+
+## Scenes, performances and recordings
+
 **saveScene**
-Example Mutation:
+
+`saveScene(input: SceneInput!): Scene` — Access: Any logged-in user.
+
 ```graphql
 mutation {
     saveScene(input: {
         name: "New Scene",
-        stageId: "1"
+        stageId: "1",
+        payload: "{}"
     }) {
         id
         name
@@ -640,21 +661,10 @@ mutation {
 }
 ```
 
-Example Response:
-```json
-{
-    "data": {
-        "saveScene": {
-            "id": "1",
-            "name": "New Scene",
-            "stageId": "1"
-        }
-    }
-}
-```
-
 **deleteScene**
-Example Mutation:
+
+`deleteScene(id: ID!): CommonResponse` — Access: Player, Admin, Super admin.
+
 ```graphql
 mutation {
     deleteScene(id: "1") {
@@ -664,20 +674,10 @@ mutation {
 }
 ```
 
-Example Response:
-```json
-{
-    "data": {
-        "deleteScene": {
-            "success": true,
-            "message": "Scene deleted successfully"
-        }
-    }
-}
-```
-
 **updatePerformance**
-Example Mutation:
+
+`updatePerformance(input: PerformanceInput!): CommonResponse` — Access: Player, Admin, Super admin.
+
 ```graphql
 mutation {
     updatePerformance(input: {
@@ -690,20 +690,10 @@ mutation {
 }
 ```
 
-Example Response:
-```json
-{
-    "data": {
-        "updatePerformance": {
-            "success": true,
-            "message": "Performance updated successfully"
-        }
-    }
-}
-```
-
 **deletePerformance**
-Example Mutation:
+
+`deletePerformance(id: ID!): CommonResponse` — Access: Player, Admin, Super admin.
+
 ```graphql
 mutation {
     deletePerformance(id: "1") {
@@ -713,20 +703,28 @@ mutation {
 }
 ```
 
-Example Response:
-```json
-{
-    "data": {
-        "deletePerformance": {
-            "success": true,
-            "message": "Performance deleted successfully"
-        }
+**duplicatePerformanceWithTrimmedPauses**
+
+`duplicatePerformanceWithTrimmedPauses(input: DuplicatePerformanceTrimInput!): Performance` — Access: Player, Admin, Super admin.
+
+```graphql
+mutation {
+    duplicatePerformanceWithTrimmedPauses(input: {
+        sourcePerformanceId: "1",
+        name: "Trimmed copy",
+        minPauseSeconds: 5
+    }) {
+        id
+        name
+        stageId
     }
 }
 ```
 
 **startRecording**
-Example Mutation:
+
+`startRecording(input: RecordInput!): Performance` — Access: Player, Admin, Super admin; the service then requires the caller to be the stage owner or an admin.
+
 ```graphql
 mutation {
     startRecording(input: {
@@ -736,198 +734,30 @@ mutation {
         id
         name
         stageId
-    }
-}
-```
-
-Example Response:
-```json
-{
-    "data": {
-        "startRecording": {
-            "id": "1",
-            "name": "New Recording",
-            "stageId": "1"
-        }
+        recording
     }
 }
 ```
 
 **saveRecording**
-Example Mutation:
+
+`saveRecording(id: ID!): Performance` — Access: Player, Admin, Super admin; the service then requires the caller to be the stage owner or an admin. Fails with "Nothing to record!" when no events were archived since the recording started.
+
 ```graphql
 mutation {
     saveRecording(id: "1") {
         id
         name
         stageId
-    }
-}
-```
-
-Example Response:
-```json
-{
-    "data": {
-        "saveRecording": {
-            "id": "1",
-            "name": "Recording Name",
-            "stageId": "1"
-        }
-    }
-}
-```
-
-**updateStatus**
-Example Mutation:
-```graphql
-mutation {
-    updateStatus(id: "1") {
-        result
-    }
-}
-```
-
-Example Response:
-```json
-{
-    "data": {
-        "updateStatus": {
-            "result": "Status updated"
-        }
-    }
-}
-```
-
-**updateVisibility**
-Example Mutation:
-```graphql
-mutation {
-    updateVisibility(id: "1") {
-        result
-    }
-}
-```
-
-Example Response:
-```json
-{
-    "data": {
-        "updateVisibility": {
-            "result": "Visibility updated"
-        }
-    }
-}
-```
-
-**updateLastAccess**
-Example Mutation:
-```graphql
-mutation {
-    updateLastAccess(id: "1") {
-        result
-    }
-}
-```
-
-Example Response:
-```json
-{
-    "data": {
-        "updateLastAccess": {
-            "result": "Last access updated"
-        }
-    }
-}
-```
-
-**access**
-Example Query:
-```graphql
-query {
-    access(path: "/path/to/asset") {
-        id
-        assetId
-        createdOn
-        level
-        permissions
-        assetPath
-    }
-}
-```
-
-Example Response:
-```json
-{
-    "data": {
-        "access": {
-            "id": "1",
-            "assetId": "123",
-            "createdOn": "2023-10-01",
-            "level": 1,
-            "permissions": "read",
-            "assetPath": "/path/to/asset"
-        }
-    }
-}
-```
-
-**createLicense**
-Example Mutation:
-```graphql
-mutation {
-    createLicense(input: {
-        assetId: "123",
-        level: 1,
-        permissions: "read"
-    }) {
-        id
-        assetId
-        createdOn
-        level
-        permissions
-        assetPath
-    }
-}
-```
-
-Example Response:
-```json
-{
-    "data": {
-        "createLicense": {
-            "id": "1",
-            "assetId": "123",
-            "createdOn": "2023-10-01",
-            "level": 1,
-            "permissions": "read",
-            "assetPath": "/path/to/asset"
-        }
-    }
-}
-```
-
-**revokeLicense**
-Example Mutation:
-```graphql
-mutation {
-    revokeLicense(id: "1") {
-        message
-    }
-}
-```
-
-Example Response:
-```json
-{
-    "data": {
-        "revokeLicense": "License revoked successfully"
+        savedOn
     }
 }
 ```
 
 **performanceCommunication**
-Example Query:
+
+`performanceCommunication: [PerformanceCommunication!]!` — Access: Admin, Super admin.
+
 ```graphql
 query {
     performanceCommunication {
@@ -946,31 +776,10 @@ query {
 }
 ```
 
-Example Response:
-```json
-{
-    "data": {
-        "performanceCommunication": [
-            {
-                "id": "1",
-                "ownerId": "1",
-                "ipAddress": "192.168.1.1",
-                "websocketPort": 8080,
-                "webclientPort": 3000,
-                "topicName": "performance_topic",
-                "username": "user",
-                "password": "pass",
-                "createdOn": "2023-10-01",
-                "expiresOn": "2023-12-01",
-                "performanceConfigId": 1
-            }
-        ]
-    }
-}
-```
-
 **performanceConfig**
-Example Query:
+
+`performanceConfig: [PerformanceConfig!]!` — Access: Admin, Super admin.
+
 ```graphql
 query {
     performanceConfig {
@@ -986,143 +795,416 @@ query {
 }
 ```
 
-Example Response:
-```json
-{
-    "data": {
-        "performanceConfig": [
-            {
-                "id": "1",
-                "name": "Performance Config",
-                "ownerId": "1",
-                "description": "Description of the performance config",
-                "splashScreenText": "Welcome",
-                "splashScreenAnimationUrls": "http://example.com/animation",
-                "createdOn": "2023-10-01",
-                "expiresOn": "2023-12-01"
-            }
-        ]
-    }
-}
-```
-
 **scene**
-Example Query:
+
+`scene: [Scene!]!` — Access: Admin, Super admin.
+
 ```graphql
 query {
     scene {
         id
         name
-        ownerId
-        description
-        splashScreenText
-        splashScreenAnimationUrls
+        sceneOrder
+        scenePreview
+        payload
         createdOn
-        expiresOn
-    }
-}
-```
-
-Example Response:
-```json
-{
-    "data": {
-        "scene": [
-            {
-                "id": "1",
-                "name": "Scene Name",
-                "ownerId": "1",
-                "description": "Description of the scene",
-                "splashScreenText": "Welcome",
-                "splashScreenAnimationUrls": "http://example.com/animation",
-                "createdOn": "2023-10-01",
-                "expiresOn": "2023-12-01"
-            }
-        ]
+        active
+        ownerId
+        stageId
     }
 }
 ```
 
 **parentStage**
-Example Query:
+
+`parentStage: [ParentStage!]` — Access: Admin, Super admin.
+
 ```graphql
 query {
     parentStage {
         id
         stageId
         childAssetId
+        exitAnimation
+        exitSpeed
         stage {
             id
             name
-            description
-            createdOn
-            expiresOn
-            assets {
-                id
-                stageId
-                childAssetId
-            }
         }
         childAsset {
             id
             name
-            type
+        }
+    }
+}
+```
+
+## Media
+
+**media**
+
+`media(input: MediaTableInput!): AssetConnection!` — Access: Player, Admin, Super admin.
+
+```graphql
+query {
+    media(input: { page: 1, limit: 10 }) {
+        totalCount
+        edges {
+            id
+            name
+            src
+        }
+    }
+}
+```
+
+**mediaList**
+
+`mediaList(mediaType: String, owner: String): [Asset!]!` — Access: Player, Admin, Super admin.
+
+```graphql
+query {
+    mediaList(mediaType: "image", owner: "owner1") {
+        id
+        name
+        src
+    }
+}
+```
+
+**mediaTypes**
+
+`mediaTypes: [AssetType!]!` — Access: Player, Admin, Super admin.
+
+```graphql
+query {
+    mediaTypes {
+        id
+        name
+    }
+}
+```
+
+**tags**
+
+`tags: [Tag!]!` — Access: Player, Admin, Super admin.
+
+```graphql
+query {
+    tags {
+        id
+        name
+        color
+        createdOn
+    }
+}
+```
+
+**voices**
+
+`voices: [Voice!]` — Access: Player, Admin, Super admin.
+
+```graphql
+query {
+    voices {
+        avatar {
+            id
+            name
+        }
+        voice {
+            voice
+            variant
+            pitch
+            speed
+            amplitude
+        }
+    }
+}
+```
+
+**uploadFile**
+
+`uploadFile(base64: String!, filename: String!): File!` — Access: Player, Admin, Super admin.
+
+```graphql
+mutation {
+    uploadFile(base64: "base64string", filename: "file.png") {
+        url
+    }
+}
+```
+
+**saveMedia**
+
+`saveMedia(input: SaveMediaInput!): SaveMediaPayload!` — Access: Player, Admin, Super admin.
+
+```graphql
+mutation {
+    saveMedia(input: {
+        name: "New Media",
+        mediaType: "image",
+        copyrightLevel: 1,
+        owner: "owner1",
+        stageAssignments: [{ stageId: "1" }],
+        tags: ["tag1", "tag2"],
+        w: 1920,
+        h: 1080,
+        urls: ["image/media.png"]
+    }) {
+        asset {
+            id
+            name
+            src
+        }
+    }
+}
+```
+
+**uploadMedia**
+
+`uploadMedia(input: UploadMediaInput!): Asset` — Access: Player, Admin, Super admin.
+
+```graphql
+mutation {
+    uploadMedia(input: {
+        name: "New Media",
+        base64: "base64string",
+        mediaType: "image",
+        filename: "media.png"
+    }) {
+        id
+        name
+        src
+    }
+}
+```
+
+**updateMedia**
+
+`updateMedia(input: UpdateMediaInput!): Asset` — Access: Player, Admin, Super admin.
+
+```graphql
+mutation {
+    updateMedia(input: {
+        id: "1",
+        name: "Updated Media",
+        description: "Updated description"
+    }) {
+        id
+        name
+        description
+    }
+}
+```
+
+**updateMediaStatus**
+
+`updateMediaStatus(input: UpdateMediaStatusInput): CommonResponse` — Access: Player, Admin, Super admin. `status` is `Active`, `Dormant` or `Remove`.
+
+```graphql
+mutation {
+    updateMediaStatus(input: {
+        id: "64",
+        status: Dormant
+    }) {
+        message
+        success
+    }
+}
+```
+
+**deleteMedia**
+
+`deleteMedia(id: ID!): DeleteMediaPayload!` — Access: Player, Admin, Super admin.
+
+```graphql
+mutation {
+    deleteMedia(id: "1") {
+        success
+        message
+    }
+}
+```
+
+**deleteMediaOnStage**
+
+`deleteMediaOnStage(id: ID!): CommonResponse` — Access: Player, Admin, Super admin.
+
+```graphql
+mutation {
+    deleteMediaOnStage(id: "1") {
+        success
+        message
+    }
+}
+```
+
+**assignMedia**
+
+`assignMedia(input: AssignMediaInput!): Stage` — Access: Player, Admin, Super admin. `id` is the stage id.
+
+```graphql
+mutation {
+    assignMedia(input: {
+        id: "1",
+        mediaIds: ["1", "2"]
+    }) {
+        id
+        name
+    }
+}
+```
+
+**assignStages**
+
+`assignStages(input: AssignStagesInput!): Asset` — Access: Player, Admin, Super admin. `id` is the asset id.
+
+```graphql
+mutation {
+    assignStages(input: {
+        id: "1",
+        stageIds: ["1", "2"]
+    }) {
+        id
+        name
+    }
+}
+```
+
+**updateStageAssignment**
+
+`updateStageAssignment(stageId: ID!, assetId: ID!, exitAnimation: String, exitSpeed: Int): ParentStage` — Access: Player, Admin, Super admin.
+
+```graphql
+mutation {
+    updateStageAssignment(stageId: "1", assetId: "1", exitAnimation: "fade", exitSpeed: 2) {
+        id
+        stageId
+        childAssetId
+        exitAnimation
+        exitSpeed
+    }
+}
+```
+
+**quickAssignMutation**
+
+`quickAssignMutation(stageIds: [ID]!, assetId: ID!): CommonResponse` — Access: Any logged-in user.
+
+```graphql
+mutation {
+    quickAssignMutation(stageIds: ["1"], assetId: "1") {
+        success
+        message
+    }
+}
+```
+
+## Media permissions
+
+**requestPermission**
+
+`requestPermission(assetId: ID!, note: String): ConfirmPermissionResponse` — Access: Any logged-in user.
+
+```graphql
+mutation {
+    requestPermission(assetId: "1", note: "Requesting permission") {
+        success
+        message
+        permissions {
+            id
+            userId
+            assetId
+            approved
             createdOn
-            expiresOn
-            stages {
-                id
-                stageId
-                childAssetId
+            note
+            user {
+                username
+                displayName
             }
         }
     }
 }
 ```
 
-Example Response:
-```json
-{
-    "data": {
-        "parentStage": [
-            {
-                "id": "1",
-                "stageId": "1",
-                "childAssetId": "1",
-                "stage": {
-                    "id": "1",
-                    "name": "Stage Name",
-                    "description": "Description of the stage",
-                    "createdOn": "2023-10-01",
-                    "expiresOn": "2023-12-01",
-                    "assets": [
-                        {
-                            "id": "1",
-                            "stageId": "1",
-                            "childAssetId": "1"
-                        }
-                    ]
-                },
-                "childAsset": {
-                    "id": "1",
-                    "name": "Asset Name",
-                    "type": "image",
-                    "createdOn": "2023-10-01",
-                    "expiresOn": "2023-12-01",
-                    "stages": [
-                        {
-                            "id": "1",
-                            "stageId": "1",
-                            "childAssetId": "1"
-                        }
-                    ]
-                }
+**confirmPermission**
+
+`confirmPermission(id: ID!, approved: Boolean): ConfirmPermissionResponse` — Access: Any logged-in user.
+
+```graphql
+mutation {
+    confirmPermission(id: "1", approved: true) {
+        success
+        message
+        permissions {
+            id
+            userId
+            assetId
+            approved
+            createdOn
+            note
+            user {
+                username
+                displayName
             }
-        ]
+        }
     }
 }
 ```
+
+**dismissNotification**
+
+`dismissNotification(id: ID!): AssetUsage` — Access: Player, Admin, Super admin.
+
+```graphql
+mutation {
+    dismissNotification(id: "1") {
+        id
+        ownerSeen
+        requesterSeen
+    }
+}
+```
+
+## Licenses
+
+**createLicense**
+
+`createLicense(input: LicenseInput!): License!` — Access: Admin, Super admin.
+
+```graphql
+mutation {
+    createLicense(input: {
+        assetId: "123",
+        level: 1,
+        permissions: "read"
+    }) {
+        id
+        assetId
+        createdOn
+        level
+        permissions
+        assetPath
+    }
+}
+```
+
+**revokeLicense**
+
+`revokeLicense(id: ID!): String!` — Access: Admin, Super admin.
+
+```graphql
+mutation {
+    revokeLicense(id: "1")
+}
+```
+
+## Site configuration
+
 **nginx**
-Example Query:
+
+`nginx: NginxConfig!` — Access: Public.
+
 ```graphql
 query {
     nginx {
@@ -1131,19 +1213,10 @@ query {
 }
 ```
 
-Example Response:
-```json
-{
-    "data": {
-        "nginx": {
-            "limit": 100
-        }
-    }
-}
-```
-
 **system**
-Example Query:
+
+`system: SystemConfig!` — Access: Public.
+
 ```graphql
 query {
     system {
@@ -1171,46 +1244,26 @@ query {
             value
             createdOn
         }
-    }
-}
-```
-
-Example Response:
-```json
-{
-    "data": {
-        "system": {
-            "termsOfService": {
-                "id": 1,
-                "name": "Terms of Service",
-                "value": "http://example.com/tos",
-                "createdOn": "2023-10-01"
-            },
-            "manual": {
-                "id": 2,
-                "name": "User Manual",
-                "value": "http://example.com/manual",
-                "createdOn": "2023-10-01"
-            },
-            "esp": {
-                "id": 3,
-                "name": "ESP Config",
-                "value": "Enabled",
-                "createdOn": "2023-10-01"
-            },
-            "enableDonate": {
-                "id": 4,
-                "name": "Enable Donate",
-                "value": "true",
-                "createdOn": "2023-10-01"
-            }
+        emailSignature {
+            id
+            name
+            value
+            createdOn
+        }
+        addingEmailSignature {
+            id
+            name
+            value
+            createdOn
         }
     }
 }
 ```
 
 **foyer**
-Example Query:
+
+`foyer: FoyerConfig!` — Access: Public.
+
 ```graphql
 query {
     foyer {
@@ -1242,42 +1295,10 @@ query {
 }
 ```
 
-Example Response:
-```json
-{
-    "data": {
-        "foyer": {
-            "title": {
-                "id": 1,
-                "name": "Foyer Title",
-                "value": "Welcome to the Foyer",
-                "createdOn": "2023-10-01"
-            },
-            "description": {
-                "id": 2,
-                "name": "Foyer Description",
-                "value": "This is the foyer description.",
-                "createdOn": "2023-10-01"
-            },
-            "menu": {
-                "id": 3,
-                "name": "Foyer Menu",
-                "value": "Home, About, Contact",
-                "createdOn": "2023-10-01"
-            },
-            "showRegistration": {
-                "id": 4,
-                "name": "Show Registration",
-                "value": "true",
-                "createdOn": "2023-10-01"
-            }
-        }
-    }
-}
-```
-
 **updateTermsOfService**
-Example Mutation:
+
+`updateTermsOfService(url: String!): Config` — Access: Admin, Super admin.
+
 ```graphql
 mutation {
     updateTermsOfService(url: "http://example.com/new-tos") {
@@ -1289,22 +1310,10 @@ mutation {
 }
 ```
 
-Example Response:
-```json
-{
-    "data": {
-        "updateTermsOfService": {
-            "id": 1,
-            "name": "Terms of Service",
-            "value": "http://example.com/new-tos",
-            "createdOn": "2023-10-01"
-        }
-    }
-}
-```
-
 **saveConfig**
-Example Mutation:
+
+`saveConfig(input: ConfigInput!): Config` — Access: Admin, Super admin.
+
 ```graphql
 mutation {
     saveConfig(input: {
@@ -1319,29 +1328,16 @@ mutation {
 }
 ```
 
-Example Response:
-```json
-{
-    "data": {
-        "saveConfig": {
-            "id": 1,
-            "name": "New Config",
-            "value": "Config Value",
-            "createdOn": "2023-10-01"
-        }
-    }
-}
-```
+**sendSystemEmail**
 
-**sendEmail**
-Example Mutation:
+`sendSystemEmail(input: SystemEmailInput!): CommonResponse` — Access: Admin, Super admin.
+
 ```graphql
 mutation {
-    sendEmail(input: {
-        subject: "Test Email",
-        body: "This is a test email.",
-        recipients: "recipient@example.com",
-        bcc: "bcc@example.com"
+    sendSystemEmail(input: {
+        subject: "Notice",
+        body: "This is a system email.",
+        recipients: "recipient@example.com"
     }) {
         success
         message
@@ -1349,80 +1345,48 @@ mutation {
 }
 ```
 
-Example Response:
-```json
-{
-    "data": {
-        "sendEmail": {
-            "success": true,
-            "message": "Email sent successfully"
-        }
-    }
-}
-```
-**oneTimePurchase**
-Example Mutation:
+## Payments
+
+**paymentSecret**
+
+`paymentSecret(input: PaymentIntentInput!): String!` — Access: Public (anonymous donations). `token` is the captcha token, verified only when `ENV_TYPE` is `"Production"`.
+
 ```graphql
 mutation {
-    oneTimePurchase(input: {
-        cardNumber: "4242424242424242",
-        expYear: "2023",
-        expMonth: "12",
-        cvc: "123",
-        amount: 100.0
-    }) {
-        success
-        message
-    }
+    paymentSecret(input: {
+        amount: 1000,
+        currency: "usd"
+    })
 }
 ```
 
-Example Response:
-```json
-{
-    "data": {
-        "oneTimePurchase": {
-            "success": true,
-            "message": "Payment successful"
-        }
-    }
-}
-```
+**generateReceipt**
 
-**createSubscription**
-Example Mutation:
+`generateReceipt(receivedFrom: String!, description: String!, amount: String!, date: String!): ReceiptFile!` — Access: Public.
+
 ```graphql
 mutation {
-    createSubscription(input: {
-        cardNumber: "4242424242424242",
-        expYear: "2023",
-        expMonth: "12",
-        cvc: "123",
-        amount: 50.0,
-        currency: "USD",
-        email: "user@example.com",
-        type: "monthly"
-    }) {
-        success
-        message
+    generateReceipt(
+        receivedFrom: "Jane Doe",
+        description: "Donation",
+        amount: "10.00",
+        date: "2026-01-31"
+    ) {
+        fileBase64
+        fileName
     }
 }
 ```
 
-Example Response:
-```json
-{
-    "data": {
-        "createSubscription": {
-            "success": true,
-            "message": "Subscription created successfully"
-        }
-    }
-}
-```
+**oneTimePurchase**, **createSubscription**, **cancelSubscription**, **updateEmailCustomer**
 
-**cancelSubscription**
-Example Mutation:
+Access: Admin, Super admin. Per the comment in `src/upstage_backend/payments/http/schema.py`, these four mutations are not used by the studio UI (the donate flow uses `paymentSecret`) and are restricted to admins until they are removed or redesigned.
+
+- `oneTimePurchase(input: OneTimePurchaseInput!): CommonResponse`
+- `createSubscription(input: CreateSubscriptionInput!): CommonResponse`
+- `cancelSubscription(subscription_id: String!): CommonResponse`
+- `updateEmailCustomer(customer_id: String!, email: String!): CommonResponse`
+
 ```graphql
 mutation {
     cancelSubscription(subscription_id: "sub_12345") {
@@ -1432,832 +1396,11 @@ mutation {
 }
 ```
 
-Example Response:
-```json
-{
-    "data": {
-        "cancelSubscription": {
-            "success": true,
-            "message": "Subscription cancelled successfully"
-        }
-    }
-}
-```
-
-**updateEmailCustomer**
-Example Mutation:
 ```graphql
 mutation {
     updateEmailCustomer(customer_id: "cus_12345", email: "new.email@example.com") {
         success
         message
     }
-}
-```
-
-Example Response:
-```json
-{
-    "data": {
-        "updateEmailCustomer": {
-            "success": true,
-            "message": "Customer email updated successfully"
-        }
-    }
-}
-```
-
-**batchUserCreation**
-Example Mutation:
-```graphql
-mutation {
-    batchUserCreation(users: [
-        {
-            username: "user1",
-            password: "password1",
-            email: "user1@example.com"
-        },
-        {
-            username: "user2",
-            password: "password2",
-            email: "user2@example.com"
-        }
-    ]) {
-        users {
-            id
-            username
-            email
-        }
-    }
-}
-```
-
-Example Response:
-```json
-{
-    "data": {
-        "batchUserCreation": {
-            "users": [
-                {
-                    "id": "1",
-                    "username": "user1",
-                    "email": "user1@example.com"
-                },
-                {
-                    "id": "2",
-                    "username": "user2",
-                    "email": "user2@example.com"
-                }
-            ]
-        }
-    }
-}
-```
-
-**updateUser**
-Example Mutation:
-```graphql
-mutation {
-    updateUser(input: {
-        id: "1",
-        username: "updatedUser",
-        email: "updated@example.com"
-    }) {
-        id
-        username
-        email
-    }
-}
-```
-
-Example Response:
-```json
-{
-    "data": {
-        "updateUser": {
-            "id": "1",
-            "username": "updatedUser",
-            "email": "updated@example.com"
-        }
-    }
-}
-```
-
-**deleteUser**
-Example Mutation:
-```graphql
-mutation {
-    deleteUser(id: "1") {
-        success
-        message
-    }
-}
-```
-
-Example Response:
-```json
-{
-    "data": {
-        "deleteUser": {
-            "success": true,
-            "message": "User deleted successfully"
-        }
-    }
-}
-```
-
-**uploadFile**
-Example Mutation:
-```graphql
-mutation {
-    uploadFile(base64: "base64string", filename: "file.png") {
-        url
-    }
-}
-```
-
-Example Response:
-```json
-{
-    "data": {
-        "uploadFile": {
-            "url": "http://example.com/file.png"
-        }
-    }
-}
-```
-
-**saveMedia**
-Example Mutation:
-```graphql
-mutation {
-    saveMedia(input: {
-        name: "New Media",
-        mediaType: "image/png",
-        copyrightLevel: 1,
-        owner: "ownerId",
-        stageIds: ["stageId1"],
-        tags: ["tag1", "tag2"],
-        w: 1920,
-        h: 1080,
-        urls: ["http://example.com/media.png"]
-    }) {
-        asset {
-            id
-            name
-            src
-        }
-    }
-}
-```
-
-Example Response:
-```json
-{
-    "data": {
-        "saveMedia": {
-            "asset": {
-                "id": "1",
-                "name": "New Media",
-                "src": "http://example.com/media.png"
-            }
-        }
-    }
-}
-```
-
-**deleteMedia**
-Example Mutation:
-```graphql
-mutation {
-    deleteMedia(id: "1") {
-        success
-        message
-    }
-}
-```
-
-Example Response:
-```json
-{
-    "data": {
-        "deleteMedia": {
-            "success": true,
-            "message": "Media deleted successfully"
-        }
-    }
-}
-```
-
-**sendEmail**
-Example Mutation:
-```graphql
-mutation {
-    sendEmail(input: {
-        subject: "Test Email",
-        body: "This is a test email.",
-        recipients: "recipient@example.com"
-    }) {
-        success
-        message
-    }
-}
-```
-
-Example Response:
-```json
-{
-    "data": {
-        "sendEmail": {
-            "success": true,
-            "message": "Email sent successfully"
-        }
-    }
-}
-```
-
-**changePassword**
-Example Mutation:
-```graphql
-mutation {
-    changePassword(input: {
-        oldPassword: "oldPassword123",
-        newPassword: "newPassword123",
-        id: "1"
-    }) {
-        success
-        message
-    }
-}
-```
-
-Example Response:
-```json
-{
-    "data": {
-        "changePassword": {
-            "success": true,
-            "message": "Password changed successfully"
-        }
-    }
-}
-```
-
-**calcSizes**
-Example Mutation:
-```graphql
-mutation {
-    calcSizes {
-        size
-    }
-}
-```
-
-Example Response:
-```json
-{
-    "data": {
-        "calcSizes": {
-            "size": 1024
-        }
-    }
-}
-```
-
-**confirmPermission**
-Example Mutation:
-```graphql
-mutation {
-    confirmPermission(id: "1", approved: true) {
-        success
-        permissions {
-            id
-            userId
-            assetId
-            approved
-            createdOn
-            note
-            user {
-                username
-                displayName
-            }
-        }
-    }
-}
-```
-
-Example Response:
-```json
-{
-    "data": {
-        "confirmPermission": {
-            "success": true,
-            "permissions": [
-                {
-                    "id": "1",
-                    "userId": 1,
-                    "assetId": 1,
-                    "approved": true,
-                    "createdOn": "2023-10-01",
-                    "note": "Permission note",
-                    "user": {
-                        "username": "user1",
-                        "displayName": "User One"
-                    }
-                }
-            ]
-        }
-    }
-}
-```
-
-**requestPermission**
-Example Mutation:
-```graphql
-mutation {
-    requestPermission(assetId: "1", note: "Requesting permission") {
-        success
-        permissions {
-            id
-            userId
-            assetId
-            approved
-            createdOn
-            note
-            user {
-                username
-                displayName
-            }
-        }
-    }
-}
-```
-
-Example Response:
-```json
-{
-    "data": {
-        "requestPermission": {
-            "success": true,
-            "permissions": [
-                {
-                    "id": "1",
-                    "userId": 1,
-                    "assetId": 1,
-                    "approved": false,
-                    "createdOn": "2023-10-01",
-                    "note": "Requesting permission",
-                    "user": {
-                        "username": "user1",
-                        "displayName": "User One"
-                    }
-                }
-            ]
-        }
-    }
-}
-```
-
-**quickAssignMutation**
-Example Mutation:
-```graphql
-mutation {
-    quickAssignMutation(stageId: "1", assetId: "1") {
-        success
-        message
-    }
-}
-```
-
-Example Response:
-```json
-{
-    "data": {
-        "quickAssignMutation": {
-            "success": true,
-            "message": "Asset assigned to stage successfully"
-        }
-    }
-}
-```
-
-**whoami**
-Example Query:
-```graphql
-query {
-    whoami {
-        id
-        username
-        email
-    }
-}
-```
-
-Example Response:
-```json
-{
-    "data": {
-        "whoami": {
-            "id": "1",
-            "username": "user1",
-            "email": "user1@example.com"
-        }
-    }
-}
-```
-
-**adminPlayers**
-Example Query:
-```graphql
-query {
-    adminPlayers(first: 10, page: 1, sort: [USERNAME_ASC]) {
-        totalCount
-        edges {
-            id
-            username
-            email
-        }
-    }
-}
-```
-
-Example Response:
-```json
-{
-    "data": {
-        "adminPlayers": {
-            "totalCount": 2,
-            "edges": [
-                {
-                    "id": "1",
-                    "username": "user1",
-                    "email": "user1@example.com"
-                },
-                {
-                    "id": "2",
-                    "username": "user2",
-                    "email": "user2@example.com"
-                }
-            ]
-        }
-    }
-}
-```
-
-**media**
-Example Query:
-```graphql
-query {
-    media(input: { page: 1, limit: 10 }) {
-        totalCount
-        edges {
-            id
-            name
-            src
-        }
-    }
-}
-```
-
-Example Response:
-```json
-{
-    "data": {
-        "media": {
-            "totalCount": 2,
-            "edges": [
-                {
-                    "id": "1",
-                    "name": "Media 1",
-                    "src": "http://example.com/media1.png"
-                },
-                {
-                    "id": "2",
-                    "name": "Media 2",
-                    "src": "http://example.com/media2.png"
-                }
-            ]
-        }
-    }
-}
-```
-
-**mediaList**
-Example Query:
-```graphql
-query {
-    mediaList(mediaType: "image/png", owner: "owner1") {
-        id
-        name
-        src
-    }
-}
-```
-
-Example Response:
-```json
-{
-    "data": {
-        "mediaList": [
-            {
-                "id": "1",
-                "name": "Media 1",
-                "src": "http://example.com/media1.png"
-            },
-            {
-                "id": "2",
-                "name": "Media 2",
-                "src": "http://example.com/media2.png"
-            }
-        ]
-    }
-}
-```
-
-**tags**
-Example Query:
-```graphql
-    query {
-        tags {
-            id
-            name
-            color
-            createdOn
-        }
-    }
-```
-
-Example Response:
-```json
-{
-  "data": {
-    "tags": [
-      {
-        "id": "1",
-        "name": "test",
-        "color": null
-      }
-    ]
-  }
-}
-```
-
-**mediaTypes**
-Example Query:
-```graphql
-    query {
-        mediaTypes{
-            id
-            name
-        }
-    }
-```
-
-Example Response:
-```json
-{
-  "data": {
-    "mediaTypes": [
-      {
-        "id": "1",
-        "name": "image"
-      }
-    ]
-  }
-}
-```
-
-**users**
-Example Query:
-```graphql
-    query {
-        users(active: true) {
-            id
-            username
-            displayName
-        }
-    }
-```
-
-Example Response:
-```json
-{
-  "data": {
-    "users": [
-      {
-        "id": "203",
-        "username": "updated_user",
-        "displayName": null
-      }
-    ]
-  }
-}
-```
-
-**getAllStagesInStudio**
-Example Query:
-```graphql
-    query {
-        getAllStages {
-            id
-            username
-            displayName
-        }
-    }
-```
-
-Example Response:
-```json
-{
- "data": {
-    "getAllStages": [
-      {
-        "id": "2",
-        "name": "Stage Name",
-        "owner": {
-          "username": "karen35@example.net",
-          "displayName": ""
-        },
-        "createdOn": "2024-11-26T17:42:04.545183"
-      }
-    ]
-    }
-}
-```
-
-
-**foyerStageList**
-
-Example Query:
-```graphql
-    query {
-        foyerStageList {
-            id
-            name
-            owner {
-            displayName
-            username
-            }
-            fileLocation
-            cover
-        }
-    }
-```
-
-Example Response:
-```json
-{
-  "data": {
-    "foyerStageList": [
-      {
-        "id": "15",
-        "name": "Duplicate Stage",
-        "owner": {
-          "displayName": "",
-          "username": "brentle@example.net"
-        },
-        "fileLocation": "duplicate-stage1",
-        "cover": null
-      }
-    ]
-  }
-}
-```
-
-**stageList**
-
-Example Query:
-```graphql
-{
-  stageList(
-    input:{ fileLocation:"duplicate-stage17"}
-  ) {
-    id
-    name
-    fileLocation
-    owner {
-      id
-      binName
-      username
-    }
-     attributes {
-      id
-      name
-      description
-    }
-    visibility
-    status
-    permission
-    
-  	assets {
-      assetType {
-        name
-      }
-      name
-      id
-      fileLocation
-      description
-    }
-    scenes {
-      id
-      name
-    }
-  	events {
-      id
-      payload
-      scenePreview
-      mqttTimestamp
-    }
-  }
-}
-```
-
-Example Response:
-```json
-{
-  "data": {
-    "stageList": [
-      {
-        "id": "69",
-        "name": "Duplicate Stage",
-        "fileLocation": "duplicate-stage17",
-        "owner": {
-          "id": "485",
-          "binName": "",
-          "username": "422lisa63@example.org"
-        },
-        "attributes": [
-          {
-            "id": "352",
-            "name": "status",
-            "description": "live"
-          },
-          {
-            "id": "347",
-            "name": "cover",
-            "description": "http://example.com/cover.jpg"
-          },
-          {
-            "id": "350",
-            "name": "playerAccess",
-            "description": "public"
-          },
-          {
-            "id": "351",
-            "name": "description",
-            "description": "Description of the stage"
-          },
-          {
-            "id": "348",
-            "name": "visibility",
-            "description": ""
-          }
-        ],
-        "visibility": false,
-        "status": "live",
-        "permission": null,
-        "assets": [
-          {
-            "assetType": {
-              "name": "image"
-            },
-            "name": "test",
-            "id": "31",
-            "fileLocation": "image/a8423b526ce9418297249603e0788d47test.png",
-            "description": null
-          }
-        ],
-        "scenes": [],
-        "events": []
-      }
-    ]
-  }
-}
-```
-
-
-**UpdateMediaStatus
-Example Query:
-```
-mutation {
-  updateMediaStatus(input: {
-    id: 64,
-    status: MediaStatusEnum  // it can be Active/Dormant/Remove
-  }) {
-    message
-    success
-  }
-}
-
-```
-Example Response:
-```
-{
-  "data": {
-    "updateMediaStatus": {
-      "message": "Media status updated successfully.",
-      "success": true
-    }
-  }
 }
 ```

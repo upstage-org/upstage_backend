@@ -47,39 +47,10 @@ def add_cors_middleware(app):
     )
 
 
-class Bootstrap:
-    def __init__(self, app: FastAPI):
-        self.app = app
-
-    def init_exception(self):
-        FastApiException.config()
-        # A browser aborting an in-flight request (page navigation, flaky
-        # network) raises ClientDisconnect while the body is being read.
-        # Without a class-specific handler it falls through to the catch-all
-        # Exception handler in ServerErrorMiddleware, which re-raises and
-        # makes uvicorn log a full "Exception in ASGI application" traceback
-        # for what is routine client behavior. Answer 499 (nginx's "client
-        # closed request") — nobody is listening anyway.
-        self.app.add_exception_handler(ClientDisconnect, _client_disconnect_handler)
-
-
 async def _client_disconnect_handler(request: Request, exc: ClientDisconnect) -> Response:
     return Response(status_code=499)
 
 
-def start_app():
-    bootstrap = Bootstrap(app)
-    add_cors_middleware(app)
-    config_graphql_endpoints(app)
-    app.include_router(rtmp_auth_router)
-    bootstrap.init_exception()
-
-
-app = FastAPI(title="upstage")
-GlobalVariable.set("app", app)
-
-
-@app.middleware("http")
 async def no_store_api_responses(request: Request, call_next):
     """Prevent CDN/browser caching of dynamic API responses (e.g. Cloudflare POST cache rules)."""
     response = await call_next(request)
@@ -90,7 +61,6 @@ async def no_store_api_responses(request: Request, call_next):
     return response
 
 
-@app.middleware("http")
 async def db_request_session(request: Request, call_next):
     """
     Bind one SQLAlchemy Session to the contextvar for the life of this
@@ -120,4 +90,30 @@ async def db_request_session(request: Request, call_next):
         return response
 
 
-start_app()
+def create_app() -> FastAPI:
+    app = FastAPI(title="upstage")
+    # fastapi_exception looks the app up here when it installs its handlers.
+    GlobalVariable.set("app", app)
+
+    # Starlette runs http middleware in reverse registration order, so
+    # db_request_session (registered second) wraps closest to the route.
+    app.middleware("http")(no_store_api_responses)
+    app.middleware("http")(db_request_session)
+
+    add_cors_middleware(app)
+    config_graphql_endpoints(app)
+    app.include_router(rtmp_auth_router)
+
+    FastApiException.config()
+    # A browser aborting an in-flight request (page navigation, flaky
+    # network) raises ClientDisconnect while the body is being read.
+    # Without a class-specific handler it falls through to the catch-all
+    # Exception handler in ServerErrorMiddleware, which re-raises and
+    # makes uvicorn log a full "Exception in ASGI application" traceback
+    # for what is routine client behavior. Answer 499 (nginx's "client
+    # closed request") — nobody is listening anyway.
+    app.add_exception_handler(ClientDisconnect, _client_disconnect_handler)
+    return app
+
+
+app = create_app()

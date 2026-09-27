@@ -47,17 +47,11 @@ class _Asset:
         self.stages = _Stages(rows)
 
 
-class _Query:
-    """Mimics session.query(ParentStageModel).filter(...).all()."""
+class _Result:
+    """Mimics session.scalars(select(ParentStageModel).where(...)).all()."""
 
     def __init__(self, rows):
         self._rows = rows
-
-    def filter(self, *_):
-        return self
-
-    def order_by(self, *_):
-        return self
 
     def all(self):
         return list(self._rows)
@@ -69,8 +63,8 @@ class _Session:
     def __init__(self, rows=None):
         self.rows = list(rows or [])
 
-    def query(self, _model):
-        return _Query(self.rows)
+    def scalars(self, _statement):
+        return _Result(self.rows)
 
     def add(self, row) -> None:
         self.rows.append(row)

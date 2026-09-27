@@ -1,6 +1,7 @@
 import json
-from datetime import datetime
 from graphql import GraphQLError
+from sqlalchemy import delete, select
+from upstage_backend.global_config.helpers.clock import utcnow
 from upstage_backend.global_config import get_session
 from upstage_backend.global_config.helpers.object import convert_keys_to_camel_case
 from upstage_backend.event_archive.db_models.event import EventModel
@@ -35,19 +36,19 @@ class PerformanceService:
         session = get_session()
         return [
             convert_keys_to_camel_case(performance.to_dict())
-            for performance in session.query(PerformanceMQTTConfigModel).all()
+            for performance in session.scalars(select(PerformanceMQTTConfigModel)).all()
         ]
 
     def get_performance_config(self):
         session = get_session()
         return [
             convert_keys_to_camel_case(performance.to_dict())
-            for performance in session.query(PerformanceConfigModel).all()
+            for performance in session.scalars(select(PerformanceConfigModel)).all()
         ]
 
     def create_performance(self, user: UserModel, input: RecordInput):
         session = get_session()
-        stage = session.query(StageModel).filter_by(id=input.stageId).first()
+        stage = session.scalars(select(StageModel).filter_by(id=input.stageId).limit(1)).first()
         if not stage:
             raise GraphQLError("Stage not found")
 
@@ -63,22 +64,21 @@ class PerformanceService:
 
         session.add(performance)
         session.flush()
-        performance = (
-            session.query(PerformanceModel).filter_by(id=performance.id).first()
-        )
+        performance = session.scalars(
+            select(PerformanceModel).filter_by(id=performance.id).limit(1)
+        ).first()
         return convert_keys_to_camel_case(performance)
 
     def update_performance(self, user: UserModel, input: PerformanceInput):
         session = get_session()
-        performance = session.query(PerformanceModel).filter_by(id=input.id).first()
+        performance = session.scalars(
+            select(PerformanceModel).filter_by(id=input.id).limit(1)
+        ).first()
 
         if not performance:
             raise GraphQLError("Performance not found")
 
-        if (
-            user.role not in [SUPER_ADMIN, ADMIN]
-            and user.id != performance.stage.owner_id
-        ):
+        if user.role not in [SUPER_ADMIN, ADMIN] and user.id != performance.stage.owner_id:
             raise GraphQLError("You are not allowed to update this performance")
 
         performance.name = input.name
@@ -91,32 +91,22 @@ class PerformanceService:
         self, user: UserModel, input: DuplicatePerformanceTrimInput
     ):
         session = get_session()
-        source = (
-            session.query(PerformanceModel)
-            .filter_by(id=input.sourcePerformanceId)
-            .first()
-        )
+        source = session.scalars(
+            select(PerformanceModel).filter_by(id=input.sourcePerformanceId).limit(1)
+        ).first()
         if not source:
             raise GraphQLError("Performance not found")
 
-        if (
-            user.role not in [SUPER_ADMIN, ADMIN]
-            and user.id != source.stage.owner_id
-        ):
+        if user.role not in [SUPER_ADMIN, ADMIN] and user.id != source.stage.owner_id:
             raise GraphQLError("You are not allowed to duplicate this performance")
 
-        description = (
-            source.description
-            if input.description is None
-            else input.description
-        )
+        description = source.description if input.description is None else input.description
 
-        events = (
-            session.query(EventModel)
-            .filter(EventModel.performance_id == source.id)
+        events = session.scalars(
+            select(EventModel)
+            .where(EventModel.performance_id == source.id)
             .order_by(EventModel.id.asc())
-            .all()
-        )
+        ).all()
 
         if not events:
             raise GraphQLError("Nothing to duplicate: this performance has no events")
@@ -148,11 +138,7 @@ class PerformanceService:
         session.flush()
 
         for ev, new_ms in zip(ordered, new_times_ms, strict=True):
-            payload_out = (
-                json.loads(json.dumps(ev.payload))
-                if ev.payload is not None
-                else None
-            )
+            payload_out = json.loads(json.dumps(ev.payload)) if ev.payload is not None else None
             if (
                 is_chat_topic(ev.topic)
                 and isinstance(payload_out, dict)
@@ -173,46 +159,39 @@ class PerformanceService:
 
     def delete_performance(self, user: UserModel, id: int):
         session = get_session()
-        performance = session.query(PerformanceModel).filter_by(id=id).first()
+        performance = session.scalars(select(PerformanceModel).filter_by(id=id).limit(1)).first()
         if not performance:
             raise GraphQLError("Performance not found")
 
-        if (
-            user.role not in [SUPER_ADMIN, ADMIN]
-            and user.id != performance.stage.owner_id
-        ):
+        if user.role not in [SUPER_ADMIN, ADMIN] and user.id != performance.stage.owner_id:
             raise GraphQLError("You are not allowed to delete this performance")
 
-        session.query(EventModel).filter(EventModel.performance_id == id).delete(
-            synchronize_session=False
+        session.execute(
+            delete(EventModel).where(EventModel.performance_id == id),
+            execution_options={"synchronize_session": False},
         )
         session.delete(performance)
         return {"success": True}
 
     def save_recording(self, user: UserModel, id: int):
         session = get_session()
-        performance = session.query(PerformanceModel).filter_by(id=id).first()
+        performance = session.scalars(select(PerformanceModel).filter_by(id=id).limit(1)).first()
         if not performance:
             raise GraphQLError("Performance not found")
 
-        if (
-            user.role not in [SUPER_ADMIN, ADMIN]
-            and user.id != performance.stage.owner_id
-        ):
+        if user.role not in [SUPER_ADMIN, ADMIN] and user.id != performance.stage.owner_id:
             raise GraphQLError("Only stage owner or Admin can save a recording!")
-        saved_on = datetime.now()
+        saved_on = utcnow()
 
-        events = (
-            session.query(EventModel)
-            .filter(
-                EventModel.topic.ilike("%/{}/%".format(performance.stage.file_location))
-            )
-            .filter(EventModel.created > performance.created_on)
-            .filter(EventModel.created < saved_on)
-        )
+        events = session.scalars(
+            select(EventModel)
+            .where(EventModel.topic.ilike("%/{}/%".format(performance.stage.file_location)))
+            .where(EventModel.created > performance.created_on)
+            .where(EventModel.created < saved_on)
+        ).all()
 
-        if events.count() > 0:
-            for event in events.all():
+        if events:
+            for event in events:
                 session.expunge(event)
                 make_transient(event)
                 event.id = None
@@ -226,8 +205,7 @@ class PerformanceService:
         session.flush()
 
         return (
-            session.query(PerformanceModel)
-            .filter_by(id=performance.id)
+            session.scalars(select(PerformanceModel).filter_by(id=performance.id).limit(1))
             .first()
             .to_dict()
         )
