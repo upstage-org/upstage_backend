@@ -728,7 +728,6 @@ type_defs = gql("""
     }
 
     type Query {
-        hello: String
         whoami: User
         adminPlayers(
             limit: Int,
@@ -745,8 +744,6 @@ type_defs = gql("""
         getAllStages: [Stage!]!
 
         currentUser: User
-
-        access(path: String!): License!
 
         performanceCommunication:  [PerformanceCommunication!]!
         performanceConfig: [PerformanceConfig!]!

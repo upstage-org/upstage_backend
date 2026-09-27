@@ -1,12 +1,9 @@
-# -*- coding: iso8859-15 -*-
-
 import loguru  # noqa: F401  # entrypoint: load loguru before upstage (see app_containers compose)
 
 from fastapi import FastAPI
 from fastapi_exception import FastApiException
 from fastapi_global_variable import GlobalVariable
 from fastapi.middleware.cors import CORSMiddleware
-from contextlib import asynccontextmanager
 from starlette.requests import ClientDisconnect, Request
 from starlette.responses import Response
 
@@ -20,11 +17,6 @@ from upstage_backend.global_config.db_context import (
     current_session_or_none,
 )
 from upstage_backend.global_config.logger import logger
-
-
-@asynccontextmanager
-async def lifespan(app: FastAPI):
-    yield
 
 
 def add_cors_middleware(app):
@@ -83,7 +75,7 @@ def start_app():
     bootstrap.init_exception()
 
 
-app = FastAPI(title="upstage", lifespan=lifespan)
+app = FastAPI(title="upstage")
 GlobalVariable.set("app", app)
 
 

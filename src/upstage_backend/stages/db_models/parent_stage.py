@@ -1,5 +1,3 @@
-# -*- coding: iso8859-15 -*-
-
 from sqlalchemy import Column, Integer, BigInteger, ForeignKey, String
 from sqlalchemy.orm import relationship
 from upstage_backend.global_config.db_models.base import BaseModel

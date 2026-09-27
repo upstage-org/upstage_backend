@@ -1,5 +1,3 @@
-# -*- coding: iso8859-15 -*-
-
 import asyncio
 import pytest
 

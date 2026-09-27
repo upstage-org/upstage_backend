@@ -24,7 +24,9 @@ from upstage_backend.global_config.env import (
 from upstage_backend.upstage_options.db_models.config import ConfigModel
 
 
-async def send(to, subject, content, bcc=[], cc=[], filenames=[], honor_to=False):
+async def send(to, subject, content, bcc=None, cc=None, filenames=None, honor_to=False):
+    # Fresh lists per call: a mutable default is shared across calls.
+    bcc, cc, filenames = list(bcc or []), list(cc or []), list(filenames or [])
     msg = create_email(
         to=to,
         subject=subject,
@@ -106,15 +108,16 @@ def create_email(
     to,
     subject,
     html,
-    filenames=[],
-    cc=[],
-    bcc=[],
+    filenames=None,
+    cc=None,
+    bcc=None,
     sender=EMAIL_HOST_FROM,
     honor_to=False,
 ):
     """
     Create an email
     """
+    filenames, cc, bcc = list(filenames or []), list(cc or []), list(bcc or [])
     msg = MIMEMultipart("fixed")
     with ScopedSession() as local_db_session:
         subject_prefix = (

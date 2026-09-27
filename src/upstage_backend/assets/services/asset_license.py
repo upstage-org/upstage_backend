@@ -1,5 +1,3 @@
-# -*- coding: iso8859-15 -*-
-
 from upstage_backend.assets.db_models.asset_license import AssetLicenseModel
 
 

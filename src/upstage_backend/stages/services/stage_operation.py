@@ -1,5 +1,3 @@
-# -*- coding: iso8859-15 -*-
-
 import json
 from upstage_backend.event_archive.db_models.event import EventModel
 from upstage_backend.performance_config.db_models.performance import PerformanceModel

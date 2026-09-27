@@ -1,5 +1,3 @@
-# -*- coding: iso8859-15 -*-
-
 from functools import wraps
 from fastapi import Request
 import jwt

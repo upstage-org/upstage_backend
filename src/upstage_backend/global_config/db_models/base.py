@@ -1,5 +1,3 @@
-# -*- coding: iso8859-15 -*-
-
 from datetime import datetime
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import class_mapper, ColumnProperty, RelationshipProperty

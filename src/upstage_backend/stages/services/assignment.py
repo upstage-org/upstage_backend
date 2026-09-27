@@ -1,5 +1,3 @@
-# -*- coding: iso8859-15 -*-
-
 from upstage_backend.stages.db_models.parent_stage import ParentStageModel
 
 

@@ -1,5 +1,3 @@
-# -*- coding: iso8859-15 -*-
-
 import datetime
 
 from sqlalchemy import Column, String, Integer, Float, DateTime

@@ -1,4 +1,3 @@
-# -*- coding: iso8859-15 -*-
 import os
 
 import socket
@@ -130,9 +129,30 @@ if not SECRET_KEY:
         ENV_TYPE,
     )
 
+
+
+def with_psycopg2_driver(url: str) -> str:
+    """
+    Name the sync driver explicitly on Postgres URLs.
+
+    A driver-less ``postgresql://`` URL means "SQLAlchemy's default driver",
+    which changed from psycopg2 to psycopg (v3) in SQLAlchemy 2.1 — an
+    unpinned CI install then fails with ``No module named 'psycopg'``
+    (2026-09-27). psycopg2-binary is the driver this app ships with, so say
+    so. ``postgres://`` (Heroku-style) is no longer accepted by SQLAlchemy
+    at all and is mapped the same way. URLs that already name a driver, and
+    non-Postgres URLs, are returned unchanged.
+    """
+    for prefix in ("postgresql://", "postgres://"):
+        if url.startswith(prefix):
+            return "postgresql+psycopg2://" + url[len(prefix) :]
+    return url
+
+
 if DATABASE_CONNECT:
     DATABASE_URL = f"{DATABASE_CONNECT}://{DATABASE_USER}:{DATABASE_PASSWORD}@{DATABASE_HOST}:{DATABASE_PORT}/{DATABASE_NAME}"
 else:
     # No DB parts configured (CI / DB-free unit tests): honor a full
     # DATABASE_URL from the environment, defaulting to in-memory SQLite.
     DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///:memory:")
+DATABASE_URL = with_psycopg2_driver(DATABASE_URL)

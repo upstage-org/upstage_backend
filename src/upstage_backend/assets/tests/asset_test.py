@@ -1,6 +1,3 @@
-# -*- coding: iso8859-15 -*-
-
-
 import base64
 import os
 

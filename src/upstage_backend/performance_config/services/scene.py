@@ -1,5 +1,3 @@
-# -*- coding: iso8859-15 -*-
-
 from graphql import GraphQLError
 from upstage_backend.global_config import get_session
 from upstage_backend.global_config.helpers.object import convert_keys_to_camel_case

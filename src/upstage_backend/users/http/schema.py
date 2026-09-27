@@ -1,12 +1,8 @@
-# -*- coding: iso8859-15 -*-
-
-from ariadne import MutationType, QueryType, make_executable_schema
+from ariadne import MutationType, QueryType
 from graphql import GraphQLError
 from pydantic import ValidationError
 from upstage_backend.global_config.helpers.object import convert_keys_to_camel_case
 from upstage_backend.global_config.decorators.authenticated import authenticated
-from upstage_backend.studio_management.http.graphql import type_defs
-from ariadne.asgi import GraphQL
 
 from upstage_backend.users.http.validation import (
     CreateUserInput,
@@ -63,7 +59,3 @@ async def reset_password(_, info, input):
     except ValidationError as exc:
         raise GraphQLError(format_validation_error(exc)) from exc
     return await UserService().reset_password(validated)
-
-
-schema = make_executable_schema(type_defs, query, mutation)
-user_graphql_app = GraphQL(schema, debug=True)

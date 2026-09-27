@@ -1,13 +1,9 @@
-# -*- coding: iso8859-15 -*-
-
-from ariadne import QueryType, make_executable_schema
+from ariadne import QueryType
 
 from upstage_backend.global_config.decorators.authenticated import authenticated
 from upstage_backend.performance_config.services.performance import PerformanceService
 from upstage_backend.performance_config.services.scene import SceneService
 from upstage_backend.stages.services.stage import StageService
-from ariadne.asgi import GraphQL
-from upstage_backend.studio_management.http.graphql import type_defs
 from upstage_backend.users.db_models.user import ADMIN, SUPER_ADMIN
 
 
@@ -38,7 +34,3 @@ def scene(*_):
 @authenticated(allowed_roles=[SUPER_ADMIN, ADMIN])
 def parent_stage(*_):
     return StageService().get_parent_stage()
-
-
-schema = make_executable_schema(type_defs, query)
-performance_graphql_app = GraphQL(schema, debug=True)

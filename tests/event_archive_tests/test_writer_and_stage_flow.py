@@ -1,4 +1,3 @@
-# -*- coding: iso8859-15 -*-
 """
 End-to-end drift-catching test for the event_archive writer's output shape
 against the downstream consumers StageOperationService.get_event_list and

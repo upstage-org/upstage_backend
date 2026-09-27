@@ -1,12 +1,8 @@
-# -*- coding: iso8859-15 -*-
-
-from ariadne import MutationType, ObjectType, QueryType, make_executable_schema
+from ariadne import MutationType, ObjectType, QueryType
 from upstage_backend.global_config.decorators.authenticated import authenticated
 from upstage_backend.global_config.env import MQTT_PASSWORD, MQTT_USER
 from upstage_backend.performance_config.services.performance import PerformanceService
 from upstage_backend.performance_config.services.scene import SceneService
-from upstage_backend.studio_management.http.graphql import type_defs
-from ariadne.asgi import GraphQL
 
 from upstage_backend.stages.http.validation import (
     AssignMediaInput,
@@ -26,7 +22,8 @@ from upstage_backend.stages.http.validation import (
 )
 from upstage_backend.stages.services.media import MediaService
 from upstage_backend.stages.services.stage import StageService
-from upstage_backend.users.db_models.user import ADMIN, PLAYER, SUPER_ADMIN, UserModel
+from upstage_backend.users.db_models.user import ADMIN, PLAYER, SUPER_ADMIN
+from upstage_backend.global_config.helpers.context import current_user
 
 query = QueryType()
 mutation = MutationType()
@@ -52,7 +49,7 @@ def resolve_stage_mqtt(stage, info):
 @authenticated(allowed_roles=[SUPER_ADMIN, ADMIN, PLAYER])
 def search_stages(_, info, input):
     return StageService().get_all_stages(
-        UserModel(**info.context["request"].state.current_user),
+        current_user(info),
         SearchStageInput(**input),
     )
 
@@ -71,21 +68,21 @@ def foyer_stage_list(_, info):
 @authenticated(allowed_roles=[SUPER_ADMIN, ADMIN, PLAYER])
 def get_stage(_, info, id: int):
     return StageService().get_stage_by_id(
-        UserModel(**info.context["request"].state.current_user), id
+        current_user(info), id
     )
 
 
 @query.field("notifications")
 @authenticated(allowed_roles=[SUPER_ADMIN, ADMIN, PLAYER])
 def get_notifications(_, info):
-    return StageService().get_notifications(UserModel(**info.context["request"].state.current_user))
+    return StageService().get_notifications(current_user(info))
 
 
 @mutation.field("createStage")
 @authenticated(allowed_roles=[SUPER_ADMIN, ADMIN, PLAYER])
 def create_stage(_, info, input):
     return StageService().create_stage(
-        UserModel(**info.context["request"].state.current_user), StageInput(**input)
+        current_user(info), StageInput(**input)
     )
 
 
@@ -93,7 +90,7 @@ def create_stage(_, info, input):
 @authenticated(allowed_roles=[SUPER_ADMIN, ADMIN, PLAYER])
 def update_stage(_, info, input):
     return StageService().update_stage(
-        UserModel(**info.context["request"].state.current_user),
+        current_user(info),
         UpdateStageInput(**input),
     )
 
@@ -101,14 +98,14 @@ def update_stage(_, info, input):
 @mutation.field("deleteStage")
 @authenticated(allowed_roles=[SUPER_ADMIN, ADMIN, PLAYER])
 def delete_stage(_, info, id):
-    return StageService().delete_stage(UserModel(**info.context["request"].state.current_user), id)
+    return StageService().delete_stage(current_user(info), id)
 
 
 @mutation.field("duplicateStage")
 @authenticated(allowed_roles=[SUPER_ADMIN, ADMIN, PLAYER])
 def duplicate_stage(_, info, id: int, name: str):
     return StageService().duplicate_stage(
-        UserModel(**info.context["request"].state.current_user),
+        current_user(info),
         DuplicateStageInput(id=id, name=name),
     )
 
@@ -118,7 +115,7 @@ def duplicate_stage(_, info, id: int, name: str):
 def assign_media(_, info, input: AssignMediaInput):
     return MediaService().assign_media(
         AssignMediaInput(**input),
-        UserModel(**info.context["request"].state.current_user),
+        current_user(info),
     )
 
 
@@ -126,7 +123,7 @@ def assign_media(_, info, input: AssignMediaInput):
 @authenticated(allowed_roles=[SUPER_ADMIN, ADMIN, PLAYER])
 async def upload_media(_, info, input: UploadMediaInput):
     return await MediaService().upload_media(
-        UserModel(**info.context["request"].state.current_user),
+        current_user(info),
         UploadMediaInput(**input),
     )
 
@@ -136,7 +133,7 @@ async def upload_media(_, info, input: UploadMediaInput):
 async def update_media(_, info, input: UpdateMediaInput):
     return await MediaService().update_media(
         UpdateMediaInput(**input),
-        UserModel(**info.context["request"].state.current_user),
+        current_user(info),
     )
 
 
@@ -144,7 +141,7 @@ async def update_media(_, info, input: UpdateMediaInput):
 @authenticated(allowed_roles=[SUPER_ADMIN, ADMIN, PLAYER])
 def delete_media(_, info, id: int):
     return MediaService().delete_media(
-        id, UserModel(**info.context["request"].state.current_user)
+        id, current_user(info)
     )
 
 
@@ -152,7 +149,7 @@ def delete_media(_, info, id: int):
 @authenticated(allowed_roles=[SUPER_ADMIN, ADMIN, PLAYER])
 def assign_stages(_, info, input: AssignStagesInput):
     return MediaService().assign_stages(
-        AssignStagesInput(**input), UserModel(**info.context["request"].state.current_user)
+        AssignStagesInput(**input), current_user(info)
     )
 
 
@@ -166,35 +163,35 @@ def update_stage_assignment(_, info, stageId, assetId, exitAnimation=None, exitS
             exitAnimation=exitAnimation,
             exitSpeed=exitSpeed,
         ),
-        UserModel(**info.context["request"].state.current_user),
+        current_user(info),
     )
 
 
 @mutation.field("sweepStage")
 @authenticated(allowed_roles=[SUPER_ADMIN, ADMIN, PLAYER])
 def sweep_stage(_, info, id: int):
-    return StageService().sweep_stage(UserModel(**info.context["request"].state.current_user), id)
+    return StageService().sweep_stage(current_user(info), id)
 
 
 @mutation.field("saveScene")
 @authenticated()
 def save_scene(_, info, input: SceneInput):
     return SceneService().create_scene(
-        UserModel(**info.context["request"].state.current_user), SceneInput(**input)
+        current_user(info), SceneInput(**input)
     )
 
 
 @mutation.field("deleteScene")
 @authenticated(allowed_roles=[SUPER_ADMIN, ADMIN, PLAYER])
 def delete_scene(_, info, id: int):
-    return SceneService().delete_scene(UserModel(**info.context["request"].state.current_user), id)
+    return SceneService().delete_scene(current_user(info), id)
 
 
 @mutation.field("updatePerformance")
 @authenticated(allowed_roles=[SUPER_ADMIN, ADMIN, PLAYER])
 def update_performance(_, info, input):
     return PerformanceService().update_performance(
-        UserModel(**info.context["request"].state.current_user),
+        current_user(info),
         PerformanceInput(**input),
     )
 
@@ -203,7 +200,7 @@ def update_performance(_, info, input):
 @authenticated(allowed_roles=[SUPER_ADMIN, ADMIN, PLAYER])
 def delete_performance(_, info, id: int):
     return PerformanceService().delete_performance(
-        UserModel(**info.context["request"].state.current_user), id
+        current_user(info), id
     )
 
 
@@ -211,7 +208,7 @@ def delete_performance(_, info, id: int):
 @authenticated(allowed_roles=[SUPER_ADMIN, ADMIN, PLAYER])
 def duplicate_performance_with_trimmed_pauses(_, info, input):
     return PerformanceService().duplicate_performance_with_trimmed_pauses(
-        UserModel(**info.context["request"].state.current_user),
+        current_user(info),
         DuplicatePerformanceTrimInput(**input),
     )
 
@@ -220,7 +217,7 @@ def duplicate_performance_with_trimmed_pauses(_, info, input):
 @authenticated(allowed_roles=[SUPER_ADMIN, ADMIN, PLAYER])
 def start_recording(_, info, input):
     return PerformanceService().create_performance(
-        UserModel(**info.context["request"].state.current_user),
+        current_user(info),
         RecordInput(**input),
     )
 
@@ -229,28 +226,24 @@ def start_recording(_, info, input):
 @authenticated(allowed_roles=[SUPER_ADMIN, ADMIN, PLAYER])
 def save_recording(_, info, id: int):
     return PerformanceService().save_recording(
-        UserModel(**info.context["request"].state.current_user), id
+        current_user(info), id
     )
 
 
 @mutation.field("updateStatus")
 @authenticated(allowed_roles=[SUPER_ADMIN, ADMIN, PLAYER])
 def update_status(_, info, id: int):
-    return StageService().update_status(UserModel(**info.context["request"].state.current_user), id)
+    return StageService().update_status(current_user(info), id)
 
 
 @mutation.field("updateVisibility")
 @authenticated(allowed_roles=[SUPER_ADMIN, ADMIN, PLAYER])
 def update_visibility(_, info, id: int):
     return StageService().update_visibility(
-        UserModel(**info.context["request"].state.current_user), id
+        current_user(info), id
     )
 
 
 @mutation.field("updateLastAccess")
 def update_last_access(_, __, id: int):
     return StageService().update_last_access(id)
-
-
-schema = make_executable_schema(type_defs, query, mutation, stage_type)
-stage_graphql_app = GraphQL(schema, debug=True)

@@ -1,4 +1,3 @@
-# -*- coding: iso8859-15 -*-
 """
 Shared pytest configuration for upstage_backend tests.
 
@@ -100,8 +99,6 @@ def rebound_db(sqlite_engine, monkeypatch):
       * global_config.database.engine
       * global_config.db_context.SessionFactory  (used by request_session()
         and ScopedSession())
-      * global_config.database.DBSession         (deprecated proxy alias,
-        still expected by some legacy tests)
 
     Also opens a Session, binds it into the request ContextVar, and yields
     it as ``db_session`` equivalent. Tests can either access it via
@@ -130,7 +127,6 @@ def rebound_db(sqlite_engine, monkeypatch):
         "engine": sqlite_engine,
         "session_factory": test_session_factory,
         "db_session": session,
-        "DBSession": session,
     }
 
     try:

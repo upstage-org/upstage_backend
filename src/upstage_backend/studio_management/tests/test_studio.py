@@ -1,5 +1,3 @@
-# -*- coding: iso8859-15 -*-
-
 import random
 from datetime import datetime, timedelta
 from faker import Faker

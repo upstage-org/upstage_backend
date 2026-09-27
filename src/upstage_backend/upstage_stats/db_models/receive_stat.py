@@ -1,5 +1,3 @@
-# -*- coding: iso8859-15 -*-
-
 from datetime import datetime
 from sqlalchemy import Column, DateTime, Integer, String
 from upstage_backend.global_config.db_models.base import BaseModel

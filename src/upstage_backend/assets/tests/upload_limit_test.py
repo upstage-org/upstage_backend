@@ -1,4 +1,3 @@
-# -*- coding: iso8859-15 -*-
 """
 Upload limits end-to-end through the GraphQL API (real DB; runs inside the
 compose network, e.g. the disposable e2e backend with

@@ -7,8 +7,12 @@ name = "upstage-backend"
 version = "0.0.0"
 description = "UpStage backend (FastAPI + Ariadne GraphQL + SQLAlchemy + aiomqtt)."
 requires-python = ">=3.12"
-# Mirrors requirements.txt verbatim. Keeping it unpinned here so behaviour
-# matches the existing dev/prod containers; tighten later in a separate PR.
+# Single source of truth (requirements.txt is just `-e .`). Runtime deps are
+# largely unpinned so the containers (built from uv.lock) and CI (pip, latest)
+# stay comparable; upper bounds are added only where a new major changes
+# defaults we rely on. pytest/faker/coverage/ruff stay in the runtime list on
+# purpose: the container image is built with `uv sync --no-dev`, and the
+# src-tree integration suites are run inside that image.
 dependencies = [
     "aiomqtt",
     "aiosmtplib",
@@ -19,8 +23,10 @@ dependencies = [
     "asyncpg",
     "coverage",
     "cryptography",
-    "databases",
     "email-validator",
+    # Imported directly (custom scalars / OperationType); previously only a
+    # transitive dependency of ariadne.
+    "graphql-core",
     "faker",
     # `!= 0.136.3` works around MAL-2026-4750 (malicious release that
     # injected an undocumented `fastar` typosquat into the [standard]
@@ -29,24 +35,26 @@ dependencies = [
     "fastapi != 0.136.3",
     "fastapi_exception",
     "fastapi_global_variable",
-    "fastapi_pagination",
-    "graphql_server",
-    "hypercorn",
     "loguru",
     "paho-mqtt",
     "Pillow",
+    # Imported directly (validation models); previously transitive via fastapi.
+    "pydantic",
     "psycopg2-binary",
-    "pydash",
     "pyjwt",
     "pyotp",
     "pytest",
+    # Captcha verification (users/services/user.py).
+    "requests",
     "python-dotenv",
     "ruff",
-    "sentry_sdk",
-    "sqlalchemy",
+    # SQLAlchemy 2.1 makes psycopg (v3) the default Postgres driver and
+    # changes other defaults; stay on 2.0 until the code is audited for it.
+    "sqlalchemy>=2.0,<2.1",
+    # Imported directly (Request/Response types); previously transitive via fastapi.
+    "starlette",
     "stripe",
     "terminal_colors",
-    "typing_inspect",
     "uvicorn",
     "PyMuPDF",
     "reportlab",

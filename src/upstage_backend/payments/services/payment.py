@@ -1,5 +1,3 @@
-# -*- coding: iso8859-15 -*-
-
 import asyncio
 
 from upstage_backend.global_config import logger
@@ -112,10 +110,6 @@ class PaymentService:
             ],
             expand=["latest_invoice.payment_intent"],
         )
-        return subscription
-
-    def get_subscription(self, subscription_id: str):
-        subscription = stripe.Subscription.retrieve(subscription_id)
         return subscription
 
     async def cancel_subscription(self, subscription_id):

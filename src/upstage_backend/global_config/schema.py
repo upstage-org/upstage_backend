@@ -1,5 +1,3 @@
-# -*- coding: iso8859-15 -*-
-
 import inspect
 
 from ariadne import MutationType, QueryType, make_executable_schema

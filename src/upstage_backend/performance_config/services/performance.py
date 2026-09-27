@@ -1,5 +1,3 @@
-# -*- coding: iso8859-15 -*-
-
 import json
 from datetime import datetime
 from graphql import GraphQLError

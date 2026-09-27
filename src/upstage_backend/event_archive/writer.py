@@ -1,4 +1,3 @@
-# -*- coding: iso8859-15 -*-
 """
 Postgres writer task for the event_archive service.
 

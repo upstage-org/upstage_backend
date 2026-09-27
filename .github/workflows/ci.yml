@@ -76,8 +76,10 @@ jobs:
 
     env:
       # Pointed at the `services:` Postgres above; matches what the
-      # autouse `db_engine` fixture in `/conftest.py` imports. Driver-less
-      # URL on purpose: event_archive derives its asyncpg URL from it.
+      # autouse `db_engine` fixture in `/conftest.py` imports. env.py names
+      # the psycopg2 driver on driver-less URLs (SQLAlchemy 2.1 would pick
+      # psycopg v3 otherwise) and event_archive derives its asyncpg URL
+      # from either form.
       DATABASE_URL: postgresql://postgres:postgres@localhost:5432/upstage
       DATABASE_NAME: upstage
       # The src-tree suites refuse to run against a DB unless told it is

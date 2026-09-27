@@ -1,10 +1,8 @@
-# -*- coding: iso8859-15 -*-
-
 from upstage_backend.global_config import logger
 
 import json
 import secrets
-from datetime import datetime, timedelta
+from datetime import datetime
 
 import paho.mqtt.client as mqtt
 
@@ -150,20 +148,12 @@ def get_client_id():
     return secrets.token_urlsafe(16)
 
 
-def build_client(client_id=get_client_id(), transport=MQTT_TRANSPORT):
-    client = mqtt.Client(client_id=client_id, transport=transport)
+def build_client(client_id=None, transport=MQTT_TRANSPORT):
+    # A fresh id per client: as a default argument `get_client_id()` ran once
+    # at import, so every client built by this process shared one id.
+    client = mqtt.Client(client_id=client_id or get_client_id(), transport=transport)
     client.on_connect = on_connect
     client.on_message = on_message
     client.on_disconnect = on_disconnect
     return client
 
-
-def get_not_alive_users():
-    two_minute_ago = datetime.now() - timedelta(minutes=2)
-    with ScopedSession() as session:
-        not_alive_clients = (
-            session.query(ReceiveStatModel)
-            .filter(ReceiveStatModel.mqtt_timestamp < two_minute_ago)
-            .all()
-        )
-        return [x.received_id for x in not_alive_clients]

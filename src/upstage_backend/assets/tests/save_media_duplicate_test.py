@@ -1,4 +1,3 @@
-# -*- coding: iso8859-15 -*-
 """
 Regression tests for save_media's duplicate-stream-key handling.
 

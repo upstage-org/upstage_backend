@@ -1,4 +1,3 @@
-# -*- coding: iso8859-15 -*-
 """
 Publish authentication for the MediaMTX RTMP server (/root/streaming2).
 

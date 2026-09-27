@@ -1,10 +1,8 @@
-# -*- coding: iso8859-15 -*-
-
 import re
 from datetime import datetime
 from graphql import GraphQLError
 import jwt
-from requests import Request
+from starlette.requests import Request
 from sqlalchemy import and_, nulls_last, exists, or_, update
 from upstage_backend.global_config import get_session
 from upstage_backend.global_config.env import ALGORITHM, SECRET_KEY

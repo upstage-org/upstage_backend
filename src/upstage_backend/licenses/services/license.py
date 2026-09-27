@@ -1,5 +1,3 @@
-# -*- coding: iso8859-15 -*-
-
 from secrets import token_urlsafe
 
 from graphql import GraphQLError

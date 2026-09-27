@@ -1,4 +1,3 @@
-# -*- coding: iso8859-15 -*-
 """
 Multi-server streaming: saveMedia accepts an optional `rtmpEndpoint` for RTMP
 stream feeds and stores it (normalised) in the asset description next to

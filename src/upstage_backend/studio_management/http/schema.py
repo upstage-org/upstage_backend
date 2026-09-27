@@ -1,8 +1,6 @@
-# -*- coding: iso8859-15 -*-
-
 from typing import List, Optional
 
-from ariadne import MutationType, QueryType, make_executable_schema
+from ariadne import MutationType, QueryType
 from graphql import GraphQLError
 
 from upstage_backend.global_config import logger
@@ -10,9 +8,7 @@ from upstage_backend.global_config.decorators.authenticated import authenticated
 from upstage_backend.global_config.env import EMAIL_HOST
 from upstage_backend.global_config.helpers.bearer import parse_bearer_token
 from upstage_backend.global_config.helpers.object import convert_keys_to_camel_case
-from ariadne.asgi import GraphQL
 from upstage_backend.mails.helpers.mail import send
-from upstage_backend.studio_management.http.graphql import type_defs
 from upstage_backend.studio_management.http.validation import (
     BatchUserInput,
     ChangePasswordInput,
@@ -25,8 +21,8 @@ from upstage_backend.users.db_models.user import (
     ROLES,
     SUPER_ADMIN,
     PLAYER,
-    UserModel,
 )
+from upstage_backend.global_config.helpers.context import current_user
 
 
 query = QueryType()
@@ -35,7 +31,7 @@ mutation = MutationType()
 
 @query.field("whoami")
 @authenticated()
-def current_user(_, info):
+def resolve_whoami(_, info):
     user = info.context["request"].state.current_user
     return convert_keys_to_camel_case(
         {
@@ -57,7 +53,7 @@ def admin_players(_, info, **kwargs):
 @query.field("getAllStages")
 @authenticated()
 def stages(_, info):
-    return StudioService().stages(UserModel(**info.context["request"].state.current_user))
+    return StudioService().stages(current_user(info))
 
 
 @query.field("users")
@@ -88,7 +84,7 @@ async def update_user(_, info, input: UpdateUserInput):
 def delete_user(_, info, id: int, contentAction: str = "REASSIGN_TO_ADMIN"):
     return StudioService().delete_user(
         id,
-        UserModel(**info.context["request"].state.current_user),
+        current_user(info),
         contentAction,
     )
 
@@ -161,7 +157,7 @@ def calc_sizes(_, __):
 @authenticated()
 def request_permission(_, info, assetId: int, note: Optional[str] = None):
     return StudioService().request_permission(
-        UserModel(**info.context["request"].state.current_user), assetId, note
+        current_user(info), assetId, note
     )
 
 
@@ -169,7 +165,7 @@ def request_permission(_, info, assetId: int, note: Optional[str] = None):
 @authenticated()
 async def confirm_permission(_, info, id: int, approved: Optional[bool] = False):
     return await StudioService().confirm_permission(
-        UserModel(**info.context["request"].state.current_user), id, approved
+        current_user(info), id, approved
     )
 
 
@@ -177,7 +173,7 @@ async def confirm_permission(_, info, id: int, approved: Optional[bool] = False)
 @authenticated(allowed_roles=[SUPER_ADMIN, ADMIN, PLAYER])
 def dismiss_notification(_, info, id: int):
     return StudioService().dismiss_notification(
-        UserModel(**info.context["request"].state.current_user), id
+        current_user(info), id
     )
 
 
@@ -185,9 +181,5 @@ def dismiss_notification(_, info, id: int):
 @authenticated()
 def quick_assign_mutation(_, info, stageIds: list[int], assetId: int):
     return StudioService().quick_assign_mutation(
-        UserModel(**info.context["request"].state.current_user), stageIds, assetId
+        current_user(info), stageIds, assetId
     )
-
-
-schema = make_executable_schema(type_defs, query, mutation)
-studio_graphql_app = GraphQL(schema, debug=True)

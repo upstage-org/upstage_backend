@@ -1,5 +1,3 @@
-# -*- coding: iso8859-15 -*-
-
 from sqlalchemy import TIMESTAMP, BigInteger, Boolean, Column, Integer, String, Text, text
 from datetime import datetime
 from upstage_backend.global_config.db_models.base import BaseModel

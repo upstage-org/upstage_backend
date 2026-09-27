@@ -1,4 +1,3 @@
-# -*- coding: iso8859-15 -*-
 """
 A stage's saved media order IS the parent_stage primary-key order (assignMedia
 writes the rows in the order arranged in Stage Management > Media, and

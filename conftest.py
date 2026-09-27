@@ -1,4 +1,3 @@
-# -*- coding: iso8859-15 -*-
 """
 Root pytest conftest.
 

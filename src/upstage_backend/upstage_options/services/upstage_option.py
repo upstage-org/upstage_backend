@@ -1,5 +1,3 @@
-# -*- coding: iso8859-15 -*-
-
 from upstage_backend.global_config.env import CLIENT_MAX_BODY_SIZE
 
 from upstage_backend.global_config.helpers.object import convert_keys_to_camel_case

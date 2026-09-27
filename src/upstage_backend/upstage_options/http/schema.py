@@ -1,6 +1,4 @@
-# -*- coding: iso8859-15 -*-
-
-from ariadne import MutationType, QueryType, make_executable_schema
+from ariadne import MutationType, QueryType
 
 from upstage_backend.global_config.decorators.authenticated import authenticated
 from upstage_backend.upstage_options.http.validation import (
@@ -8,8 +6,6 @@ from upstage_backend.upstage_options.http.validation import (
     SystemEmailInput,
 )
 from upstage_backend.upstage_options.services.upstage_option import SettingService
-from upstage_backend.studio_management.http.graphql import type_defs
-from ariadne.asgi import GraphQL
 
 from upstage_backend.users.db_models.user import ADMIN, SUPER_ADMIN
 
@@ -48,7 +44,3 @@ async def save_config(*_, input: ConfigInput):
 @authenticated(allowed_roles=[ADMIN, SUPER_ADMIN])
 async def send_email(*_, input: SystemEmailInput):
     return await SettingService().send_email(SystemEmailInput(**input))
-
-
-schema = make_executable_schema(type_defs, query, mutation)
-config_graphql_app = GraphQL(schema, debug=True)

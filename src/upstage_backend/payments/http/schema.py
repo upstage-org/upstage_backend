@@ -1,13 +1,9 @@
-# -*- coding: iso8859-15 -*-
-
 from upstage_backend.payments.services.pdf_operator import create_receipt_base64
 
-from ariadne import MutationType, QueryType, make_executable_schema
-from ariadne.asgi import GraphQL
+from ariadne import MutationType, QueryType
 from graphql import GraphQLError
 from pydantic import ValidationError
 from upstage_backend.global_config.decorators.authenticated import authenticated
-from upstage_backend.studio_management.http.graphql import type_defs
 from upstage_backend.payments.services.payment import PaymentService
 from upstage_backend.payments.http.validation import (
     PaymentIntentInput,
@@ -76,7 +72,3 @@ def resolve_generate_receipt(_, info, receivedFrom, date, description, amount):
     except ValidationError as exc:
         raise GraphQLError("Invalid receipt details") from exc
     return create_receipt_base64(dto.receivedFrom, dto.date, dto.description, dto.amount)
-
-
-schema = make_executable_schema(type_defs, query, mutation)
-payment_graphql_app = GraphQL(schema, debug=True)

@@ -1,4 +1,3 @@
-# -*- coding: iso8859-15 -*-
 """
 Tests for the MediaMTX publish-auth endpoint (/api/rtmp/auth).
 

@@ -1,4 +1,3 @@
-# -*- coding: iso8859-15 -*-
 """
 Async SQLAlchemy session for the event_archive service.
 

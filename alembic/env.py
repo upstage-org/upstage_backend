@@ -1,4 +1,3 @@
-# -*- coding: iso8859-15 -*-
 from logging.config import fileConfig
 
 from sqlalchemy import engine_from_config, pool, text
@@ -21,8 +20,8 @@ config.set_main_option("sqlalchemy.url", DATABASE_URL)
 # Importing the GraphQL wiring module registers every mapped class on
 # `Base.metadata` (the models are spread across the feature packages).
 # NOTE: `alembic check` currently reports pre-existing drift (see the
-# 2026-09 review: StageLicenseModel has no table, a few legacy tables have
-# no model, FK column widths differ) — resolve that before adding it to CI.
+# 2026-09 review: a few legacy tables have no model, FK column widths
+# differ) — resolve that before adding it to CI.
 from upstage_backend.global_config.db_models.base import Base  # noqa: E402
 import upstage_backend.global_config.schema  # noqa: E402,F401  (registers all models)
 

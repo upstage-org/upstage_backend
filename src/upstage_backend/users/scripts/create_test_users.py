@@ -1,5 +1,3 @@
-# -*- coding: iso8859-15 -*-
-
 from upstage_backend.global_config.database import ScopedSession
 from upstage_backend.global_config.helpers.password import hash_password
 from upstage_backend.users.db_models.user import SUPER_ADMIN, UserModel

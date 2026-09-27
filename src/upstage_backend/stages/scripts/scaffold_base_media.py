@@ -1,4 +1,3 @@
-# -*- coding: iso8859-15 -*-
 """Seed a new installation with the Demo Stage.
 
 Manifest-driven: everything comes from dashboard/demo/seed/demo_stage_seed.json

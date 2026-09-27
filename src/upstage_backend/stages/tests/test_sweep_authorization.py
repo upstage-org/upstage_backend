@@ -1,4 +1,3 @@
-# -*- coding: iso8859-15 -*-
 """
 sweepStage archives a stage's live events and clears it — it ends whatever is
 on that stage. It was callable by ANY logged-in player account: the resolver

@@ -1,16 +1,13 @@
-# -*- coding: iso8859-15 -*-
-
-from ariadne import MutationType, QueryType, make_executable_schema
-from ariadne.asgi import GraphQL
+from ariadne import MutationType, QueryType
 from upstage_backend.assets.http.validation import (
     MediaTableInput,
     SaveMediaInput,
     UpdateMediaStatusInput,
 )
 from upstage_backend.global_config.decorators.authenticated import authenticated
-from upstage_backend.studio_management.http.graphql import type_defs
 from upstage_backend.assets.services.asset import AssetService
-from upstage_backend.users.db_models.user import ADMIN, PLAYER, SUPER_ADMIN, UserModel
+from upstage_backend.users.db_models.user import ADMIN, PLAYER, SUPER_ADMIN
+from upstage_backend.global_config.helpers.context import current_user
 
 query = QueryType()
 mutation = MutationType()
@@ -20,7 +17,7 @@ mutation = MutationType()
 @authenticated(allowed_roles=[SUPER_ADMIN, ADMIN, PLAYER])
 async def media_list(_, info, **kwargs):
     return AssetService().get_all_medias(
-        UserModel(**info.context["request"].state.current_user), kwargs
+        current_user(info), kwargs
     )
 
 
@@ -28,7 +25,7 @@ async def media_list(_, info, **kwargs):
 @authenticated(allowed_roles=[SUPER_ADMIN, ADMIN, PLAYER])
 async def search_assets(_, info, **kwargs):
     return AssetService().search_assets(
-        UserModel(**info.context["request"].state.current_user),
+        current_user(info),
         MediaTableInput(**kwargs["input"]),
     )
 
@@ -55,7 +52,7 @@ async def get_voices(_, __):
 @authenticated(allowed_roles=[SUPER_ADMIN, ADMIN, PLAYER])
 async def upload_file(_, info, base64: str, filename: str):
     return await AssetService().upload_file_async(
-        UserModel(**info.context["request"].state.current_user), base64, filename
+        current_user(info), base64, filename
     )
 
 
@@ -63,7 +60,7 @@ async def upload_file(_, info, base64: str, filename: str):
 @authenticated(allowed_roles=[SUPER_ADMIN, ADMIN, PLAYER])
 async def save_media(_, info, input: SaveMediaInput):
     return AssetService().save_media(
-        UserModel(**info.context["request"].state.current_user),
+        current_user(info),
         SaveMediaInput(**input),
     )
 
@@ -71,17 +68,13 @@ async def save_media(_, info, input: SaveMediaInput):
 @mutation.field("deleteMedia")
 @authenticated(allowed_roles=[SUPER_ADMIN, ADMIN, PLAYER])
 async def delete_media(_, info, id: int):
-    return AssetService().delete_media(UserModel(**info.context["request"].state.current_user), id)
+    return AssetService().delete_media(current_user(info), id)
 
 
 @mutation.field("updateMediaStatus")
 @authenticated(allowed_roles=[SUPER_ADMIN, ADMIN, PLAYER])
 async def update_status(_, info, input: UpdateMediaStatusInput):
     return AssetService().update_status(
-        UserModel(**info.context["request"].state.current_user),
+        current_user(info),
         UpdateMediaStatusInput(**input),
     )
-
-
-schema = make_executable_schema(type_defs, query, mutation)
-asset_graphql_app = GraphQL(schema, debug=True)

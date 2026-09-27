@@ -1,10 +1,6 @@
-# -*- coding: iso8859-15 -*-
-
-from ariadne import MutationType, QueryType, make_executable_schema
-from ariadne.asgi import GraphQL
+from ariadne import MutationType, QueryType
 from upstage_backend.authentication.http.validation import LoginInput
 from upstage_backend.authentication.services.auth import AuthenticationService
-from upstage_backend.studio_management.http.graphql import type_defs
 
 
 query = QueryType()
@@ -12,13 +8,8 @@ mutation = MutationType()
 
 
 @mutation.field("login")
-async def login(
-    _,
-    info,
-    payload: LoginInput,
-    authentication_service: AuthenticationService = AuthenticationService(),
-):
-    return await authentication_service.login(
+async def login(_, info, payload: LoginInput):
+    return await AuthenticationService().login(
         LoginInput(**payload), info.context["request"]
     )
 
@@ -31,13 +22,5 @@ async def refresh_token(_, info):
 
 
 @mutation.field("logout")
-async def resolve_logout(
-    _,
-    info,
-    authentication_service: AuthenticationService = AuthenticationService(),
-):
-    return await authentication_service.logout(info.context["request"])
-
-
-schema = make_executable_schema(type_defs, query, mutation)
-auth_graphql_app = GraphQL(schema, debug=True)
+async def resolve_logout(_, info):
+    return await AuthenticationService().logout(info.context["request"])

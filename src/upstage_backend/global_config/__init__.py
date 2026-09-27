@@ -1,7 +1,6 @@
-# -*- coding: iso8859-15 -*-
 import sys
 
-from upstage_backend.global_config.database import ScopedSession, DBSession
+from upstage_backend.global_config.database import ScopedSession
 from upstage_backend.global_config.db_context import (
     get_session,
     set_session,
@@ -31,7 +30,6 @@ __all__ = [
     "db",  # noqa: F405  (re-exported from .env via star import above)
     "ScopedSession",
     "config_graphql_endpoints",
-    "DBSession",
     "get_session",
     "set_session",
     "reset_session",

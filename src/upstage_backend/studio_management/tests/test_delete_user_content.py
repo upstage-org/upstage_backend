@@ -1,4 +1,3 @@
-# -*- coding: iso8859-15 -*-
 """deleteUser content handling: DELETE_ALL wipes a user's stages, media and
 recordings (substituting the placeholder into surviving references), while the
 default REASSIGN_TO_ADMIN keeps only avatars/props/backdrops, handing them to

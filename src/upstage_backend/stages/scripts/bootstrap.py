@@ -1,4 +1,3 @@
-# -*- coding: iso8859-15 -*-
 """New-installation bootstrap: seed the Demo Stage when the database has no
 stages at all (the "fresh install" signal). Invoked by scripts/run_bootstrap
 inside the one-shot upstage_db_migrate container, right after alembic reaches

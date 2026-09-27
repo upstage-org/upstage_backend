@@ -1,4 +1,3 @@
-# -*- coding: iso8859-15 -*-
 """
 Request-scoped SQLAlchemy session, stored in a ContextVar.
 

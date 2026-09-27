@@ -1,6 +1,3 @@
-# -*- coding: iso8859-15 -*-
-
-
 import pytest
 from upstage_backend.authentication.tests.auth_test import (
     TestAuthenticationController as _TestAuthenticationController,

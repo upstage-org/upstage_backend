@@ -123,7 +123,7 @@ ACCEPT_EMAIL_HOST = ["dev.example.org"]
 ACCEPT_SERVER_SEND_EMAIL_EXTERNAL = []
 SEND_EMAIL_SERVER = "https://dev.example.org"
 
-# Change to "Production" for official releases (locks down CORS to HOSTNAME).
+# Change to "Production" for official releases (CORS then allows only UPSTAGE_FRONTEND_URL and https sub-domains of DOMAIN; see main.py add_cors_middleware).
 ENV_TYPE = "Dev"
 
 JWT_ACCESS_TOKEN_MINUTES = "86400"  # 1 day
