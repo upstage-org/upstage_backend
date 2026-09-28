@@ -133,7 +133,7 @@ type_defs = gql("""
         type: String!
     }
 
-    input OneTimePurchaseInput {
+    input OneTimeDonationInput {
         cardNumber: String!
         expYear: String!
         expMonth: String!
@@ -692,7 +692,7 @@ type_defs = gql("""
         revokeLicense(id: ID!): String!
 
         paymentSecret(input: PaymentIntentInput!): String!
-        oneTimePurchase(input: OneTimePurchaseInput!): CommonResponse
+        oneTimeDonation(input: OneTimeDonationInput!): CommonResponse
         createSubscription(input: CreateSubscriptionInput!): CommonResponse
         cancelSubscription(subscription_id: String!): CommonResponse
         updateEmailCustomer(customer_id: String!, email: String!): CommonResponse

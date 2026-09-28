@@ -118,7 +118,7 @@ def config_graphql_endpoints(app: FastAPI, endpoint="/api/studio_graphql"):
 
     combined_mutation.set_field("paymentSecret", payment_mutation._resolvers["paymentSecret"])
 
-    combined_mutation.set_field("oneTimePurchase", payment_mutation._resolvers["oneTimePurchase"])
+    combined_mutation.set_field("oneTimeDonation", payment_mutation._resolvers["oneTimeDonation"])
     combined_mutation.set_field(
         "createSubscription", payment_mutation._resolvers["createSubscription"]
     )

@@ -1378,11 +1378,11 @@ mutation {
 }
 ```
 
-**oneTimePurchase**, **createSubscription**, **cancelSubscription**, **updateEmailCustomer**
+**oneTimeDonation**, **createSubscription**, **cancelSubscription**, **updateEmailCustomer**
 
 Access: Admin, Super admin. Per the comment in `src/upstage_backend/payments/http/schema.py`, these four mutations are not used by the studio UI (the donate flow uses `paymentSecret`) and are restricted to admins until they are removed or redesigned.
 
-- `oneTimePurchase(input: OneTimePurchaseInput!): CommonResponse`
+- `oneTimeDonation(input: OneTimeDonationInput!): CommonResponse`
 - `createSubscription(input: CreateSubscriptionInput!): CommonResponse`
 - `cancelSubscription(subscription_id: String!): CommonResponse`
 - `updateEmailCustomer(customer_id: String!, email: String!): CommonResponse`

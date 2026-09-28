@@ -7,7 +7,7 @@ from upstage_backend.global_config.decorators.authenticated import authenticated
 from upstage_backend.payments.services.payment import PaymentService
 from upstage_backend.payments.http.validation import (
     PaymentIntentInput,
-    OneTimePurchaseInput,
+    OneTimeDonationInput,
     CreateSubscriptionInput,
     ReceiptInput,
 )
@@ -37,10 +37,10 @@ async def get_payment_secret(_, info, input: PaymentIntentInput):
 # studio UI (the donate flow uses Stripe Elements via paymentSecret). They
 # handled raw card numbers and let anyone cancel any subscription id, so they
 # are restricted to admins until they are removed or redesigned.
-@mutation.field("oneTimePurchase")
+@mutation.field("oneTimeDonation")
 @authenticated(allowed_roles=[SUPER_ADMIN, ADMIN])
-async def one_time_purchase(_, info, input: OneTimePurchaseInput):
-    return await PaymentService().one_time_purchase(OneTimePurchaseInput(**input))
+async def one_time_donation(_, info, input: OneTimeDonationInput):
+    return await PaymentService().one_time_donation(OneTimeDonationInput(**input))
 
 
 @mutation.field("createSubscription")

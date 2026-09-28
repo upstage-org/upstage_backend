@@ -33,7 +33,7 @@ from upstage_backend.authentication.services.auth import AuthenticationService
 from upstage_backend.payments.http import schema as payments_schema
 from upstage_backend.payments.http.validation import (
     CreateSubscriptionInput,
-    OneTimePurchaseInput,
+    OneTimeDonationInput,
 )
 from upstage_backend.payments.services.payment import PaymentService
 from upstage_backend.users.db_models.user import SUPER_ADMIN, UserModel
@@ -216,7 +216,7 @@ _CARD = dict(cardNumber="4242424242424242", expYear="2030", expMonth="12", cvc="
 
 STRIPE_ENTRY_POINTS = {
     "payment_intent": lambda: PaymentService().create_payment_intent_async(100, "usd"),
-    "one_time_purchase": lambda: PaymentService().one_time_purchase(OneTimePurchaseInput(**_CARD)),
+    "one_time_donation": lambda: PaymentService().one_time_donation(OneTimeDonationInput(**_CARD)),
     "create_subscription": lambda: PaymentService().create_subscription_process(
         CreateSubscriptionInput(**_CARD, currency="usd", email="a@example.org", type="card")
     ),

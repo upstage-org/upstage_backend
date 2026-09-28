@@ -1,7 +1,7 @@
 import pytest
 import stripe
 
-from upstage_backend.payments.http.validation import OneTimePurchaseInput
+from upstage_backend.payments.http.validation import OneTimeDonationInput
 from upstage_backend.payments.services.payment import PaymentService
 
 
@@ -22,7 +22,7 @@ class TestPaymentController:
         monkeypatch.setattr(stripe.Token, "create", fake_token_create)
         monkeypatch.setattr(stripe.Charge, "create", fake_charge_create)
 
-        otpi = OneTimePurchaseInput(
+        otpi = OneTimeDonationInput(
             cardNumber="4242424242424242",
             expYear="2025",
             expMonth="12",
@@ -30,7 +30,7 @@ class TestPaymentController:
             amount=100,
         )
         ps = PaymentService()
-        result = await ps.one_time_purchase(otpi)
+        result = await ps.one_time_donation(otpi)
         assert result["success"] is True
         assert calls["token"]["card"] == {
             "number": "4242424242424242",

@@ -18,7 +18,7 @@ class ReceiptInput(BaseModel):
     amount: str = Field(..., min_length=1, max_length=20)
 
 
-class OneTimePurchaseInput(BaseModel):
+class OneTimeDonationInput(BaseModel):
     cardNumber: str = Field(...)
     expYear: str = Field(...)
     expMonth: str = Field(...)
