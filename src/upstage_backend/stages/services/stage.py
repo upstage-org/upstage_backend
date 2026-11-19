@@ -1,3 +1,4 @@
+import json
 import re
 from graphql import GraphQLError
 import jwt
@@ -29,6 +30,8 @@ from upstage_backend.performance_config.db_models.performance import Performance
 from upstage_backend.performance_config.db_models.scene import SceneModel
 from upstage_backend.stages.db_models.parent_stage import ParentStageModel
 from upstage_backend.stages.db_models.stage import StageModel
+from upstage_backend.upstage_options.db_models.config import ConfigModel
+from upstage_backend.upstage_options.services.upstage_option import FOYER_PINNED_STAGES
 from upstage_backend.stages.db_models.stage_attribute import StageAttributeModel
 from upstage_backend.upstage_stats.db_models.stage_statistic import StageStatisticModel
 from upstage_backend.users.db_models.user import UserModel
@@ -733,6 +736,44 @@ class StageService:
             for stage in session.scalars(select(ParentStageModel)).all()
         ]
 
+    @staticmethod
+    def parse_pinned_stage_ids(config_row) -> list[int]:
+        """FOYER_PINNED_STAGES is a JSON list of stage ids (a comma-separated
+        string is tolerated); anything unreadable pins nothing."""
+        raw = getattr(config_row, "value", None) if config_row is not None else None
+        if not raw:
+            return []
+        try:
+            values = json.loads(raw)
+        except (TypeError, ValueError):
+            values = str(raw).split(",")
+        if not isinstance(values, list):
+            return []
+        ids: list[int] = []
+        for value in values:
+            try:
+                stage_id = int(str(value).strip())
+            except (TypeError, ValueError):
+                continue
+            if stage_id not in ids:
+                ids.append(stage_id)
+        return ids
+
+    @staticmethod
+    def order_foyer_stages(stages: list[dict], pinned_ids: list[int]) -> list[dict]:
+        """Pinned stages (that are in the list at all, i.e. visible) first, in
+        the pinned order, each flagged ``pinned``; the others follow in their
+        existing order."""
+        by_id = {int(stage["id"]): stage for stage in stages}
+        pinned = [by_id[stage_id] for stage_id in pinned_ids if stage_id in by_id]
+        pinned_set = {int(stage["id"]) for stage in pinned}
+        rest = [stage for stage in stages if int(stage["id"]) not in pinned_set]
+        for stage in pinned:
+            stage["pinned"] = True
+        for stage in rest:
+            stage["pinned"] = False
+        return pinned + rest
+
     def get_foyer_stage_list(self):
         session = get_session()
         # Use explicit EXISTS subquery instead of .any() to avoid transaction issues
@@ -757,6 +798,12 @@ class StageService:
             }
             for stage in stages
         ]
+        # Pinned stages come first, in the configured order (#1568); the rest
+        # keep the most-recently-active order above.
+        pinned_row = session.scalars(
+            select(ConfigModel).filter_by(name=FOYER_PINNED_STAGES).limit(1)
+        ).first()
+        result = self.order_foyer_stages(result, self.parse_pinned_stage_ids(pinned_row))
 
         stats_map = self._stage_stats_map(session, [stage.get("fileLocation") for stage in result])
         for stage in result:
