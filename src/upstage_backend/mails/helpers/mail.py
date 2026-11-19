@@ -1,3 +1,4 @@
+import html
 import os
 
 from email.mime.application import MIMEApplication
@@ -231,10 +232,21 @@ def create_email(
     return msg
 
 
+_TAG_RE = re.compile(r"<[^>]*>")
+_BLOCK_END_RE = re.compile(r"</(p|div|h[1-6]|li|tr|blockquote|pre)>|<br\s*/?>", re.IGNORECASE)
+
+
 def remove_html(raw_html):
-    cleanr = re.compile("<.*?>")
-    cleantext = re.sub(cleanr, "", raw_html)
-    return cleantext
+    """The text/plain alternative of an HTML body.
+
+    Tags go, block ends become line breaks, and entities are decoded so that
+    `&nbsp;`, `&amp;` or an older signature's `&eacute;` do not appear
+    literally in the plain-text part; the result may hold any Unicode
+    character (the part is sent as UTF-8).
+    """
+    text = _BLOCK_END_RE.sub("\n", raw_html or "")
+    text = _TAG_RE.sub("", text)
+    return html.unescape(text).replace("\xa0", " ")
 
 
 """
