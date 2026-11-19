@@ -9,6 +9,9 @@ from xml.sax.saxutils import escape
 from reportlab.pdfgen import canvas
 from reportlab.lib.pagesizes import A4
 from reportlab.lib import colors
+from reportlab.pdfbase import pdfmetrics
+from reportlab.pdfbase.cidfonts import UnicodeCIDFont
+from reportlab.pdfbase.ttfonts import TTFont
 from reportlab.platypus import Table, TableStyle, Paragraph
 from reportlab.lib.styles import getSampleStyleSheet
 
@@ -19,6 +22,45 @@ from upstage_backend.mails.helpers.mail import send
 # Resolved relative to this module, not the process working directory (the
 # old "src/payments/services/..." string predates the package rename).
 TEMPLATE_PATH = Path(__file__).with_name("UpStage_Receipt_Template.pdf")
+
+
+BODY_FONT_NAME = "UpStageReceiptBody"
+
+# A font with glyphs for the donor's own script. ReportLab's built-in
+# Helvetica covers Latin-1 only, so a Chinese or Japanese donor name came out
+# as black boxes. First match wins: an operator-supplied font, then the Noto
+# CJK family the backend image installs (CJK + Latin + Greek + Cyrillic), then
+# fonts common on Debian/Ubuntu hosts.
+FONT_CANDIDATES = [
+    os.environ.get("RECEIPT_FONT_PATH", ""),
+    "/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc",
+    "/usr/share/fonts/truetype/noto/NotoSansCJK-Regular.ttc",
+    "/usr/share/fonts/opentype/noto/NotoSerifCJK-Regular.ttc",
+    "/usr/share/fonts/truetype/wqy/wqy-zenhei.ttc",
+    "/usr/share/fonts/truetype/wqy/wqy-microhei.ttc",
+    "/usr/share/fonts/truetype/droid/DroidSansFallbackFull.ttf",
+    "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
+]
+# Last resort, no file needed: a CID font the PDF reader supplies itself
+# (Adobe's Simplified Chinese collection; Latin letters included). It is not
+# embedded, so the reader must have an Asian font pack.
+CID_FALLBACK = "STSong-Light"
+
+
+def body_font_name() -> str:
+    """Register (once) and return the font used for the free-text cells."""
+    if BODY_FONT_NAME in pdfmetrics.getRegisteredFontNames():
+        return BODY_FONT_NAME
+    for path in FONT_CANDIDATES:
+        if path and os.path.isfile(path):
+            try:
+                pdfmetrics.registerFont(TTFont(BODY_FONT_NAME, path, subfontIndex=0))
+                return BODY_FONT_NAME
+            except Exception:  # unreadable or unsupported file: try the next one
+                continue
+    if CID_FALLBACK not in pdfmetrics.getRegisteredFontNames():
+        pdfmetrics.registerFont(UnicodeCIDFont(CID_FALLBACK))
+    return CID_FALLBACK
 
 
 def _receipt_filename(received_from: str) -> str:
@@ -36,16 +78,16 @@ def create_receipt_base64(received_from, date, description, amount):
     can.setFont("Helvetica", 12)
 
     styles = getSampleStyleSheet()
-    normal_style = styles["Normal"]
+    normal_style = styles["Normal"].clone("ReceiptBody", fontName=body_font_name())
 
     # Paragraph() parses ReportLab markup: escape the free-text fields.
     data = [
         ["Received from", "Date", "Description", "Amount"],
         [
             Paragraph(escape(received_from), normal_style),
-            escape(date),
+            Paragraph(escape(date), normal_style),
             Paragraph(escape(description), normal_style),
-            "USD$" + escape(amount),
+            Paragraph("USD$" + escape(amount), normal_style),
         ],
     ]
 

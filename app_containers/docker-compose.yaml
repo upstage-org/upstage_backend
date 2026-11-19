@@ -41,9 +41,12 @@ x-common-build: &common_build |
 
   WORKDIR /usr/app
 
-  # First-frame JPEG posters for uploads + Alembic backfill (video_poster.py).
+  # ffmpeg: first-frame JPEG posters for uploads + Alembic backfill (video_poster.py).
+  # fonts-noto-cjk: donation receipts (payments/services/pdf_operator.py) draw
+  # donor names and descriptions in any script; ReportLab's built-in Helvetica
+  # has no CJK glyphs.
   RUN apt-get update \
-      && apt-get install -y --no-install-recommends ffmpeg \
+      && apt-get install -y --no-install-recommends ffmpeg fonts-noto-cjk \
       && rm -rf /var/lib/apt/lists/*
 
   # Copy project venv from builder (shebangs point to /usr/app/.venv/bin/python)
