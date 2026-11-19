@@ -2,6 +2,7 @@ import fitz  # PyMuPDF
 import io
 import base64
 import os
+import threading
 import re
 from pathlib import Path
 from xml.sax.saxutils import escape
@@ -32,35 +33,59 @@ BODY_FONT_NAME = "UpStageReceiptBody"
 # CJK family the backend image installs (CJK + Latin + Greek + Cyrillic), then
 # fonts common on Debian/Ubuntu hosts.
 FONT_CANDIDATES = [
-    os.environ.get("RECEIPT_FONT_PATH", ""),
-    "/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc",
-    "/usr/share/fonts/truetype/noto/NotoSansCJK-Regular.ttc",
-    "/usr/share/fonts/opentype/noto/NotoSerifCJK-Regular.ttc",
+    os.environ.get("RECEIPT_FONT_PATH"),
+    # TrueType (glyf) fonts only: ReportLab's TTFont rejects CFF/PostScript
+    # outlines, which is what Noto CJK ships, so those are not listed.
     "/usr/share/fonts/truetype/wqy/wqy-zenhei.ttc",
     "/usr/share/fonts/truetype/wqy/wqy-microhei.ttc",
     "/usr/share/fonts/truetype/droid/DroidSansFallbackFull.ttf",
     "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
 ]
+# A candidate is only accepted when it can draw CJK: U+4E00 (一) is in every
+# CJK font and in no Latin-only one. DejaVu stays last as a Latin fallback
+# that is still better than Helvetica for accented text, but a CJK-capable
+# reader font (the CID fallback) wins over it.
+CJK_PROBE = 0x4E00
 # Last resort, no file needed: a CID font the PDF reader supplies itself
 # (Adobe's Simplified Chinese collection; Latin letters included). It is not
 # embedded, so the reader must have an Asian font pack.
 CID_FALLBACK = "STSong-Light"
 
 
+def _load_cjk_capable(path: str):
+    """A TTFont for `path` if ReportLab can load it AND it has CJK glyphs."""
+    try:
+        font = TTFont(BODY_FONT_NAME, path, subfontIndex=0)
+    except Exception:  # CFF outlines, unreadable or unsupported file
+        return None
+    return font if font.face.charToGlyph.get(CJK_PROBE) else None
+
+
+_FONT_LOCK = threading.Lock()
+
+
 def body_font_name() -> str:
-    """Register (once) and return the font used for the free-text cells."""
-    if BODY_FONT_NAME in pdfmetrics.getRegisteredFontNames():
-        return BODY_FONT_NAME
-    for path in FONT_CANDIDATES:
-        if path and os.path.isfile(path):
-            try:
-                pdfmetrics.registerFont(TTFont(BODY_FONT_NAME, path, subfontIndex=0))
-                return BODY_FONT_NAME
-            except Exception:  # unreadable or unsupported file: try the next one
+    """Register (once) and return the font used for the free-text cells.
+
+    The first CJK-capable TrueType candidate wins; without one the reader's
+    own CID font is used, which renders CJK everywhere a CJK font pack is
+    installed. The lock only matters if this ever runs off the event loop.
+    """
+    with _FONT_LOCK:
+        registered = pdfmetrics.getRegisteredFontNames()
+        if BODY_FONT_NAME in registered:
+            return BODY_FONT_NAME
+        if CID_FALLBACK in registered:
+            return CID_FALLBACK
+        for path in FONT_CANDIDATES:
+            if not path or not os.path.isfile(path):
                 continue
-    if CID_FALLBACK not in pdfmetrics.getRegisteredFontNames():
+            font = _load_cjk_capable(path)
+            if font is not None:
+                pdfmetrics.registerFont(font)
+                return BODY_FONT_NAME
         pdfmetrics.registerFont(UnicodeCIDFont(CID_FALLBACK))
-    return CID_FALLBACK
+        return CID_FALLBACK
 
 
 def _receipt_filename(received_from: str) -> str:

@@ -35,6 +35,7 @@ from upstage_backend.upstage_options.services.upstage_option import FOYER_PINNED
 from upstage_backend.stages.db_models.stage_attribute import StageAttributeModel
 from upstage_backend.upstage_stats.db_models.stage_statistic import StageStatisticModel
 from upstage_backend.users.db_models.user import UserModel
+from upstage_backend.global_config.helpers.authz import is_admin
 from upstage_backend.assets.db_models.asset import AssetModel
 
 
@@ -194,7 +195,7 @@ class StageService:
         for stage in data:
             attrs = attribute_map.get(stage.id, {})
             permission = self.stage_operation_service.resolve_permission(
-                user.id, stage, player_access=attrs.get("playerAccess")
+                user.id, stage, player_access=attrs.get("playerAccess"), admin=is_admin(user)
             )
             if permission in access:
                 stages.append(
@@ -285,6 +286,16 @@ class StageService:
         stage_ids = [stage.id for stage in stages]
         attribute_map = self._stage_attribute_map(session, stage_ids)
         assets_map = self._stage_assets_map(session, stage_ids)
+        # The access token carries only the user id; an admin is an editor
+        # of every stage (see resolve_permission), so look the role up once.
+        caller = (
+            session.scalars(
+                select(UserModel).where(UserModel.id == current_user_id).limit(1)
+            ).first()
+            if current_user_id
+            else None
+        )
+        caller_is_admin = is_admin(caller) if caller else False
 
         return [
             convert_keys_to_camel_case(self._stage_payload(input, stage, attrs, assets, permission))
@@ -297,6 +308,7 @@ class StageService:
                         current_user_id,
                         stage,
                         player_access=attribute_map.get(stage.id, {}).get("playerAccess"),
+                        admin=caller_is_admin,
                     ),
                 )
                 for stage in stages
@@ -747,6 +759,8 @@ class StageService:
             values = json.loads(raw)
         except (TypeError, ValueError):
             values = str(raw).split(",")
+        if isinstance(values, (int, str)):
+            values = [values]
         if not isinstance(values, list):
             return []
         ids: list[int] = []

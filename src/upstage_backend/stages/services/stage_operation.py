@@ -61,12 +61,20 @@ class StageOperationService:
     # Sentinel: "caller did not pre-fetch the playerAccess attribute".
     _UNSET = object()
 
-    def resolve_permission(self, user_id: int, stage: StageModel | None, player_access=_UNSET):
+    def resolve_permission(
+        self, user_id: int, stage: StageModel | None, player_access=_UNSET, admin: bool = False
+    ):
         """
         `player_access` may carry the stage's playerAccess attribute value
         (the JSON string, or None when the row does not exist) when the
         caller already loaded the attributes in bulk (StageService list
         paths); otherwise it is read here, one query per stage.
+
+        `admin`: the caller is an admin / super admin. Admins run every stage
+        from Studio, so on the live stage they are editors of any stage they
+        do not own — without this they were "audience" on every stage not
+        listing them, and kept out of rehearsals (#1573 made that an API
+        rule as well as a curtain).
         """
         if stage is None:
             return "audience"
@@ -74,6 +82,8 @@ class StageOperationService:
             return "audience"
         if stage.owner_id == user_id:
             return "owner"
+        if admin:
+            return "editor"
 
         user_id = str(user_id)
 

@@ -5,7 +5,7 @@ import json
 import uuid
 from graphql import GraphQLError
 from sqlalchemy import and_, delete, or_, select
-from upstage_backend.assets.db_models.asset import AssetModel
+from upstage_backend.assets.db_models.asset import AssetModel, Previlege
 from upstage_backend.assets.db_models.asset_license import AssetLicenseModel
 from upstage_backend.assets.db_models.asset_usage import AssetUsageModel
 from upstage_backend.assets.db_models.media_tag import MediaTagModel
@@ -44,6 +44,37 @@ class MediaService:
         self.asset_license_service = AssetLicenseService()
         self.file_handling = FileHandling()
 
+    def assert_may_use_new_media(self, session, user: UserModel, stage_id: int, media_ids) -> None:
+        """A stage owner may only ADD media they are allowed to use: their
+        own, copyright-free items, or items whose owner acknowledged /
+        granted them (privilege APPROVED). Items already on the stage — put
+        there by their owner, say — stay assignable, so re-saving the list
+        never fails on them. Admins are exempt, as everywhere."""
+        if user.role in [ADMIN, SUPER_ADMIN]:
+            return
+        wanted = {int(media_id) for media_id in media_ids or []}
+        if not wanted:
+            return
+        existing = set(
+            session.scalars(
+                select(ParentStageModel.child_asset_id).where(
+                    ParentStageModel.stage_id == int(stage_id)
+                )
+            ).all()
+        )
+        new_ids = wanted - existing
+        if not new_ids:
+            return
+        assets = session.scalars(select(AssetModel).where(AssetModel.id.in_(new_ids))).all()
+        for asset in assets:
+            if asset.owner_id == user.id:
+                continue
+            privilege = self.asset_service.resolve_privilege(user.id, asset)
+            if privilege not in (Previlege.OWNER.value, Previlege.APPROVED.value):
+                raise GraphQLError(
+                    f'You do not have permission to use the media "{asset.name}" on your stage'
+                )
+
     def assign_media(self, input: AssignMediaInput, user: UserModel):
         session = get_session()
         stage = session.scalars(select(StageModel).filter_by(id=input.id).limit(1)).first()
@@ -54,6 +85,7 @@ class MediaService:
             raise GraphQLError("You are not authorized to update this stage")
 
         snapshot = snapshot_exit_settings(session, stage_id=input.id)
+        self.assert_may_use_new_media(session, user, input.id, input.mediaIds)
         session.execute(delete(ParentStageModel).where(ParentStageModel.stage_id == input.id))
 
         for media_id in input.mediaIds:

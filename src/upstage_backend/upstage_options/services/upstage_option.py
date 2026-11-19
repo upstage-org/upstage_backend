@@ -30,7 +30,11 @@ class SettingService:
     def get_config(self, name: str, session=None):
         if session is None:
             session = get_session()
-        return session.scalars(select(ConfigModel).filter_by(name=name).limit(1)).first()
+        # Oldest row wins when duplicates exist (the unique index from
+        # migration d4e6f8a0b2c4 prevents new ones).
+        return session.scalars(
+            select(ConfigModel).filter_by(name=name).order_by(ConfigModel.id).limit(1)
+        ).first()
 
     def upload_limit(self):
         """

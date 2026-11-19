@@ -12,6 +12,7 @@ changes the stages they can manage.
 from __future__ import annotations
 
 import pytest
+from graphql import GraphQLError
 
 from upstage_backend.assets.db_models.asset import Previlege
 from upstage_backend.studio_management.services.studio import StudioService
@@ -55,4 +56,16 @@ def test_non_owner_keeps_assignments_on_stages_they_cannot_manage():
 
 
 def test_targets_do_not_duplicate_and_keep_the_callers_order():
-    assert StudioService.quick_assign_targets([3, "1"], [1, 3], {1, 3}) == [3, 1]
+    assert StudioService.quick_assign_targets([3, "1", 3], [1, 3], {1, 3}) == [3, 1]
+
+
+def test_non_owner_cannot_add_a_stage_they_do_not_manage():
+    """The pop-up used to send every stage the caller merely had player
+    access to; the backend accepted them and the item landed on other
+    people's stages. Only owned/edited stages are accepted now."""
+    with pytest.raises(GraphQLError):
+        StudioService.quick_assign_targets(wanted=[1, 7], current=[], manageable={1})
+
+
+def test_quick_assign_manage_roles_exclude_player_access():
+    assert StudioService.QUICK_ASSIGN_MANAGE_ROLES == ("owner", "editor")

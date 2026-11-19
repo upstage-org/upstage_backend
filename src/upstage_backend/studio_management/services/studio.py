@@ -738,13 +738,25 @@ class StudioService:
             return True
         return privilege in (Previlege.OWNER.value, Previlege.APPROVED.value)
 
+    # Stages another player may put shared media on, or take it off: the ones
+    # they own or edit. Mere player access is not enough — the Assign pop-up
+    # offers only these, and the backend must not accept more.
+    QUICK_ASSIGN_MANAGE_ROLES = ("owner", "editor")
+
     @staticmethod
     def quick_assign_targets(wanted, current, manageable) -> list[int]:
-        """The assignment set to write: the caller's list, plus every current
-        assignment on a stage the caller cannot manage. Another player's
-        quick-assign must only ever change the stages they have access to;
-        the owner's other assignments are not theirs to drop."""
-        targets = [int(stage_id) for stage_id in wanted]
+        """The assignment set to write for a NON-owner: the caller's list
+        (every entry must be manageable) plus every current assignment on a
+        stage the caller cannot manage. Another player's quick-assign must
+        only ever change the stages they manage; the owner's other
+        assignments are not theirs to drop."""
+        targets = []
+        for stage_id in wanted:
+            stage_id = int(stage_id)
+            if stage_id not in manageable:
+                raise GraphQLError("You can only assign media to stages you own or edit")
+            if stage_id not in targets:
+                targets.append(stage_id)
         for stage_id in current:
             if stage_id not in targets and stage_id not in manageable:
                 targets.append(int(stage_id))
@@ -768,9 +780,8 @@ class StudioService:
         )
         if any(stage_id not in found_ids for stage_id in wanted_ids):
             raise GraphQLError("Stage not found!")
-        asset_service.assert_can_assign_to_stages(user, wanted_ids, session)
-
         if is_admin(user) or asset.owner_id == user_id_of(user):
+            asset_service.assert_can_assign_to_stages(user, wanted_ids, session)
             targets = wanted_ids
         else:
             current_ids = session.scalars(
@@ -782,9 +793,9 @@ class StudioService:
             manageable = {
                 stage.id
                 for stage in session.scalars(
-                    select(StageModel).where(StageModel.id.in_(set(current_ids)))
+                    select(StageModel).where(StageModel.id.in_(set(current_ids) | set(wanted_ids)))
                 ).all()
-                if resolve_permission(user_id_of(user), stage) in ("owner", "editor", "player")
+                if resolve_permission(user_id_of(user), stage) in self.QUICK_ASSIGN_MANAGE_ROLES
             }
             targets = self.quick_assign_targets(wanted_ids, current_ids, manageable)
 
@@ -816,7 +827,9 @@ class StudioService:
             convert_keys_to_camel_case(
                 {
                     **stage.to_dict(),
-                    "permission": self.stage_operation_service.resolve_permission(user.id, stage),
+                    "permission": self.stage_operation_service.resolve_permission(
+                        user.id, stage, admin=is_admin(user)
+                    ),
                 }
             )
             for stage in session.scalars(select(StageModel).order_by(StageModel.name.asc())).all()

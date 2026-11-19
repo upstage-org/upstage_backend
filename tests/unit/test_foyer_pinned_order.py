@@ -19,6 +19,8 @@ def test_parse_pinned_stage_ids_accepts_json_lists_and_csv():
     assert StageService.parse_pinned_stage_ids(_Row("")) == []
     assert StageService.parse_pinned_stage_ids(_Row('[3, "7", 3, "x"]')) == [3, 7]
     assert StageService.parse_pinned_stage_ids(_Row("5, 2")) == [5, 2]
+    assert StageService.parse_pinned_stage_ids(_Row("5")) == [5]
+    assert StageService.parse_pinned_stage_ids(_Row('"7"')) == [7]
     assert StageService.parse_pinned_stage_ids(_Row('{"a": 1}')) == []
 
 

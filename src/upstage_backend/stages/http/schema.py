@@ -42,6 +42,12 @@ def resolve_stage_mqtt(stage, info):
     / stage-scoped credential would mint against later, without a schema change
     or a frontend redeploy.
     """
+    # #1573: the audience of a stage that is not live gets no login either —
+    # with the shared credential they could subscribe to the rehearsal's
+    # topics directly and hear what the curtain hides. The list resolvers put
+    # `permission` and `status` on the dict; recordings never need the broker.
+    if not StageService.live_state_visible(stage.get("permission"), stage.get("status"), None):
+        return None
     return {"username": MQTT_USER, "password": MQTT_PASSWORD}
 
 
@@ -67,9 +73,7 @@ def foyer_stage_list(_, info):
 @query.field("stage")
 @authenticated(allowed_roles=[SUPER_ADMIN, ADMIN, PLAYER])
 def get_stage(_, info, id: int):
-    return StageService().get_stage_by_id(
-        current_user(info), id
-    )
+    return StageService().get_stage_by_id(current_user(info), id)
 
 
 @query.field("notifications")
@@ -81,9 +85,7 @@ def get_notifications(_, info):
 @mutation.field("createStage")
 @authenticated(allowed_roles=[SUPER_ADMIN, ADMIN, PLAYER])
 def create_stage(_, info, input):
-    return StageService().create_stage(
-        current_user(info), StageInput(**input)
-    )
+    return StageService().create_stage(current_user(info), StageInput(**input))
 
 
 @mutation.field("updateStage")
@@ -140,17 +142,13 @@ async def update_media(_, info, input: UpdateMediaInput):
 @mutation.field("deleteMediaOnStage")
 @authenticated(allowed_roles=[SUPER_ADMIN, ADMIN, PLAYER])
 def delete_media(_, info, id: int):
-    return MediaService().delete_media(
-        id, current_user(info)
-    )
+    return MediaService().delete_media(id, current_user(info))
 
 
 @mutation.field("assignStages")
 @authenticated(allowed_roles=[SUPER_ADMIN, ADMIN, PLAYER])
 def assign_stages(_, info, input: AssignStagesInput):
-    return MediaService().assign_stages(
-        AssignStagesInput(**input), current_user(info)
-    )
+    return MediaService().assign_stages(AssignStagesInput(**input), current_user(info))
 
 
 @mutation.field("updateStageAssignment")
@@ -176,9 +174,7 @@ def sweep_stage(_, info, id: int):
 @mutation.field("saveScene")
 @authenticated()
 def save_scene(_, info, input: SceneInput):
-    return SceneService().create_scene(
-        current_user(info), SceneInput(**input)
-    )
+    return SceneService().create_scene(current_user(info), SceneInput(**input))
 
 
 @mutation.field("deleteScene")
@@ -199,9 +195,7 @@ def update_performance(_, info, input):
 @mutation.field("deletePerformance")
 @authenticated(allowed_roles=[SUPER_ADMIN, ADMIN, PLAYER])
 def delete_performance(_, info, id: int):
-    return PerformanceService().delete_performance(
-        current_user(info), id
-    )
+    return PerformanceService().delete_performance(current_user(info), id)
 
 
 @mutation.field("duplicatePerformanceWithTrimmedPauses")
@@ -225,9 +219,7 @@ def start_recording(_, info, input):
 @mutation.field("saveRecording")
 @authenticated(allowed_roles=[SUPER_ADMIN, ADMIN, PLAYER])
 def save_recording(_, info, id: int):
-    return PerformanceService().save_recording(
-        current_user(info), id
-    )
+    return PerformanceService().save_recording(current_user(info), id)
 
 
 @mutation.field("updateStatus")
@@ -239,9 +231,7 @@ def update_status(_, info, id: int):
 @mutation.field("updateVisibility")
 @authenticated(allowed_roles=[SUPER_ADMIN, ADMIN, PLAYER])
 def update_visibility(_, info, id: int):
-    return StageService().update_visibility(
-        current_user(info), id
-    )
+    return StageService().update_visibility(current_user(info), id)
 
 
 @mutation.field("updateLastAccess")
