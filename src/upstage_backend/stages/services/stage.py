@@ -76,6 +76,23 @@ class StageService:
         return out
 
     @staticmethod
+    def live_state_visible(permission, status, performance_id):
+        """Whether the caller may see what is on the stage right now (#1573).
+
+        A stage that is not live is closed to the audience: the Preloader
+        keeps them behind the curtain, so the live event log (the board,
+        the streams and audio on it) and the chat are not handed out to
+        them either. Players and editors see their stage in any status. A
+        recording (``performance_id`` set) is a separate question and is
+        returned as before.
+        """
+        if performance_id is not None:
+            return True
+        if permission and permission != "audience":
+            return True
+        return status == "live"
+
+    @staticmethod
     def _attribute_fields(attrs):
         """The same values StageModel.cover/visibility/status/playerAccess
         produce, from one stage's pre-fetched attribute map."""
@@ -267,33 +284,47 @@ class StageService:
         assets_map = self._stage_assets_map(session, stage_ids)
 
         return [
-            convert_keys_to_camel_case(
-                {
-                    **stage.to_dict(),
-                    "assets": [
-                        self._asset_with_exit_settings(asset)
-                        for asset in assets_map.get(stage.id, [])
-                    ],
-                    "scenes": self.stage_operation_service.get_scene_list(input, stage.id),
-                    "events": self.stage_operation_service.get_event_list(input, stage),
-                    **self._attribute_fields(attribute_map.get(stage.id, {})),
-                    "permission": self.stage_operation_service.resolve_permission(
+            convert_keys_to_camel_case(self._stage_payload(input, stage, attrs, assets, permission))
+            for stage, attrs, assets, permission in (
+                (
+                    stage,
+                    attribute_map.get(stage.id, {}),
+                    assets_map.get(stage.id, []),
+                    self.stage_operation_service.resolve_permission(
                         current_user_id,
                         stage,
                         player_access=attribute_map.get(stage.id, {}).get("playerAccess"),
                     ),
-                    "performances": [
-                        convert_keys_to_camel_case(pf.to_dict())
-                        for pf in self.stage_operation_service.resolve_performances(stage.id)
-                    ],
-                    "chats": [
-                        convert_keys_to_camel_case(chat.to_dict())
-                        for chat in self.stage_operation_service.resolve_chats(stage.file_location)
-                    ],
-                }
+                )
+                for stage in stages
             )
-            for stage in stages
         ]
+
+    def _stage_payload(self, input: StageStreamInput, stage, attrs, assets, permission):
+        fields = self._attribute_fields(attrs)
+        visible = self.live_state_visible(permission, fields["status"], input.performanceId)
+        return {
+            **stage.to_dict(),
+            "assets": [self._asset_with_exit_settings(asset) for asset in assets],
+            "scenes": self.stage_operation_service.get_scene_list(input, stage.id),
+            "events": (
+                self.stage_operation_service.get_event_list(input, stage) if visible else []
+            ),
+            **fields,
+            "permission": permission,
+            "performances": [
+                convert_keys_to_camel_case(pf.to_dict())
+                for pf in self.stage_operation_service.resolve_performances(stage.id)
+            ],
+            "chats": (
+                [
+                    convert_keys_to_camel_case(chat.to_dict())
+                    for chat in self.stage_operation_service.resolve_chats(stage.file_location)
+                ]
+                if visible
+                else []
+            ),
+        }
 
     def get_stage_by_id(self, user: UserModel, id: int):
         session = get_session()
