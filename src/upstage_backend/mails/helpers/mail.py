@@ -1,7 +1,11 @@
+import base64
+import binascii
+import hashlib
 import html
 import os
 
 from email.mime.application import MIMEApplication
+from email.mime.image import MIMEImage
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 from email.utils import formatdate, getaddresses, make_msgid
@@ -210,7 +214,19 @@ def create_email(
     """
     msg_alternative = MIMEMultipart("alternative")
     msg_alternative.attach(MIMEText(remove_html(html), "plain", "utf-8"))
-    msg_alternative.attach(MIMEText(html, "html", "utf-8"))
+    # Pictures embedded in the HTML as data: URIs (the editor's "Choose
+    # file…", e.g. a logo in the e-mail signature) travel as inline parts
+    # the HTML points at by Content-ID. Mail programs show those; most of
+    # them refuse to show a data: URI at all (#1575).
+    html_body, inline_images = inline_data_images(html)
+    if inline_images:
+        related = MIMEMultipart("related")
+        related.attach(MIMEText(html_body, "html", "utf-8"))
+        for image in inline_images:
+            related.attach(image)
+        msg_alternative.attach(related)
+    else:
+        msg_alternative.attach(MIMEText(html, "html", "utf-8"))
     """
     Attach plain and HTML variations of the body to main message content.
     """
@@ -230,6 +246,51 @@ def create_email(
             msg["X-MS-Has-Attach"] = "Yes"
 
     return msg
+
+
+# <img ... src="data:image/png;base64,...."> — only bitmap types a mail
+# program renders; anything else (SVG, a malformed payload) is left as it is.
+_DATA_IMAGE_RE = re.compile(
+    r"""(<img\b[^>]*?\bsrc\s*=\s*)(["'])data:image/(png|jpe?g|gif|webp);base64,([A-Za-z0-9+/=\s]+?)\2""",
+    re.IGNORECASE,
+)
+
+
+def inline_data_images(html_content):
+    """Replace data: URI pictures in ``html_content`` by ``cid:`` references.
+
+    Returns ``(html, parts)`` where ``parts`` are the ``MIMEImage`` parts to
+    attach in a ``multipart/related`` next to the HTML. The same picture used
+    several times (a signature appended to a body that quotes it) becomes one
+    part. With nothing to inline the HTML comes back unchanged and ``parts``
+    is empty.
+    """
+    if not html_content or "data:image/" not in html_content:
+        return html_content, []
+    parts = {}
+
+    def to_cid(match):
+        subtype = match.group(3).lower().replace("jpg", "jpeg")
+        try:
+            data = base64.b64decode(re.sub(r"\s+", "", match.group(4)), validate=True)
+        except (binascii.Error, ValueError):
+            return match.group(0)
+        if not data:
+            return match.group(0)
+        digest = hashlib.sha256(data).hexdigest()[:24]
+        cid = f"img-{digest}@{DOMAIN or 'upstage'}"
+        if cid not in parts:
+            part = MIMEImage(data, _subtype=subtype)
+            part.add_header("Content-ID", f"<{cid}>")
+            part.add_header(
+                "Content-Disposition",
+                "inline",
+                filename=f"image-{len(parts) + 1}.{'jpg' if subtype == 'jpeg' else subtype}",
+            )
+            parts[cid] = part
+        return f"{match.group(1)}{match.group(2)}cid:{cid}{match.group(2)}"
+
+    return _DATA_IMAGE_RE.sub(to_cid, html_content), list(parts.values())
 
 
 _TAG_RE = re.compile(r"<[^>]*>")
