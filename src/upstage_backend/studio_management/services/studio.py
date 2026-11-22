@@ -41,7 +41,7 @@ from upstage_backend.stages.scripts.scaffold_base_media import (
     ensure_admin_user,
     ensure_placeholder_asset,
 )
-from upstage_backend.assets.db_models.asset import AssetModel
+from upstage_backend.assets.db_models.asset import AssetModel, Previlege
 from upstage_backend.performance_config.db_models.scene import SceneModel
 from upstage_backend.users.db_models.one_time_totp import OneTimeTOTPModel
 
@@ -661,11 +661,51 @@ class StudioService:
         session.flush()
         return convert_keys_to_camel_case(asset_usage.to_dict())
 
+    @staticmethod
+    def may_quick_assign(user: UserModel, asset: AssetModel, privilege: int) -> bool:
+        """Who may put a media item on a stage from the media list (#1569).
+
+        "Assign to stage" is the way OTHER players use shared media: the
+        owner and admins get the full edit form instead. So besides them,
+        anyone whose usage privilege is APPROVED — a copyright-free item, or
+        an acknowledged / granted request — may assign it.
+        """
+        if user.role in (ADMIN, SUPER_ADMIN) or asset.owner_id == user.id:
+            return True
+        return privilege in (Previlege.OWNER.value, Previlege.APPROVED.value)
+
+    # Stages another player may put shared media on, or take it off: the ones
+    # they own or edit. Mere player access is not enough — the Assign pop-up
+    # offers only these, and the backend must not accept more.
+    QUICK_ASSIGN_MANAGE_ROLES = ("owner", "editor")
+
+    @staticmethod
+    def quick_assign_targets(wanted, current, manageable) -> list[int]:
+        """The assignment set to write for a NON-owner: the caller's list
+        (every entry must be manageable) plus every current assignment on a
+        stage the caller cannot manage. Another player's quick-assign must
+        only ever change the stages they manage; the owner's other
+        assignments are not theirs to drop."""
+        targets = []
+        for stage_id in wanted:
+            stage_id = int(stage_id)
+            if stage_id not in manageable:
+                raise GraphQLError("You can only assign media to stages you own or edit")
+            if stage_id not in targets:
+                targets.append(stage_id)
+        for stage_id in current:
+            if stage_id not in targets and stage_id not in manageable:
+                targets.append(int(stage_id))
+        return targets
+
     def quick_assign_mutation(self, user: UserModel, stage_ids: list[int], asset_id: int):
         session = get_session()
         asset = session.query(AssetModel).filter(AssetModel.id == asset_id).first()
         if not asset:
             raise GraphQLError("Asset not found!")
+        privilege = AssetService().resolve_privilege(user.id, asset)
+        if not self.may_quick_assign(user, asset, privilege):
+            raise GraphQLError("You are not allowed to assign this media")
 
         wanted_ids = [int(stage_id) for stage_id in stage_ids]
         found_ids = {
@@ -675,11 +715,29 @@ class StudioService:
         if any(stage_id not in found_ids for stage_id in wanted_ids):
             raise GraphQLError("Stage not found!")
 
+        if user.role in (ADMIN, SUPER_ADMIN) or asset.owner_id == user.id:
+            targets = wanted_ids
+        else:
+            current_ids = [
+                row.stage_id
+                for row in session.query(ParentStageModel.stage_id)
+                .filter(ParentStageModel.child_asset_id == int(asset_id))
+                .all()
+            ]
+            candidate_ids = set(current_ids) | set(wanted_ids)
+            manageable = {
+                stage.id
+                for stage in session.query(StageModel)
+                .filter(StageModel.id.in_(candidate_ids))
+                .all()
+                if self.stage_operation_service.resolve_permission(user.id, stage)
+                in self.QUICK_ASSIGN_MANAGE_ROLES
+            }
+            targets = self.quick_assign_targets(wanted_ids, current_ids, manageable)
+
         # Surviving assignments keep their parent_stage row, i.e. their
         # place in each stage's saved media order (see sync_asset_assignments).
-        sync_asset_assignments(
-            session, asset_id, [(stage_id, None, None) for stage_id in wanted_ids]
-        )
+        sync_asset_assignments(session, asset_id, [(stage_id, None, None) for stage_id in targets])
         session.flush()
         return {"success": True}
 

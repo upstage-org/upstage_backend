@@ -204,30 +204,60 @@ class StageService:
 
         return [
             convert_keys_to_camel_case(
-                {
-                    **stage.to_dict(),
-                    "assets": [self._asset_with_exit_settings(asset) for asset in stage.assets],
-                    "scenes": self.stage_operation_service.get_scene_list(input, stage.id),
-                    "events": self.stage_operation_service.get_event_list(input, stage),
-                    "cover": stage.cover,
-                    "visibility": stage.visibility,
-                    "status": stage.status,
-                    "playerAccess": stage.playerAccess,
-                    "permission": self.stage_operation_service.resolve_permission(
-                        current_user_id, stage
-                    ),
-                    "performances": [
-                        convert_keys_to_camel_case(pf.to_dict())
-                        for pf in self.stage_operation_service.resolve_performances(stage.id)
-                    ],
-                    "chats": [
-                        convert_keys_to_camel_case(chat.to_dict())
-                        for chat in self.stage_operation_service.resolve_chats(stage.file_location)
-                    ],
-                }
+                self._stage_payload(
+                    input,
+                    stage,
+                    self.stage_operation_service.resolve_permission(current_user_id, stage),
+                )
             )
             for stage in stages
         ]
+
+    @staticmethod
+    def live_state_visible(permission, status, performance_id):
+        """Whether the caller may see what is on the stage right now (#1573).
+
+        A stage that is not live is closed to the audience: the Preloader
+        keeps them behind the curtain, so the live event log (the board,
+        the streams and audio on it) and the chat are not handed out to
+        them either. Players and editors see their stage in any status. A
+        recording (``performance_id`` set) is a separate question and is
+        returned as before.
+        """
+        if performance_id is not None:
+            return True
+        if permission and permission != "audience":
+            return True
+        return status == "live"
+
+    def _stage_payload(self, input: StageStreamInput, stage, permission):
+        status = stage.status
+        visible = self.live_state_visible(permission, status, input.performanceId)
+        return {
+            **stage.to_dict(),
+            "assets": [self._asset_with_exit_settings(asset) for asset in stage.assets],
+            "scenes": self.stage_operation_service.get_scene_list(input, stage.id),
+            "events": (
+                self.stage_operation_service.get_event_list(input, stage) if visible else []
+            ),
+            "cover": stage.cover,
+            "visibility": stage.visibility,
+            "status": status,
+            "playerAccess": stage.playerAccess,
+            "permission": permission,
+            "performances": [
+                convert_keys_to_camel_case(pf.to_dict())
+                for pf in self.stage_operation_service.resolve_performances(stage.id)
+            ],
+            "chats": (
+                [
+                    convert_keys_to_camel_case(chat.to_dict())
+                    for chat in self.stage_operation_service.resolve_chats(stage.file_location)
+                ]
+                if visible
+                else []
+            ),
+        }
 
     def get_stage_by_id(self, user: UserModel, id: int):
         session = get_session()
