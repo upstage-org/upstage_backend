@@ -1,8 +1,11 @@
 # -*- coding: iso8859-15 -*-
+import uuid
 
 import pytest
 
-from upstage_backend.authentication.tests.auth_test import TestAuthenticationController as _TestAuthenticationController
+from upstage_backend.authentication.tests.auth_test import (
+    TestAuthenticationController as _TestAuthenticationController,
+)
 from upstage_backend.global_config.env import JWT_HEADER_NAME
 from upstage_backend.global_config import get_session
 from upstage_backend.stages.db_models.stage import StageModel
@@ -22,7 +25,9 @@ class TestStageController:
 
         variables = {
             "input": {
-                "fileLocation": "path/to/file",
+                # Unique per call: a stage URL must be unique, and this fixture
+                # is created many times.
+                "fileLocation": f"path-to-file-{uuid.uuid4().hex[:8]}",
                 "status": "active",
                 "visibility": True,
                 "cover": "http://example.com/cover.jpg",
@@ -65,7 +70,6 @@ class TestStageController:
         variables = {
             "input": {
                 "id": id,
-                "fileLocation": "path/to/file",
                 "status": "active",
                 "visibility": True,
                 "cover": "http://example.com/cover.jpg",
@@ -106,7 +110,7 @@ class TestStageController:
         stage = (
             get_session()
             .query(StageModel)
-            .filter(StageModel.name == "Stage Name", StageModel.file_location == "path/to/file")
+            .filter(StageModel.name == "Stage Name", StageModel.file_location.like("path-to-file%"))
             .order_by(StageModel.id.desc())
             .first()
         )
@@ -117,6 +121,50 @@ class TestStageController:
         print(response)
         assert "errors" not in response
         return response
+
+    async def test_02b_create_stage_refuses_a_url_that_is_taken(self, client):
+        """Two stages on one URL share a page and an archive; the second
+        create must be refused, and a different URL still works."""
+        data = await test_AuthenticationController.test_02_login_successfully(client)
+        headers = {
+            "Authorization": f"Bearer {data['data']['login']['access_token']}",
+            JWT_HEADER_NAME: data["data"]["login"]["refresh_token"],
+        }
+        url = f"taken-{uuid.uuid4().hex[:8]}"
+        query = """
+            mutation createStage($input: StageInput!) {
+                createStage(input: $input) { id fileLocation }
+            }
+        """
+
+        def create(file_location):
+            return client.post(
+                "/api/studio_graphql",
+                json={
+                    "query": query,
+                    "variables": {
+                        "input": {
+                            "fileLocation": file_location,
+                            "status": "rehearsal",
+                            "visibility": False,
+                            "cover": "",
+                            "name": "Taken",
+                            "description": "",
+                            "playerAccess": "[[],[]]",
+                            "config": None,
+                        }
+                    },
+                },
+                headers=headers,
+            ).json()
+
+        first = create(url)
+        assert "errors" not in first
+        second = create(url)
+        assert "errors" in second
+        assert "already exists" in second["errors"][0]["message"]
+        assert get_session().query(StageModel).filter(StageModel.file_location == url).count() == 1
+        assert "errors" not in create(f"{url}-2")
 
     def search_stages(self, client, headers, name):
         query = """

@@ -312,8 +312,25 @@ class StageService:
             raise GraphQLError("You are not authorized to update this stage")
         return permission
 
+    @staticmethod
+    def stage_url_taken(session, file_location) -> bool:
+        """Whether a stage already lives at this URL (exact match, like the
+        stage lookup itself)."""
+        if not file_location:
+            return False
+        return (
+            session.query(StageModel.id).filter(StageModel.file_location == file_location).first()
+            is not None
+        )
+
     def create_stage(self, user: UserModel, input: StageInput):
         session = get_session()
+        # Two stages on one URL share a page, a chat and an event archive, and
+        # only the older one is ever opened. The form is meant to prevent it,
+        # but its check never worked (it queried the stage table without the
+        # URL), so nothing stopped a duplicate. Refuse it here.
+        if self.stage_url_taken(session, input.fileLocation):
+            raise GraphQLError("A stage with this URL already exists")
         stage = StageModel(
             name=input.name,
             description=input.description,
