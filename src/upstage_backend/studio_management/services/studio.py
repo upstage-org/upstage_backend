@@ -687,15 +687,24 @@ class StudioService:
         only ever change the stages they manage; the owner's other
         assignments are not theirs to drop."""
         targets = []
+        current = [int(stage_id) for stage_id in current]
         for stage_id in wanted:
             stage_id = int(stage_id)
             if stage_id not in manageable:
+                # The pop-up sends back the item's existing assignments on
+                # stages the caller cannot manage, so that they are kept.
+                # Those are kept below whatever the caller sends; refusing
+                # the whole save for them made the item unassignable as soon
+                # as it was on its owner's own stage. Only ADDING such a
+                # stage is refused.
+                if stage_id in current:
+                    continue
                 raise GraphQLError("You can only assign media to stages you own or edit")
             if stage_id not in targets:
                 targets.append(stage_id)
         for stage_id in current:
             if stage_id not in targets and stage_id not in manageable:
-                targets.append(int(stage_id))
+                targets.append(stage_id)
         return targets
 
     def quick_assign_mutation(self, user: UserModel, stage_ids: list[int], asset_id: int):
