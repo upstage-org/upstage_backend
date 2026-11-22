@@ -67,5 +67,18 @@ def test_non_owner_cannot_add_a_stage_they_do_not_manage():
         StudioService.quick_assign_targets(wanted=[1, 7], current=[], manageable={1})
 
 
+def test_non_owner_may_send_back_existing_assignments_they_cannot_manage():
+    """The pop-up includes the item's current assignments on other people's
+    stages in its list so they are kept. That must not fail the save: it made
+    an item unassignable as soon as it was on its owner's own stage."""
+    targets = StudioService.quick_assign_targets(wanted=[9, 1], current=[9], manageable={1, 2})
+    assert targets == [1, 9]
+    # unassigning from my stage while the owner's stays
+    assert StudioService.quick_assign_targets(wanted=["9"], current=[9, 1], manageable={1}) == [9]
+    # but a NEW stage I do not manage is still refused, even next to a kept one
+    with pytest.raises(GraphQLError):
+        StudioService.quick_assign_targets(wanted=[9, 7], current=[9], manageable={1})
+
+
 def test_quick_assign_manage_roles_exclude_player_access():
     assert StudioService.QUICK_ASSIGN_MANAGE_ROLES == ("owner", "editor")
