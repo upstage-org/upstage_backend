@@ -19,6 +19,8 @@ ENABLE_DONATE = "ENABLE_DONATE"
 FOYER_TITLE = "FOYER_TITLE"
 FOYER_DESCRIPTION = "FOYER_DESCRIPTION"
 FOYER_MENU = "FOYER_MENU"
+# JSON list of stage ids shown first on the foyer, in that order (#1568).
+FOYER_PINNED_STAGES = "FOYER_PINNED_STAGES"
 SHOW_REGISTRATION = "SHOW_REGISTRATION"
 EMAIL_SIGNATURE = "EMAIL_SIGNATURE"
 ADDING_EMAIL_SIGNATURE = "ADDING_EMAIL_SIGNATURE"
@@ -85,6 +87,7 @@ class SettingService:
                 "title": self.get_config(FOYER_TITLE),
                 "description": self.get_config(FOYER_DESCRIPTION),
                 "menu": self.get_config(FOYER_MENU),
+                "pinnedStages": self.get_config(FOYER_PINNED_STAGES),
                 "showRegistration": {
                     **show_registration_row,
                     "value": show_registration_row.get("value") == "true",

@@ -368,6 +368,8 @@ type_defs = gql("""
         exitAnimation: String
         exitSpeed: Int
         mqtt: MqttCredentials
+        # foyerStageList only: this stage is pinned to the front of the foyer.
+        pinned: Boolean
     }
 
 
@@ -579,6 +581,8 @@ type_defs = gql("""
         description: Config
         menu: Config
         showRegistration: BooleanConfig
+        # JSON list of stage ids pinned to the front of the foyer, in order.
+        pinnedStages: Config
     }
 
     type ReceiptFile {
