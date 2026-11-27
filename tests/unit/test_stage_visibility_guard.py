@@ -44,31 +44,12 @@ class _Attr:
         self.description = description
 
 
-class _AttrQuery:
-    """Resolves session.query(StageAttributeModel).filter(and_(...)).first()
-    to the stored attribute row matching the name in the filter clause."""
-
-    def __init__(self, attrs):
-        self._attrs = attrs
-        self._name = None
-
-    def filter(self, clause):
-        self._name = clause.clauses[1].right.value
-        return self
+class _Result:
+    def __init__(self, row):
+        self._row = row
 
     def first(self):
-        return self._attrs.get(self._name)
-
-
-class _StageQuery:
-    def __init__(self, stage):
-        self._stage = stage
-
-    def filter_by(self, **_):
-        return self
-
-    def first(self):
-        return self._stage
+        return self._row
 
 
 class _Session:
@@ -77,10 +58,14 @@ class _Session:
         self.attrs = attrs
         self.added = []
 
-    def query(self, model):
-        if model is StageAttributeModel:
-            return _AttrQuery(self.attrs)
-        return _StageQuery(self._stage)
+    def scalars(self, statement):
+        """select(StageAttributeModel).where(and_(stage_id == ..., name == ...))
+        resolves to the stored attribute row of that name; any other select
+        to the stage."""
+        if statement.column_descriptions[0]["entity"] is StageAttributeModel:
+            name = statement.whereclause.clauses[1].right.value
+            return _Result(self.attrs.get(name))
+        return _Result(self._stage)
 
     def add(self, obj):
         self.added.append(obj)

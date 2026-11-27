@@ -1,4 +1,3 @@
-# -*- coding: iso8859-15 -*-
 """
 Shared pytest configuration for upstage_backend tests.
 
@@ -8,13 +7,9 @@ rather than trying to connect to a real Postgres at import time.
 """
 
 import os
-import sys
 
 os.environ.setdefault("DATABASE_URL", "sqlite:///:memory:")
-os.environ.setdefault("ALGORITHM", "HS256")
 os.environ.setdefault("SECRET_KEY", "test-secret")
-os.environ.setdefault("REFRESH_SECRET_KEY", "test-refresh-secret")
-os.environ.setdefault("HOSTNAME", "localhost")
 os.environ.setdefault("ENV_TYPE", "Test")
 os.environ.setdefault("MQTT_BROKER", "localhost")
 os.environ.setdefault("MQTT_ADMIN_USER", "test")
@@ -23,24 +18,6 @@ os.environ.setdefault("MQTT_ADMIN_PORT", "1883")
 os.environ.setdefault("MQTT_TRANSPORT", "tcp")
 os.environ.setdefault("PERFORMANCE_TOPIC_RULE", "+/+/+")
 os.environ.setdefault("STRICT_DB_CONTEXT", "0")
-
-import types as _types  # noqa: E402
-
-if "databases" not in sys.modules:
-    _stub = _types.ModuleType("databases")
-
-    class _DatabaseStub:
-        def __init__(self, *args, **kwargs):
-            pass
-
-        async def connect(self):
-            return None
-
-        async def disconnect(self):
-            return None
-
-    _stub.Database = _DatabaseStub
-    sys.modules["databases"] = _stub
 
 import pytest  # noqa: E402
 from sqlalchemy import JSON as GenericJSON, create_engine, event  # noqa: E402
@@ -100,8 +77,6 @@ def rebound_db(sqlite_engine, monkeypatch):
       * global_config.database.engine
       * global_config.db_context.SessionFactory  (used by request_session()
         and ScopedSession())
-      * global_config.database.DBSession         (deprecated proxy alias,
-        still expected by some legacy tests)
 
     Also opens a Session, binds it into the request ContextVar, and yields
     it as ``db_session`` equivalent. Tests can either access it via
@@ -130,7 +105,6 @@ def rebound_db(sqlite_engine, monkeypatch):
         "engine": sqlite_engine,
         "session_factory": test_session_factory,
         "db_session": session,
-        "DBSession": session,
     }
 
     try:

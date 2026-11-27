@@ -1,4 +1,4 @@
-# -*- coding: iso8859-15 -*-
+from sqlalchemy import select
 
 from upstage_backend.global_config.database import ScopedSession
 from upstage_backend.global_config.helpers.password import hash_password
@@ -20,7 +20,7 @@ def create_some_users():
 
 def modify_user():
     with ScopedSession() as s:
-        user = s.query(UserModel).filter(UserModel.username == "gloria2").one()
+        user = s.scalars(select(UserModel).where(UserModel.username == "gloria2")).one()
         user.password = hash_password("")
 
 

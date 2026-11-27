@@ -1,12 +1,13 @@
-# -*- coding: iso8859-15 -*-
 """
 Publish authentication for the MediaMTX RTMP server (/root/streaming2).
 
 MediaMTX (authMethod: http) POSTs a JSON payload here for every connection
 it has not excluded via authHTTPExclude. Read/playback actions are excluded
 in mediamtx.yml (audience playback is anonymous), so in practice only
-"publish" reaches this endpoint; anything else is allowed through as a
-no-op to keep the exclusion list and this endpoint independently safe.
+"publish" reaches this endpoint. Should that exclusion ever be dropped,
+"read"/"playback" are still waved through here (same anonymous-audience
+policy); every other action (api, metrics, pprof, anything unknown) is
+refused so this endpoint never becomes a blanket "yes".
 
 A publisher must present the token produced by AssetService.resolve_sign():
     token  = "<ts>-<md5('/live/<file_location>-<ts>-<STREAM_KEY>')>"
@@ -32,6 +33,7 @@ from urllib.parse import parse_qs
 
 from fastapi import APIRouter, HTTPException, Response
 from pydantic import BaseModel, ConfigDict
+from sqlalchemy import select
 
 from upstage_backend.assets.db_models.asset import AssetModel
 from upstage_backend.global_config import get_session
@@ -41,6 +43,8 @@ from upstage_backend.global_config.logger import logger
 router = APIRouter()
 
 RTMP_PATH_PREFIX = "live/"
+# Anonymous by design (audience playback); see module docstring.
+ANONYMOUS_ACTIONS = ("read", "playback")
 OPUS_MIRROR_SUFFIX = "-opus"
 LOOPBACK_IPS = ("127.0.0.1", "::1")
 
@@ -77,8 +81,13 @@ def _token_is_valid(key: str, token: str) -> bool:
 
 @router.post("/api/rtmp/auth")
 async def rtmp_auth(payload: MtxAuthPayload):
-    if payload.action != "publish":
+    if payload.action in ANONYMOUS_ACTIONS:
         return Response(status_code=204)
+    if payload.action != "publish":
+        logger.warning(
+            "rtmp_auth: refusing unexpected action {!r} for {}", payload.action, payload.path
+        )
+        raise HTTPException(status_code=401, detail="Unsupported action")
 
     if not STREAM_KEY:
         # Fail closed: without the shared secret every token is forgeable.
@@ -95,7 +104,9 @@ async def rtmp_auth(payload: MtxAuthPayload):
     if payload.ip in LOOPBACK_IPS and key.endswith(OPUS_MIRROR_SUFFIX):
         base_key = key[: -len(OPUS_MIRROR_SUFFIX)]
         base_asset = (
-            get_session().query(AssetModel).filter(AssetModel.file_location == base_key).first()
+            get_session()
+            .scalars(select(AssetModel).where(AssetModel.file_location == base_key).limit(1))
+            .first()
         )
         if (
             base_asset is not None
@@ -110,7 +121,11 @@ async def rtmp_auth(payload: MtxAuthPayload):
         logger.warning("rtmp_auth: rejected publish for {} from {}", payload.path, payload.ip)
         raise HTTPException(status_code=401, detail="Invalid or expired token")
 
-    asset = get_session().query(AssetModel).filter(AssetModel.file_location == key).first()
+    asset = (
+        get_session()
+        .scalars(select(AssetModel).where(AssetModel.file_location == key).limit(1))
+        .first()
+    )
     if asset is None or not asset.asset_type or asset.asset_type.name != "stream":
         logger.warning("rtmp_auth: no stream asset for key {}", key)
         raise HTTPException(status_code=401, detail="Unknown stream key")

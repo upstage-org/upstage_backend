@@ -36,13 +36,6 @@ def test_live_state_visible(permission, status, performance_id, visible):
 class _Stage:
     id = 3
     file_location = "rehearsing"
-    cover = None
-    visibility = True
-    playerAccess = None
-    assets = []
-
-    def __init__(self, status="rehearsal"):
-        self.status = status
 
     @staticmethod
     def to_dict():
@@ -78,7 +71,11 @@ def service():
 
 def test_audience_gets_no_events_or_chat_from_a_rehearsing_stage(service):
     payload = service._stage_payload(
-        StageStreamInput(fileLocation="rehearsing"), _Stage("rehearsal"), "audience"
+        StageStreamInput(fileLocation="rehearsing"),
+        _Stage(),
+        {"status": "rehearsal", "visibility": "true"},
+        [],
+        "audience",
     )
     assert payload["events"] == []
     assert payload["chats"] == []
@@ -91,11 +88,11 @@ def test_audience_gets_no_events_or_chat_from_a_rehearsing_stage(service):
 
 def test_audience_gets_events_from_a_live_stage_and_players_always(service):
     live = service._stage_payload(
-        StageStreamInput(fileLocation="rehearsing"), _Stage("live"), "audience"
+        StageStreamInput(fileLocation="rehearsing"), _Stage(), {"status": "live"}, [], "audience"
     )
     assert len(live["events"]) == 1
     player = service._stage_payload(
-        StageStreamInput(fileLocation="rehearsing"), _Stage("rehearsal"), "player"
+        StageStreamInput(fileLocation="rehearsing"), _Stage(), {"status": "rehearsal"}, [], "player"
     )
     assert len(player["events"]) == 1
 
@@ -103,7 +100,9 @@ def test_audience_gets_events_from_a_live_stage_and_players_always(service):
 def test_a_recording_is_returned_to_the_audience_of_a_rehearsing_stage(service):
     payload = service._stage_payload(
         StageStreamInput(fileLocation="rehearsing", performanceId=7),
-        _Stage("rehearsal"),
+        _Stage(),
+        {"status": "rehearsal"},
+        [],
         "audience",
     )
     assert len(payload["events"]) == 1

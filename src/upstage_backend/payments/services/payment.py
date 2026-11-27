@@ -1,5 +1,3 @@
-# -*- coding: iso8859-15 -*-
-
 import asyncio
 
 from upstage_backend.global_config import logger
@@ -8,7 +6,7 @@ import stripe
 from upstage_backend.global_config.env import STRIPE_KEY, STRIPE_PRODUCT_ID
 from upstage_backend.global_config.helpers.object import convert_keys_to_camel_case
 from upstage_backend.payments.http.validation import (
-    OneTimePurchaseInput,
+    OneTimeDonationInput,
     CreateSubscriptionInput,
 )
 
@@ -114,10 +112,6 @@ class PaymentService:
         )
         return subscription
 
-    def get_subscription(self, subscription_id: str):
-        subscription = stripe.Subscription.retrieve(subscription_id)
-        return subscription
-
     async def cancel_subscription(self, subscription_id):
         """Cancel a subcription"""
         await asyncio.to_thread(stripe.Subscription.delete, subscription_id)
@@ -156,7 +150,7 @@ class PaymentService:
         )
         return price
 
-    async def one_time_purchase(self, data: OneTimePurchaseInput):
+    async def one_time_donation(self, data: OneTimeDonationInput):
         card_number = data.cardNumber
         card_exp_year = data.expYear
         card_exp_month = data.expMonth

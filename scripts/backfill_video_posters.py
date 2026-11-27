@@ -1,5 +1,4 @@
 #!/usr/bin/env python
-# -*- coding: iso8859-15 -*-
 """Generate poster JPGs for every existing uploaded video.
 
 Manual CLI wrapper around

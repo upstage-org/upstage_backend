@@ -1,6 +1,7 @@
 import base64
 import binascii
 import hashlib
+import html
 import os
 
 from email.mime.application import MIMEApplication
@@ -11,6 +12,7 @@ from email.utils import formatdate, getaddresses, make_msgid
 import re
 import ssl
 import aiosmtplib
+from sqlalchemy import select
 
 from upstage_backend.global_config import ScopedSession
 from upstage_backend.global_config.logger import logger
@@ -28,7 +30,9 @@ from upstage_backend.global_config.env import (
 from upstage_backend.upstage_options.db_models.config import ConfigModel
 
 
-async def send(to, subject, content, bcc=[], cc=[], filenames=[], honor_to=False):
+async def send(to, subject, content, bcc=None, cc=None, filenames=None, honor_to=False):
+    # Fresh lists per call: a mutable default is shared across calls.
+    bcc, cc, filenames = list(bcc or []), list(cc or []), list(filenames or [])
     msg = create_email(
         to=to,
         subject=subject,
@@ -110,22 +114,21 @@ def create_email(
     to,
     subject,
     html,
-    filenames=[],
-    cc=[],
-    bcc=[],
+    filenames=None,
+    cc=None,
+    bcc=None,
     sender=EMAIL_HOST_FROM,
     honor_to=False,
 ):
     """
     Create an email
     """
+    filenames, cc, bcc = list(filenames or []), list(cc or []), list(bcc or [])
     msg = MIMEMultipart("fixed")
     with ScopedSession() as local_db_session:
-        subject_prefix = (
-            local_db_session.query(ConfigModel)
-            .filter(ConfigModel.name == "EMAIL_SUBJECT_PREFIX")
-            .first()
-        )
+        subject_prefix = local_db_session.scalars(
+            select(ConfigModel).where(ConfigModel.name == "EMAIL_SUBJECT_PREFIX").limit(1)
+        ).first()
         if subject_prefix:
             subject = f"{subject_prefix.value}: {subject}"
     # The MIME preamble is emitted as raw ASCII by the generator, so it must
@@ -290,10 +293,21 @@ def inline_data_images(html_content):
     return _DATA_IMAGE_RE.sub(to_cid, html_content), list(parts.values())
 
 
+_TAG_RE = re.compile(r"<[^>]*>")
+_BLOCK_END_RE = re.compile(r"</(p|div|h[1-6]|li|tr|blockquote|pre)>|<br\s*/?>", re.IGNORECASE)
+
+
 def remove_html(raw_html):
-    cleanr = re.compile("<.*?>")
-    cleantext = re.sub(cleanr, "", raw_html)
-    return cleantext
+    """The text/plain alternative of an HTML body.
+
+    Tags go, block ends become line breaks, and entities are decoded so that
+    `&nbsp;`, `&amp;` or an older signature's `&eacute;` do not appear
+    literally in the plain-text part; the result may hold any Unicode
+    character (the part is sent as UTF-8).
+    """
+    text = _BLOCK_END_RE.sub("\n", raw_html or "")
+    text = _TAG_RE.sub("", text)
+    return html.unescape(text).replace("\xa0", " ")
 
 
 """

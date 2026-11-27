@@ -31,20 +31,12 @@ SEED_PATH = os.path.join(DEMO_FOLDER, "seed", "demo_stage_seed.json")
 # ---------------------------------------------------------------- gate logic
 
 
-class _CountQuery:
-    def __init__(self, count):
-        self._count = count
-
-    def count(self):
-        return self._count
-
-
 class _Session:
     def __init__(self, stage_count):
         self._stage_count = stage_count
 
-    def query(self, _model):
-        return _CountQuery(self._stage_count)
+    def scalar(self, _statement):
+        return self._stage_count
 
 
 class _ScopedSession:
@@ -234,14 +226,11 @@ def test_scene_background_is_a_shipped_asset():
 # -------------------------------------------------------------- idempotency
 
 
-class _FirstQuery:
-    """session.query(...).filter(...).first() returning a fixed row."""
+class _FirstResult:
+    """session.scalars(select(...).where(...)).first() returning a fixed row."""
 
     def __init__(self, row):
         self._row = row
-
-    def filter(self, *args, **kwargs):
-        return self
 
     def first(self):
         return self._row
@@ -257,8 +246,8 @@ class _StageSession:
         self._existing = existing_stage
         self.added = []
 
-    def query(self, _model):
-        return _FirstQuery(self._existing)
+    def scalars(self, _statement):
+        return _FirstResult(self._existing)
 
     def add(self, obj):
         self.added.append(obj)

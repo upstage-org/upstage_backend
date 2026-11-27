@@ -2,8 +2,8 @@
 
 ``quickAssignMutation`` backs the "Assign to stage" button that players who
 are NOT the owner see in the media list (owners and admins get the edit
-form). On prod it had no permission rule at all and wrote exactly the list it was sent,
-dropping the owner's other assignments. The rule is now: admins, the
+form). The 2026-09 ownership check made it reject exactly those players,
+so the pop-up neither assigned nor closed. The rule is now: admins, the
 owner, and anyone whose usage privilege is APPROVED (copyright-free item,
 or an acknowledged / granted request). A non-owner's list only ever
 changes the stages they can manage.

@@ -1,5 +1,3 @@
-# -*- coding: iso8859-15 -*-
-
 from functools import wraps
 from fastapi import Request
 import jwt
@@ -56,9 +54,9 @@ def authenticated(allowed_roles=None):
                 request.state.current_user = current_user.to_dict()
 
             except jwt.ExpiredSignatureError:
-                raise GraphQLError("Signature has expired")
+                raise GraphQLError("Signature has expired") from None
             except jwt.InvalidTokenError:
-                raise GraphQLError("Authenticated Failed")
+                raise GraphQLError("Authenticated Failed") from None
 
             return func(*args, **kwargs)
 

@@ -1,5 +1,4 @@
 #!/usr/bin/env python
-# -*- coding: iso8859-15 -*-
 """
 One-shot install bootstrap, chained after alembic in the upstage_db_migrate
 container: seeds the Demo Stage ONLY when the stage table is empty (a new

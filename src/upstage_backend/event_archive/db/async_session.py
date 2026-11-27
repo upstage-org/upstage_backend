@@ -1,4 +1,3 @@
-# -*- coding: iso8859-15 -*-
 """
 Async SQLAlchemy session for the event_archive service.
 
@@ -22,10 +21,10 @@ def _to_async_url(sync_url: str) -> str:
     """
     if sync_url.startswith("postgresql+asyncpg://"):
         return sync_url
-    if sync_url.startswith("postgresql://"):
-        return "postgresql+asyncpg://" + sync_url[len("postgresql://") :]
-    if sync_url.startswith("postgres://"):
-        return "postgresql+asyncpg://" + sync_url[len("postgres://") :]
+    # Any Postgres URL, whichever sync driver it names (psycopg2 in CI).
+    for prefix in ("postgresql+psycopg2://", "postgresql+psycopg://", "postgresql://", "postgres://"):
+        if sync_url.startswith(prefix):
+            return "postgresql+asyncpg://" + sync_url[len(prefix) :]
     return sync_url
 
 

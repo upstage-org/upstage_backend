@@ -1,4 +1,4 @@
-# -*- coding: iso8859-15 -*-
+from sqlalchemy import select
 import uuid
 
 import pytest
@@ -25,8 +25,8 @@ class TestStageController:
 
         variables = {
             "input": {
-                # Unique per call: a stage URL must be unique, and this fixture
-                # is created many times.
+                # Unique per call: the slug is validated (letters/digits/-/_)
+                # and must be unique, and this fixture is created many times.
                 "fileLocation": f"path-to-file-{uuid.uuid4().hex[:8]}",
                 "status": "active",
                 "visibility": True,
@@ -106,17 +106,22 @@ class TestStageController:
         # Only ever touch the fixture stage test_01 created. An unfiltered
         # .first() picks whatever stage sorts first in the configured database
         # and overwrites it with these placeholder values - on dev that was the
-        # Demo Stage (renamed to "Stage Name" / "path/to/file", 2026-09-10).
+        # Demo Stage (renamed to "Stage Name" / "path/to/file", 2026-09-10; slugs are now path-to-file-<hex>).
         stage = (
             get_session()
-            .query(StageModel)
-            .filter(StageModel.name == "Stage Name", StageModel.file_location.like("path-to-file%"))
-            .order_by(StageModel.id.desc())
+            .scalars(
+                select(StageModel)
+                .where(
+                    StageModel.name == "Stage Name", StageModel.file_location.like("path-to-file%")
+                )
+                .order_by(StageModel.id.desc())
+                .limit(1)
+            )
             .first()
         )
         if stage is None:
             stage = await self.test_01_create_stage(client)
-            stage = get_session().query(StageModel).get(int(stage["id"]))
+            stage = get_session().get(StageModel, int(stage["id"]))
         response = self.update_stage(client, stage.id, data)
         print(response)
         assert "errors" not in response
@@ -163,7 +168,14 @@ class TestStageController:
         second = create(url)
         assert "errors" in second
         assert "already exists" in second["errors"][0]["message"]
-        assert get_session().query(StageModel).filter(StageModel.file_location == url).count() == 1
+        assert (
+            len(
+                get_session()
+                .scalars(select(StageModel.id).where(StageModel.file_location == url))
+                .all()
+            )
+            == 1
+        )
         assert "errors" not in create(f"{url}-2")
 
     def search_stages(self, client, headers, name):
@@ -280,7 +292,7 @@ class TestStageController:
     #     asset_id = await test_MediaController.test_03_upload_media(client)
 
     #     with ScopedSession() as session:
-    #         stage = get_session().query(StageModel).first()
+    #         stage = get_session().scalars(select(StageModel).limit(1)).first()
     #         item = ParentStageModel(stage_id=stage.id, child_asset_id=asset_id)
     #         session.add(item)
     #         session.commit()
@@ -321,13 +333,13 @@ class TestStageController:
     #     data = await test_AuthenticationController.test_player_login_successfully(
     #         client
     #     )
-    #     stage = get_session().query(StageModel).first()
+    #     stage = get_session().scalars(select(StageModel).limit(1)).first()
     #     response = self.remove_media(client, stage.id, data)
     #     assert "errors" in response
 
     # async def test_08_delete_stage(self, client):
     #     data = await test_AuthenticationController.test_02_login_successfully(client)
-    #     stage = get_session().query(StageModel).first()
+    #     stage = get_session().scalars(select(StageModel).limit(1)).first()
     #     response = self.remove_media(client, stage.id, data)
     #     assert response["data"]["deleteStage"]["success"] == True
 
@@ -356,12 +368,12 @@ class TestStageController:
     #     assert response["errors"][0]["message"] == "Stage not found"
 
     # async def test_10_sweep_stage(self, client):
-    #     stage = get_session().query(StageModel).all()[-1]
+    #     stage = get_session().scalars(select(StageModel)).all()[-1]
     #     response = await self.sweep_stage(client, stage.id)
     #     assert response["errors"][0]["message"] == "The stage is already sweeped!"
 
     # async def test_11_sweep_stage_successfully(self, client):
-    #     stage = get_session().query(StageModel).all()[-1]
+    #     stage = get_session().scalars(select(StageModel)).all()[-1]
     #     with ScopedSession() as session:
     #         event = EventModel(
     #             topic="/{}/".format(stage.file_location),
@@ -395,7 +407,7 @@ class TestStageController:
     #     assert response.json()["errors"][0]["message"] == "Stage not found"
 
     #     headers = test_AuthenticationController.get_headers(client, PLAYER)
-    #     stage = get_session().query(StageModel).all()[-1]
+    #     stage = get_session().scalars(select(StageModel)).all()[-1]
     #     variables = {"id": stage.id}
     #     response = client.post(
     #         "/api/studio_graphql",
@@ -411,7 +423,7 @@ class TestStageController:
 
     # async def test_13_update_status(self, client):
     #     headers = test_AuthenticationController.get_headers(client, SUPER_ADMIN)
-    #     stage = get_session().query(StageModel).all()[-1]
+    #     stage = get_session().scalars(select(StageModel)).all()[-1]
     #     variables = {"id": stage.id}
     #     query = """
     #         mutation updateStatus($id: ID!) {
@@ -480,7 +492,7 @@ class TestStageController:
     #     assert response.json()["errors"][0]["message"] == "Stage not found"
 
     #     headers = test_AuthenticationController.get_headers(client, PLAYER)
-    #     stage = get_session().query(StageModel).all()[-1]
+    #     stage = get_session().scalars(select(StageModel)).all()[-1]
     #     variables = {"id": stage.id}
     #     response = client.post(
     #         "/api/studio_graphql",
@@ -496,7 +508,7 @@ class TestStageController:
 
     # async def test_15_update_visibility(self, client):
     #     headers = test_AuthenticationController.get_headers(client, SUPER_ADMIN)
-    #     stage = get_session().query(StageModel).all()[-1]
+    #     stage = get_session().scalars(select(StageModel)).all()[-1]
     #     variables = {"id": stage.id}
     #     query = """
     #         mutation updateVisibility($id: ID!) {
@@ -565,7 +577,7 @@ class TestStageController:
     #     assert response.json()["errors"][0]["message"] == "Stage not found"
 
     #     headers = test_AuthenticationController.get_headers(client, PLAYER)
-    #     stage = get_session().query(StageModel).all()[-1]
+    #     stage = get_session().scalars(select(StageModel)).all()[-1]
     #     variables = {"id": stage.id}
     #     response = client.post(
     #         "/api/studio_graphql",
@@ -581,7 +593,7 @@ class TestStageController:
 
     # async def test_17_update_last_access(self, client):
     #     headers = test_AuthenticationController.get_headers(client, SUPER_ADMIN)
-    #     stage = get_session().query(StageModel).all()[-1]
+    #     stage = get_session().scalars(select(StageModel)).all()[-1]
     #     variables = {"id": stage.id}
     #     query = """
     #         mutation updateLastAccess($id: ID!) {

@@ -1,14 +1,13 @@
-# -*- coding: iso8859-15 -*-
-
 from upstage_backend.global_config import logger
 
 import json
 import secrets
-from datetime import datetime, timedelta
 
 import paho.mqtt.client as mqtt
+from sqlalchemy import select, update
 
 from upstage_backend.global_config.env import MQTT_TRANSPORT
+from upstage_backend.global_config.helpers.clock import utcnow
 from upstage_backend.global_config.database import ScopedSession
 from upstage_backend.upstage_stats.db_models.receive_stat import ReceiveStatModel
 from upstage_backend.upstage_stats.db_models.connection_stat import ConnectionStatModel
@@ -33,7 +32,7 @@ def on_connect(client: mqtt.Client, userdata, flags, rc):
         client.subscribe(CONNECTION_TOPIC)
         connection_payload = {
             "connected": client._client_id.decode("utf-8"),
-            "timestamp": datetime.now().isoformat(),
+            "timestamp": utcnow().isoformat(),
             "channel": CONNECTION_TOPIC,
         }
         client.publish(CONNECTION_TOPIC, payload=json.dumps(connection_payload))
@@ -55,22 +54,22 @@ def record_stage_statistics(msg: mqtt.MQTTMessage):
         players = int(payload.get("players", 0) or 0)
         audiences = int(payload.get("audiences", 0) or 0)
         with ScopedSession() as session:
-            row = (
-                session.query(StageStatisticModel)
-                .filter(StageStatisticModel.stage_url == stage_url)
-                .first()
-            )
+            row = session.scalars(
+                select(StageStatisticModel)
+                .where(StageStatisticModel.stage_url == stage_url)
+                .limit(1)
+            ).first()
             if row:
                 row.players = players
                 row.audiences = audiences
-                row.updated_on = datetime.now()
+                row.updated_on = utcnow()
             else:
                 session.add(
                     StageStatisticModel(
                         stage_url=stage_url,
                         players=players,
                         audiences=audiences,
-                        updated_on=datetime.now(),
+                        updated_on=utcnow(),
                     )
                 )
     except Exception as error:
@@ -88,7 +87,15 @@ def on_message(client: mqtt.Client, userdata, msg: mqtt.MQTTMessage):
 
     if not msg.retain:
         client_id = client._client_id.decode("utf-8")
-        payload = json.loads(msg.payload)
+        # Anyone holding the shared broker login can publish here; a
+        # malformed body must not take the stats worker down.
+        try:
+            payload = json.loads(msg.payload)
+        except (ValueError, TypeError):
+            logger.warning("upstage_stats: ignoring non-JSON payload on {}", msg.topic)
+            return
+        if not isinstance(payload, dict):
+            return
         if client_id not in client_messages:
             client_messages[client_id] = 0
         if "connected" in payload:
@@ -110,24 +117,23 @@ def on_message(client: mqtt.Client, userdata, msg: mqtt.MQTTMessage):
             client_messages[client_id] = 0
             try:
                 with ScopedSession() as session:
-                    receive_stat = session.query(ReceiveStatModel).filter(
-                        ReceiveStatModel.received_id == client_id
-                    )
-                    if not receive_stat.first():
+                    received = ReceiveStatModel.received_id == client_id
+                    if not session.scalars(
+                        select(ReceiveStatModel).where(received).limit(1)
+                    ).first():
                         receive_stat = ReceiveStatModel(
                             received_id=client_id,
-                            mqtt_timestamp=datetime.now(),
+                            mqtt_timestamp=utcnow(),
                             topic=LIVE_CLIENT_TOPIC,
                             payload=payload,
                         )
                         session.add(receive_stat)
                     else:
-                        receive_stat.update(
-                            {
-                                ReceiveStatModel.mqtt_timestamp: datetime.now(),
-                                ReceiveStatModel.payload: payload,
-                            },
-                            synchronize_session=False,
+                        session.execute(
+                            update(ReceiveStatModel)
+                            .where(received)
+                            .values(mqtt_timestamp=utcnow(), payload=payload),
+                            execution_options={"synchronize_session": False},
                         )
             except Exception as error:
                 logger.error(error)
@@ -142,20 +148,11 @@ def get_client_id():
     return secrets.token_urlsafe(16)
 
 
-def build_client(client_id=get_client_id(), transport=MQTT_TRANSPORT):
-    client = mqtt.Client(client_id=client_id, transport=transport)
+def build_client(client_id=None, transport=MQTT_TRANSPORT):
+    # A fresh id per client: as a default argument `get_client_id()` ran once
+    # at import, so every client built by this process shared one id.
+    client = mqtt.Client(client_id=client_id or get_client_id(), transport=transport)
     client.on_connect = on_connect
     client.on_message = on_message
     client.on_disconnect = on_disconnect
     return client
-
-
-def get_not_alive_users():
-    two_minute_ago = datetime.now() - timedelta(minutes=2)
-    with ScopedSession() as session:
-        not_alive_clients = (
-            session.query(ReceiveStatModel)
-            .filter(ReceiveStatModel.mqtt_timestamp < two_minute_ago)
-            .all()
-        )
-        return [x.received_id for x in not_alive_clients]

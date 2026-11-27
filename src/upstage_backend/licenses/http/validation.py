@@ -1,4 +1,3 @@
-# -*- coding: iso8859-15 -*-
 from pydantic import BaseModel, Field
 
 

@@ -1,12 +1,15 @@
-# -*- coding: iso8859-15 -*-
-
 from datetime import datetime
-from sqlalchemy.ext.declarative import declarative_base
-from sqlalchemy.orm import class_mapper, ColumnProperty, RelationshipProperty
-# from global_config import Base
 
-global Base
-Base = declarative_base()
+from upstage_backend.global_config.helpers.clock import as_utc
+from sqlalchemy.orm import ColumnProperty, DeclarativeBase, RelationshipProperty, class_mapper
+
+
+class Base(DeclarativeBase):
+    """
+    SQLAlchemy 2.0 declarative base. Models declare typed attributes:
+    `Mapped[...] = mapped_column(...)`, with the column arguments spelled
+    out (type, nullable, default) rather than inferred from the annotation.
+    """
 
 
 class BaseModel(Base):
@@ -29,7 +32,9 @@ class BaseModel(Base):
             if isinstance(attr, ColumnProperty):
                 value = getattr(self, attr.key)
                 if isinstance(value, datetime):
-                    result[attr.key] = value.isoformat()
+                    # Always with the UTC offset, so clients never have to
+                    # guess which zone a bare timestamp was written in.
+                    result[attr.key] = as_utc(value).isoformat()
                 else:
                     result[attr.key] = value
 
@@ -45,9 +50,7 @@ class BaseModel(Base):
                         ]
                     else:
                         result[attr.key] = (
-                            value.to_dict(visited)
-                            if hasattr(value, "to_dict")
-                            else value
+                            value.to_dict(visited) if hasattr(value, "to_dict") else value
                         )
 
         return result

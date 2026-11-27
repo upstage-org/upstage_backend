@@ -32,7 +32,7 @@ from graphql import GraphQLError
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
-from upstage_backend.global_config import db_context
+from upstage_backend.global_config import db_context, env
 from upstage_backend.stages.db_models.stage import StageModel
 from upstage_backend.stages.services.stage import StageService
 
@@ -117,17 +117,30 @@ def test_unknown_stage_raises_and_leaves_no_open_transaction(session_factory):
     session.close()
 
 
-def test_engine_requests_lock_and_idle_transaction_timeouts(monkeypatch):
+def _probe_engine_kwargs(monkeypatch, database_url):
+    """Re-run ``global_config.database`` against ``database_url`` and return
+    the kwargs it hands to ``create_engine``."""
     captured = {}
 
     def fake_create_engine(url, **kwargs):
         captured.update(kwargs)
         return object()
 
+    # The module picks its engine options by URL scheme. The DB-free unit
+    # scope (tests/unit/conftest.py, CI's `verify` job) runs on
+    # sqlite:///:memory:, so name the URL explicitly rather than inherit it.
+    monkeypatch.setattr(env, "DATABASE_URL", database_url)
     # Re-run the module body in a throwaway namespace so the real, already
     # imported engine is untouched.
     monkeypatch.setattr(sqlalchemy, "create_engine", fake_create_engine)
     runpy.run_module("upstage_backend.global_config.database", run_name="_probe")
+    return captured
+
+
+def test_engine_requests_lock_and_idle_transaction_timeouts(monkeypatch):
+    captured = _probe_engine_kwargs(
+        monkeypatch, env.with_psycopg2_driver("postgresql://u:p@db:5432/upstage")
+    )
 
     options = captured["connect_args"]["options"]
     assert "-c lock_timeout=" in options
@@ -136,3 +149,9 @@ def test_engine_requests_lock_and_idle_transaction_timeouts(monkeypatch):
     assert 0 < lock_ms <= 10_000, (
         "lock_timeout must be short enough to fail one request, not stall prod"
     )
+
+
+def test_non_postgres_engine_gets_no_postgres_connect_args(monkeypatch):
+    # `options=-c ...` is libpq-only; sqlite3.connect() rejects the keyword.
+    captured = _probe_engine_kwargs(monkeypatch, "sqlite:///:memory:")
+    assert "connect_args" not in captured

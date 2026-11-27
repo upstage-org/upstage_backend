@@ -1,15 +1,12 @@
-# -*- coding: iso8859-15 -*-
 """
 Root pytest conftest.
 
 Keep this file's top-level imports stdlib-only. Anything that pulls in
 ``upstage_backend.global_config`` (or transitively ``upstage_backend.main``)
-forces ``global_config.database.create_engine(DATABASE_URL)`` and
-``metadata.create_all(engine)`` to run at import time, which fails immediately
-on hosts where ``postgres_container_dev`` is not resolvable (anywhere outside
-the docker-compose network). That broke ``pytest --collect-only`` from the
-host, which in turn made it impossible to lint or count tests without bringing
-the whole stack up.
+resolves the settings and builds the engine for whatever DATABASE_URL this
+host is configured with. Collection (``pytest --collect-only``) must work
+without that: from a host outside the docker-compose network, and in CI's
+database-free job.
 
 The actual ``app``/``DATABASE_URL`` imports are pushed into the fixtures that
 need them so collection only requires the upstage_backend package to be
@@ -226,6 +223,45 @@ def _sweep_test_fixtures(engine):
 @pytest.fixture(scope="session")
 def anyio_backend():
     return "asyncio"
+
+
+@pytest.fixture(autouse=True)
+def _test_body_session():
+    """
+    One managed Session for the test body's own `get_session()` calls.
+
+    The src-tree suites read and write rows directly (outside any HTTP
+    request). Before this fixture, each such call hit db_context's
+    non-strict fallback, which opens a Session, binds it to the test's
+    context and never closes it — one leaked Postgres connection per test
+    (39 in a full run; what made a QueuePool time out on 2026-09-27).
+    Requests made through the TestClient still get their own session from
+    the middleware; this one only serves the test code itself.
+
+    Tests that bind their own session first (tests/unit `rebound_db`) are
+    left alone.
+    """
+    from upstage_backend.global_config.db_context import (
+        SessionFactory,
+        current_session_or_none,
+        reset_session,
+        set_session,
+    )
+
+    if current_session_or_none() is not None:
+        yield
+        return
+    session = SessionFactory()
+    token = set_session(session)
+    try:
+        yield
+    finally:
+        for step in (session.rollback, session.close):
+            try:
+                step()
+            except Exception:
+                pass
+        reset_session(token)
 
 
 @pytest.fixture(scope="session", autouse=True)

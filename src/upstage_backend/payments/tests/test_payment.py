@@ -1,16 +1,28 @@
-# -*- coding: iso8859-15 -*-
-
-import asyncio
 import pytest
+import stripe
 
-from upstage_backend.payments.http.validation import OneTimePurchaseInput
+from upstage_backend.payments.http.validation import OneTimeDonationInput
 from upstage_backend.payments.services.payment import PaymentService
 
 
 @pytest.mark.anyio
 class TestPaymentController:
-    async def test_01_one_time_payment(self):
-        otpi = OneTimePurchaseInput(
+    async def test_01_one_time_payment(self, monkeypatch):
+        # Stripe is stubbed: the suite must run without an API key or network.
+        calls = {}
+
+        def fake_token_create(**kwargs):
+            calls["token"] = kwargs
+            return {"id": "tok_test"}
+
+        def fake_charge_create(**kwargs):
+            calls["charge"] = kwargs
+            return {"paid": True}
+
+        monkeypatch.setattr(stripe.Token, "create", fake_token_create)
+        monkeypatch.setattr(stripe.Charge, "create", fake_charge_create)
+
+        otpi = OneTimeDonationInput(
             cardNumber="4242424242424242",
             expYear="2025",
             expMonth="12",
@@ -18,8 +30,17 @@ class TestPaymentController:
             amount=100,
         )
         ps = PaymentService()
-        result = await ps.one_time_purchase(otpi)
+        result = await ps.one_time_donation(otpi)
         assert result["success"] is True
+        assert calls["token"]["card"] == {
+            "number": "4242424242424242",
+            "exp_month": 12,
+            "exp_year": 2025,
+            "cvc": "123",
+        }
+        assert calls["charge"]["source"] == "tok_test"
+        assert calls["charge"]["amount"] == 100 * 100  # dollars -> cents
+        assert calls["charge"]["currency"] == "usd"
 
     '''
     login_query = """
@@ -54,7 +75,3 @@ class TestPaymentController:
         assert "errors" in data
         assert data["errors"][0]["message"] == "Incorrect username or password"
     """
-
-
-if __name__ == "__main__":
-    asyncio.run(TestPaymentController().test_01_one_time_payment())

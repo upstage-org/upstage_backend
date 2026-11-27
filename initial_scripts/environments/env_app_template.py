@@ -42,5 +42,5 @@ STRIPE_PRODUCT_ID = ""
 # Change to "Production" for official releases.
 ENV_TYPE="Dev/Testing"
 
-JWT_ACCESS_TOKEN_MINUTES = "86400" # 1 day
+JWT_ACCESS_TOKEN_SECONDS = "86400" # 1 day
 JWT_REFRESH_TOKEN_DAYS = "30" # 30 days

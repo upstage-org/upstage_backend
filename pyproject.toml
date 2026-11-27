@@ -7,8 +7,13 @@ name = "upstage-backend"
 version = "0.0.0"
 description = "UpStage backend (FastAPI + Ariadne GraphQL + SQLAlchemy + aiomqtt)."
 requires-python = ">=3.12"
-# Mirrors requirements.txt verbatim. Keeping it unpinned here so behaviour
-# matches the existing dev/prod containers; tighten later in a separate PR.
+# Single source of truth (requirements.txt is just `-e .`). Runtime deps are
+# largely unpinned; the exact versions live in uv.lock, which both the
+# containers and CI install from (`uv sync --frozen`). Upgrade with
+# `uv lock --upgrade`. Upper bounds are added only where a new major changes
+# defaults we rely on. pytest/faker/coverage/ruff stay in the runtime list on
+# purpose: the container image is built with `uv sync --no-dev`, and the
+# src-tree integration suites are run inside that image.
 dependencies = [
     "aiomqtt",
     "aiosmtplib",
@@ -19,8 +24,12 @@ dependencies = [
     "asyncpg",
     "coverage",
     "cryptography",
-    "databases",
     "email-validator",
+    # Imported directly (custom scalars / OperationType); previously only a
+    # transitive dependency of ariadne. Capped: graphql-core 3.3.0 removed
+    # `ExecutionContext` from the package root, which ariadne 1.1.0 (the
+    # latest) imports - `import ariadne` fails. Lift when ariadne supports 3.3.
+    "graphql-core>=3.2,<3.3",
     "faker",
     # `!= 0.136.3` works around MAL-2026-4750 (malicious release that
     # injected an undocumented `fastar` typosquat into the [standard]
@@ -29,24 +38,29 @@ dependencies = [
     "fastapi != 0.136.3",
     "fastapi_exception",
     "fastapi_global_variable",
-    "fastapi_pagination",
-    "graphql_server",
-    "hypercorn",
     "loguru",
     "paho-mqtt",
     "Pillow",
+    # Imported directly (validation models); previously transitive via fastapi.
+    "pydantic",
+    "pydantic-settings",
     "psycopg2-binary",
-    "pydash",
     "pyjwt",
     "pyotp",
     "pytest",
+    # Captcha verification (users/services/user.py).
+    "requests",
     "python-dotenv",
     "ruff",
-    "sentry_sdk",
-    "sqlalchemy",
+    # SQLAlchemy 2.1 makes psycopg (v3) the default Postgres driver; env.py
+    # names psycopg2 explicitly on every URL (with_psycopg2_driver). 2.1 also
+    # stopped installing greenlet by default; the [asyncio] extra brings it
+    # back for event_archive's async engine.
+    "sqlalchemy[asyncio]>=2.1",
+    # Imported directly (Request/Response types); previously transitive via fastapi.
+    "starlette",
     "stripe",
     "terminal_colors",
-    "typing_inspect",
     "uvicorn",
     "PyMuPDF",
     "reportlab",
@@ -70,18 +84,18 @@ include = ["upstage_backend*"]
 # ============================================================================
 # Linter / formatter (ruff)
 # ============================================================================
-# Deliberately narrow starter selection so the existing ~189 .py files in src/
-# don't drown the team in findings on day one. We only enforce real-correctness
-# rules right now:
-#   * E   - pycodestyle errors (syntax / indentation that even Python disagrees with)
-#   * F   - pyflakes (undefined names, unused imports — real bugs)
+# Correctness rules only; style is the formatter's job.
+#   * E, F    - pycodestyle errors, pyflakes (undefined names, unused imports)
+#   * B       - bugbear (mutable defaults, `raise` without `from`, ...)
+#   * DTZ     - naive datetimes: every timestamp column is timestamptz, use
+#               global_config.helpers.clock.utcnow()
+#   * RUF006  - asyncio tasks nobody keeps a reference to (use helpers.background.spawn)
+#   * ASYNC   - blocking calls inside async functions (they stall the event loop)
 #
-# Everything else (W, I, B, UP, SIM, RUF, PT, PERF, …) is queued for follow-up
-# cleanup PRs. The `ruff-format` hook in `.pre-commit-config.yaml` is the
-# pressure valve for stylistic drift on new / modified code; we deliberately
-# do NOT run `ruff format --check` against the whole repo in `verify.sh`,
-# because that would force a 63-file reformat-everything PR ahead of the
-# protections actually getting installed.
+# UP, SIM, I, RUF (~330 findings, all stylistic) are not enabled. We
+# deliberately do NOT run `ruff format --check` against the whole repo in
+# `verify.sh`: files are formatted as they are touched (the `ruff-format`
+# pre-commit hook), not in one reformat-everything change.
 [tool.ruff]
 line-length = 100
 target-version = "py312"
@@ -97,10 +111,16 @@ extend-exclude = [
 ]
 
 [tool.ruff.lint]
-select = ["E", "F"]
+select = ["E", "F", "B", "DTZ", "RUF006", "ASYNC"]
 ignore = [
     "E501",  # long lines — formatter handles new code; many legacy lines remain
 ]
+
+[tool.ruff.lint.per-file-ignores]
+# Tests stat files and block on purpose (the event-loop tests measure exactly that).
+"**/tests/**" = ["ASYNC240", "ASYNC251"]
+# Applied revision: its seed rows keep the timestamp they were written with.
+"alembic/versions/baseline001_consolidated_schema_and_seeds.py" = ["DTZ005"]
 
 [tool.ruff.format]
 quote-style = "double"

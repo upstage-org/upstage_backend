@@ -1,5 +1,3 @@
-# -*- coding: iso8859-15 -*-
-
 import inspect
 
 from ariadne import MutationType, QueryType, make_executable_schema
@@ -9,10 +7,8 @@ from ariadne.asgi.handlers import GraphQLHTTPHandler
 from graphql import OperationType
 
 from upstage_backend.global_config.db_context import (
-    SessionFactory,
     current_session_or_none,
     finish_request_transaction,
-    set_session,
 )
 from upstage_backend.global_config.env import ENV_TYPE
 from upstage_backend.global_config.logger import logger
@@ -27,17 +23,17 @@ def _make_graphql_context(request, data=None):
     shapes. Resolvers may use info.context["db"] or
     global_config.get_session() interchangeably.
 
-    On the normal HTTP path the FastAPI middleware has already opened a
-    session; here we just reuse it. Pure ASGI/WebSocket entry points
-    never run HTTP middleware, so as a fallback we open a Session and
-    bind it to the contextvar so get_session() works in resolvers too.
+    The FastAPI middleware (main.py db_request_session) has already opened
+    the request's session; reuse it. There is no other entry point: the
+    schema has no Subscription type and the frontend never opens a GraphQL
+    WebSocket, so the WebSocket route — and the fallback that used to open
+    a Session here and never close it (one leaked connection per socket) —
+    are gone (2026-09-27).
     """
     existing = current_session_or_none()
-    if existing is not None:
-        return {"request": request, "db": existing}
-    session = SessionFactory()
-    set_session(session)
-    return {"request": request, "db": session}
+    if existing is None:
+        raise RuntimeError("GraphQL request reached the schema without a request session")
+    return {"request": request, "db": existing}
 
 
 def end_transaction_after_root_mutation(resolver, obj, info, **kwargs):
@@ -122,7 +118,7 @@ def config_graphql_endpoints(app: FastAPI, endpoint="/api/studio_graphql"):
 
     combined_mutation.set_field("paymentSecret", payment_mutation._resolvers["paymentSecret"])
 
-    combined_mutation.set_field("oneTimePurchase", payment_mutation._resolvers["oneTimePurchase"])
+    combined_mutation.set_field("oneTimeDonation", payment_mutation._resolvers["oneTimeDonation"])
     combined_mutation.set_field(
         "createSubscription", payment_mutation._resolvers["createSubscription"]
     )
@@ -248,11 +244,12 @@ def config_graphql_endpoints(app: FastAPI, endpoint="/api/studio_graphql"):
 
     combined_graphql_app = GraphQL(
         combined_schema,
-        debug=ENV_TYPE != "Production",
+        # Debug responses carry Python tracebacks; keep them off every
+        # internet-facing deployment (the Dev host included), not just prod.
+        debug=ENV_TYPE not in ("Production", "Dev"),
         context_value=_make_graphql_context,
         http_handler=GraphQLHTTPHandler(middleware=[end_transaction_after_root_mutation]),
     )
 
     logger.info("GraphQL endpoint mounted at {}", endpoint)
     app.add_route(endpoint, combined_graphql_app)
-    app.add_api_websocket_route(endpoint, combined_graphql_app)

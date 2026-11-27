@@ -1,6 +1,3 @@
-# -*- coding: iso8859-15 -*-
-
-
 import random
 from upstage_backend.global_config.database import ScopedSession
 from upstage_backend.global_config.env import JWT_HEADER_NAME

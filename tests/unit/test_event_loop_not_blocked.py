@@ -33,7 +33,7 @@ from upstage_backend.authentication.services.auth import AuthenticationService
 from upstage_backend.payments.http import schema as payments_schema
 from upstage_backend.payments.http.validation import (
     CreateSubscriptionInput,
-    OneTimePurchaseInput,
+    OneTimeDonationInput,
 )
 from upstage_backend.payments.services.payment import PaymentService
 from upstage_backend.users.db_models.user import SUPER_ADMIN, UserModel
@@ -216,7 +216,7 @@ _CARD = dict(cardNumber="4242424242424242", expYear="2030", expMonth="12", cvc="
 
 STRIPE_ENTRY_POINTS = {
     "payment_intent": lambda: PaymentService().create_payment_intent_async(100, "usd"),
-    "one_time_purchase": lambda: PaymentService().one_time_purchase(OneTimePurchaseInput(**_CARD)),
+    "one_time_donation": lambda: PaymentService().one_time_donation(OneTimeDonationInput(**_CARD)),
     "create_subscription": lambda: PaymentService().create_subscription_process(
         CreateSubscriptionInput(**_CARD, currency="usd", email="a@example.org", type="card")
     ),
@@ -262,13 +262,12 @@ def media_service(monkeypatch):
         name="",
         asset_type_id=None,
         file_location="avatar/a.png",
+        owner_id=1,
         description='{"frames": []}',
     )
     session = SimpleNamespace(
         flush=step("db:flush"),
-        query=lambda *_: SimpleNamespace(
-            filter_by=lambda **_: SimpleNamespace(first=lambda: asset)
-        ),
+        scalars=lambda *_: SimpleNamespace(first=lambda: asset),
     )
     monkeypatch.setattr(media_module, "get_session", lambda: session)
     monkeypatch.setattr(media_module, "finish_request_transaction", step("db:locks-released"))

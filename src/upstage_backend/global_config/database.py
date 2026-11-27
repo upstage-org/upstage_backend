@@ -1,9 +1,7 @@
-# -*- coding: iso8859-15 -*-
-
 from upstage_backend.global_config.logger import logger
 
 from sqlalchemy import create_engine
-from sqlalchemy.pool import NullPool
+from sqlalchemy.pool import NullPool, QueuePool
 
 from upstage_backend.global_config.env import DATABASE_URL
 
@@ -23,11 +21,37 @@ from upstage_backend.global_config.env import DATABASE_URL
 # lock_timeout, a contended statement fails that one request after 5 s
 # instead of freezing prod; idle_in_transaction_session_timeout reaps any
 # transaction a yielded request leaves open (see 2026-09-19 outage).
+#
+# Pooling: a small QueuePool instead of NullPool. NullPool opened a fresh
+# Postgres connection (TLS + auth + the `options` round-trip) for every
+# request, every email and every stats message. `pool_pre_ping` swaps a
+# connection the server dropped (idle timeout, restart) for a fresh one
+# instead of failing the request; `pool_recycle` retires connections before
+# typical server-side idle limits. Returned connections are rolled back by
+# SQLAlchemy, so the timeouts above still see a clean transaction.
+#
+# History: a first attempt (2026-09-27) timed out in the integration suite —
+# not an app leak but the tests' own `get_session()` calls hitting
+# db_context's non-strict fallback (a Session per test, never closed; see
+# conftest.py `_test_body_session`) plus the GraphQL WebSocket fallback
+# session (route removed). With both gone the suite holds ≤2 connections.
+_PG_CONNECT_ARGS = {"options": "-c lock_timeout=5000 -c idle_in_transaction_session_timeout=120000"}
+_is_postgres = DATABASE_URL.startswith("postgresql")
 engine = create_engine(
     DATABASE_URL,
-    poolclass=NullPool,
-    query_cache_size=0,
-    connect_args={"options": "-c lock_timeout=5000 -c idle_in_transaction_session_timeout=120000"},
+    **(
+        dict(
+            poolclass=QueuePool,
+            pool_size=5,
+            max_overflow=10,
+            pool_timeout=10,
+            pool_pre_ping=True,
+            pool_recycle=1800,
+            connect_args=_PG_CONNECT_ARGS,
+        )
+        if _is_postgres
+        else dict(poolclass=NullPool)
+    ),
 )
 
 
@@ -44,7 +68,7 @@ class ScopedSession(object):
         with ScopedSession() as local_db_session:
            local_db_session.add(some_obj)
            local_db_session.flush()  # if you need the ID right away
-           rows = local_db_session.query(Model).filter(...).all()
+           rows = local_db_session.scalars(select(Model).where(...)).all()
 
     Session will be committed and closed when you fall out of scope.
     Rollback on exception is default; pass rollback_upon_failure=False
@@ -97,35 +121,3 @@ class ScopedSession(object):
                 logger.exception("ScopedSession: session.close() failed")
             self.session = None
         return False
-
-
-class _RequestSessionProxy:
-    """
-    Deprecated thin proxy for the legacy module-level `DBSession`. Every
-    attribute access is forwarded to the Session that's bound on the
-    request contextvar via `get_session()`. This lets in-flight call
-    sites like `DBSession.query(Model).filter(...)` keep working during
-    the scoped-session refactor.
-
-    Prefer `session = get_session()` directly in new and migrated code.
-    This alias will be removed once all call sites are migrated.
-    """
-
-    __slots__ = ()
-
-    def _target(self):
-        from upstage_backend.global_config.db_context import get_session
-
-        return get_session()
-
-    def __getattr__(self, name):
-        return getattr(self._target(), name)
-
-    def __call__(self, *args, **kwargs):
-        return self._target()(*args, **kwargs)
-
-    def __repr__(self):
-        return "<DBSession deprecated alias -> request contextvar Session>"
-
-
-DBSession = _RequestSessionProxy()

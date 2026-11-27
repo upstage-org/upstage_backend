@@ -1,5 +1,4 @@
 #!/usr/bin/env python
-# -*- coding: iso8859-15 -*-
 """
 Entry point for the event_archive service.
 

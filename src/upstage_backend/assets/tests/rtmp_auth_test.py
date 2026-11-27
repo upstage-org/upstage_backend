@@ -1,4 +1,3 @@
-# -*- coding: iso8859-15 -*-
 """
 Tests for the MediaMTX publish-auth endpoint (/api/rtmp/auth).
 
@@ -12,12 +11,22 @@ import time
 import pytest
 
 from upstage_backend.assets.http import rtmp_auth
-from upstage_backend.authentication.tests.auth_test import TestAuthenticationController as _TestAuthenticationController
+from upstage_backend.authentication.tests.auth_test import (
+    TestAuthenticationController as _TestAuthenticationController,
+)
 from upstage_backend.global_config.env import JWT_HEADER_NAME
 
 test_AuthenticationController = _TestAuthenticationController()
 
 STREAM_ASSET_KEY = "rtmpauthtestkey"
+
+
+@pytest.fixture(autouse=True)
+def _stream_key(monkeypatch):
+    # The endpoint answers 503 without a STREAM_KEY, and CI configures none;
+    # the suite must not depend on the host's secret being present.
+    if not rtmp_auth.STREAM_KEY:
+        monkeypatch.setattr(rtmp_auth, "STREAM_KEY", "rtmp-auth-test-stream-key")
 
 
 def make_token(key: str, ts: int, stream_key: str) -> str:
@@ -148,6 +157,17 @@ class TestRtmpAuth:
     async def test_08_read_action_allowed_without_token(self, client):
         response = client.post("/api/rtmp/auth", json=auth_payload(action="read"))
         assert response.status_code == 204
+
+    async def test_08b_playback_action_allowed_without_token(self, client):
+        response = client.post("/api/rtmp/auth", json=auth_payload(action="playback"))
+        assert response.status_code == 204
+
+    async def test_08c_other_actions_refused(self, client):
+        # api/metrics/pprof are excluded in mediamtx.yml; if that exclusion
+        # ever goes, the backend must not wave them through.
+        for action in ("api", "metrics", "pprof", "", "bogus"):
+            response = client.post("/api/rtmp/auth", json=auth_payload(action=action))
+            assert response.status_code == 401, action
 
     async def test_09_empty_stream_key_fails_closed(self, client, monkeypatch):
         monkeypatch.setattr(rtmp_auth, "STREAM_KEY", "")

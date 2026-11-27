@@ -1,12 +1,11 @@
-# -*- coding: iso8859-15 -*-
-
 import json
 import re
-from datetime import datetime
 from graphql import GraphQLError
 import jwt
-from requests import Request
-from sqlalchemy import and_, nulls_last, exists, or_, select, update
+from starlette.requests import Request
+from sqlalchemy import and_, delete, exists, func, nulls_last, or_, select, update
+from sqlalchemy.orm import joinedload, selectinload
+from upstage_backend.global_config.helpers.clock import utcnow
 from upstage_backend.global_config import get_session
 from upstage_backend.global_config.env import ALGORITHM, SECRET_KEY
 from upstage_backend.global_config.helpers.bearer import parse_bearer_token
@@ -36,6 +35,7 @@ from upstage_backend.upstage_options.services.upstage_option import FOYER_PINNED
 from upstage_backend.stages.db_models.stage_attribute import StageAttributeModel
 from upstage_backend.upstage_stats.db_models.stage_statistic import StageStatisticModel
 from upstage_backend.users.db_models.user import UserModel
+from upstage_backend.global_config.helpers.authz import is_admin
 from upstage_backend.assets.db_models.asset import AssetModel
 
 
@@ -50,38 +50,112 @@ class StageService:
         locs = [f for f in file_locations if f]
         if not locs:
             return {}
-        rows = (
-            session.query(StageStatisticModel).filter(StageStatisticModel.stage_url.in_(locs)).all()
-        )
+        rows = session.scalars(
+            select(StageStatisticModel).where(StageStatisticModel.stage_url.in_(locs))
+        ).all()
         return {row.stage_url: {"players": row.players, "audiences": row.audiences} for row in rows}
+
+    # The four stage_attribute rows the list responses expose (StageModel's
+    # cover / visibility / status / playerAccess hybrids read the same rows,
+    # one query each, per stage).
+    _LIST_ATTRIBUTES = ("cover", "visibility", "status", "playerAccess")
+
+    def _stage_attribute_map(self, session, stage_ids):
+        """{stage_id: {name: description}} for the list attributes, one query.
+        Lowest row id wins when a name is duplicated (the hybrids' `.first()`
+        made no such promise)."""
+        if not stage_ids:
+            return {}
+        rows = session.scalars(
+            select(StageAttributeModel)
+            .where(
+                StageAttributeModel.stage_id.in_(stage_ids),
+                StageAttributeModel.name.in_(self._LIST_ATTRIBUTES),
+            )
+            .order_by(StageAttributeModel.id)
+        ).all()
+        out = {}
+        for row in rows:
+            out.setdefault(row.stage_id, {}).setdefault(row.name, row.description)
+        return out
+
+    @staticmethod
+    def live_state_visible(permission, status, performance_id):
+        """Whether the caller may see what is on the stage right now (#1573).
+
+        A stage that is not live is closed to the audience: the Preloader
+        keeps them behind the curtain, so the live event log (the board,
+        the streams and audio on it) and the chat are not handed out to
+        them either. Players and editors see their stage in any status. A
+        recording (``performance_id`` set) is a separate question and is
+        returned as before.
+        """
+        if performance_id is not None:
+            return True
+        if permission and permission != "audience":
+            return True
+        return status == "live"
+
+    @staticmethod
+    def _attribute_fields(attrs):
+        """The same values StageModel.cover/visibility/status/playerAccess
+        produce, from one stage's pre-fetched attribute map."""
+        return {
+            "cover": attrs.get("cover"),
+            "visibility": attrs.get("visibility") == "true",
+            "status": attrs.get("status"),
+            "playerAccess": attrs.get("playerAccess"),
+        }
+
+    def _stage_assets_map(self, session, stage_ids):
+        """{stage_id: [ParentStageModel, ...]} in assignment order, with each
+        child asset and the relationships its to_dict() walks (type, owner,
+        license) loaded in the same round-trip. Iterating `stage.assets`
+        (dynamic) and lazy-loading per asset cost 1 + 4 queries per asset."""
+        if not stage_ids:
+            return {}
+        rows = session.scalars(
+            select(ParentStageModel)
+            .where(ParentStageModel.stage_id.in_(stage_ids))
+            .options(
+                joinedload(ParentStageModel.child_asset).joinedload(AssetModel.asset_type),
+                joinedload(ParentStageModel.child_asset).joinedload(AssetModel.owner),
+                joinedload(ParentStageModel.child_asset).joinedload(AssetModel.asset_license),
+            )
+            .order_by(ParentStageModel.id)
+        ).all()
+        out = {}
+        for row in rows:
+            out.setdefault(row.stage_id, []).append(row)
+        return out
 
     def get_all_stages(self, user: UserModel, input: SearchStageInput):
         session = get_session()
-        query = (
-            session.query(StageModel)
+        statement = (
+            select(StageModel)
             .outerjoin(UserModel)
             .outerjoin(ParentStageModel)
             .outerjoin(AssetModel)
             .group_by(StageModel.id)
+            # to_dict() walks `owner`; load it for the whole page at once.
+            .options(selectinload(StageModel.owner))
         )
 
         if input.name:
             # The studio search box matches either the stage name or its URL
             # slug — names and file locations frequently differ.
             pattern = f"%{input.name}%"
-            query = query.filter(
+            statement = statement.where(
                 or_(StageModel.name.ilike(pattern), StageModel.file_location.ilike(pattern))
             )
 
         if input.owners:
-            query = query.filter(UserModel.username.in_(input.owners))
+            statement = statement.where(UserModel.username.in_(input.owners))
 
         if input.createdBetween:
-            query = query.filter(
+            statement = statement.where(
                 StageModel.created_on.between(input.createdBetween[0], input.createdBetween[1])
             )
-
-        total_count = query.count()
 
         if input.sort:
             sort = input.sort
@@ -91,24 +165,27 @@ class StageService:
                 if field == "ACCESS":
                     continue
 
-                if field == "OWNER_ID":
-                    sort_field = StageModel.owner_id
-                elif field == "NAME":
-                    sort_field = StageModel.name
-                elif field == "CREATED_ON":
-                    sort_field = StageModel.created_on
-                elif field == "LAST_ACCESS":
-                    sort_field = StageModel.last_access
+                sort_field = {
+                    "OWNER_ID": StageModel.owner_id,
+                    "NAME": StageModel.name,
+                    "CREATED_ON": StageModel.created_on,
+                    "LAST_ACCESS": StageModel.last_access,
+                }.get(field)
+                if sort_field is None:
+                    # Unknown key used to leave `sort_field` unbound (or reuse
+                    # the previous iteration's column).
+                    continue
 
                 if direction == "ASC":
-                    query = query.order_by(nulls_last(sort_field.asc()))
+                    statement = statement.order_by(nulls_last(sort_field.asc()))
                 elif direction == "DESC":
-                    query = query.order_by(nulls_last(sort_field.desc()))
+                    statement = statement.order_by(nulls_last(sort_field.desc()))
 
         else:
-            query = query.order_by(StageModel.name.asc())
+            statement = statement.order_by(StageModel.name.asc())
 
-        data = query.all()
+        data = session.scalars(statement).all()
+        attribute_map = self._stage_attribute_map(session, [stage.id for stage in data])
 
         access = (
             input.access if input.access and len(input.access) else ["owner", "editor", "player"]
@@ -116,16 +193,16 @@ class StageService:
 
         stages = []
         for stage in data:
-            permission = self.stage_operation_service.resolve_permission(user.id, stage)
+            attrs = attribute_map.get(stage.id, {})
+            permission = self.stage_operation_service.resolve_permission(
+                user.id, stage, player_access=attrs.get("playerAccess"), admin=is_admin(user)
+            )
             if permission in access:
                 stages.append(
                     convert_keys_to_camel_case(
                         {
                             **stage.to_dict(),
-                            "cover": stage.cover,
-                            "visibility": stage.visibility,
-                            "status": stage.status,
-                            "playerAccess": stage.playerAccess,
+                            **self._attribute_fields(attrs),
                             "permission": permission,
                         }
                     )
@@ -146,6 +223,7 @@ class StageService:
         stats_map = self._stage_stats_map(
             session, [stage.get("fileLocation") for stage in paginated_stages]
         )
+        assets_map = self._stage_assets_map(session, [stage["id"] for stage in paginated_stages])
 
         return {
             "edges": [
@@ -153,7 +231,7 @@ class StageService:
                     **stage,
                     "assets": [
                         convert_keys_to_camel_case(self._asset_with_exit_settings(asset))
-                        for asset in stage["assets"]
+                        for asset in assets_map.get(stage["id"], [])
                     ],
                     "players": stats_map.get(stage.get("fileLocation"), {}).get("players", 0),
                     "audiences": stats_map.get(stage.get("fileLocation"), {}).get("audiences", 0),
@@ -190,63 +268,64 @@ class StageService:
             except jwt.InvalidTokenError:
                 current_user_id = None
 
-        query = (
-            session.query(StageModel)
+        statement = (
+            select(StageModel)
             .outerjoin(UserModel)
             .outerjoin(StageAttributeModel)
             .outerjoin(ParentStageModel)
             .outerjoin(AssetModel)
             .group_by(StageModel.id)
+            .options(selectinload(StageModel.owner))
         )
 
         if input.fileLocation:
-            query = query.filter(StageModel.file_location == input.fileLocation)
+            statement = statement.where(StageModel.file_location == input.fileLocation)
 
-        query = query.order_by(StageModel.id)
-        stages = query.all()
+        statement = statement.order_by(StageModel.id)
+        stages = session.scalars(statement).all()
+        stage_ids = [stage.id for stage in stages]
+        attribute_map = self._stage_attribute_map(session, stage_ids)
+        assets_map = self._stage_assets_map(session, stage_ids)
+        # The access token carries only the user id; an admin is an editor
+        # of every stage (see resolve_permission), so look the role up once.
+        caller = (
+            session.scalars(
+                select(UserModel).where(UserModel.id == current_user_id).limit(1)
+            ).first()
+            if current_user_id
+            else None
+        )
+        caller_is_admin = is_admin(caller) if caller else False
 
         return [
-            convert_keys_to_camel_case(
-                self._stage_payload(
-                    input,
+            convert_keys_to_camel_case(self._stage_payload(input, stage, attrs, assets, permission))
+            for stage, attrs, assets, permission in (
+                (
                     stage,
-                    self.stage_operation_service.resolve_permission(current_user_id, stage),
+                    attribute_map.get(stage.id, {}),
+                    assets_map.get(stage.id, []),
+                    self.stage_operation_service.resolve_permission(
+                        current_user_id,
+                        stage,
+                        player_access=attribute_map.get(stage.id, {}).get("playerAccess"),
+                        admin=caller_is_admin,
+                    ),
                 )
+                for stage in stages
             )
-            for stage in stages
         ]
 
-    @staticmethod
-    def live_state_visible(permission, status, performance_id):
-        """Whether the caller may see what is on the stage right now (#1573).
-
-        A stage that is not live is closed to the audience: the Preloader
-        keeps them behind the curtain, so the live event log (the board,
-        the streams and audio on it) and the chat are not handed out to
-        them either. Players and editors see their stage in any status. A
-        recording (``performance_id`` set) is a separate question and is
-        returned as before.
-        """
-        if performance_id is not None:
-            return True
-        if permission and permission != "audience":
-            return True
-        return status == "live"
-
-    def _stage_payload(self, input: StageStreamInput, stage, permission):
-        status = stage.status
-        visible = self.live_state_visible(permission, status, input.performanceId)
+    def _stage_payload(self, input: StageStreamInput, stage, attrs, assets, permission):
+        fields = self._attribute_fields(attrs)
+        visible = self.live_state_visible(permission, fields["status"], input.performanceId)
         return {
             **stage.to_dict(),
-            "assets": [self._asset_with_exit_settings(asset) for asset in stage.assets],
+            "assets": [self._asset_with_exit_settings(asset) for asset in assets],
             "scenes": self.stage_operation_service.get_scene_list(input, stage.id),
             "events": (
                 self.stage_operation_service.get_event_list(input, stage) if visible else []
             ),
-            "cover": stage.cover,
-            "visibility": stage.visibility,
-            "status": status,
-            "playerAccess": stage.playerAccess,
+            **fields,
             "permission": permission,
             "performances": [
                 convert_keys_to_camel_case(pf.to_dict())
@@ -264,17 +343,17 @@ class StageService:
 
     def get_stage_by_id(self, user: UserModel, id: int):
         session = get_session()
-        stage = (
-            session.query(StageModel)
+        stage = session.scalars(
+            select(StageModel)
             .outerjoin(UserModel)
             .outerjoin(ParentStageModel)
             .outerjoin(AssetModel)
             .outerjoin(PerformanceModel)
             .outerjoin(SceneModel, SceneModel.stage_id == StageModel.id)
             .outerjoin(EventModel, EventModel.performance_id == PerformanceModel.id)
-            .filter(StageModel.id == id)
-            .first()
-        )
+            .where(StageModel.id == id)
+            .limit(1)
+        ).first()
 
         permission = self.extract_permission(user, stage)
 
@@ -312,29 +391,28 @@ class StageService:
             raise GraphQLError("You are not authorized to update this stage")
         return permission
 
-    @staticmethod
-    def stage_url_taken(session, file_location) -> bool:
-        """Whether a stage already lives at this URL (exact match, like the
-        stage lookup itself)."""
-        if not file_location:
-            return False
-        return (
-            session.query(StageModel.id).filter(StageModel.file_location == file_location).first()
-            is not None
-        )
+    # Mirrors the studio form's own check (StageManagement/General.vue); the
+    # slug is also the MQTT / event-archive namespace of the stage.
+    _STAGE_SLUG_RE = re.compile(r"^[A-Za-z0-9_-]{1,64}$")
+
+    def _validate_stage_slug(self, session, file_location, exclude_stage_id=None):
+        if not isinstance(file_location, str) or not self._STAGE_SLUG_RE.match(file_location):
+            raise GraphQLError("Stage URL may only contain letters, digits, '-' and '_'")
+        statement = select(StageModel.id).where(StageModel.file_location == file_location)
+        if exclude_stage_id is not None:
+            statement = statement.where(StageModel.id != exclude_stage_id)
+        if session.execute(statement.limit(1)).first() is not None:
+            raise GraphQLError("A stage with this URL already exists")
 
     def create_stage(self, user: UserModel, input: StageInput):
         session = get_session()
-        # Two stages on one URL share a page, a chat and an event archive, and
-        # only the older one is ever opened. The form is meant to prevent it,
-        # but its check never worked (it queried the stage table without the
-        # URL), so nothing stopped a duplicate. Refuse it here.
-        if self.stage_url_taken(session, input.fileLocation):
-            raise GraphQLError("A stage with this URL already exists")
+        self._validate_stage_slug(session, input.fileLocation)
+        # Only admins may create a stage on someone else's behalf.
+        owner_id = input.owner if input.owner and user.role in (ADMIN, SUPER_ADMIN) else user.id
         stage = StageModel(
             name=input.name,
             description=input.description,
-            owner_id=input.owner if input.owner else user.id,
+            owner_id=owner_id,
             file_location=input.fileLocation,
         )
 
@@ -371,11 +449,16 @@ class StageService:
 
     def update_stage(self, user: UserModel, input: UpdateStageInput):
         session = get_session()
-        stage = session.query(StageModel).filter_by(id=input.id).first()
+        stage = session.scalars(select(StageModel).filter_by(id=input.id).limit(1)).first()
         if not stage or not input.id:
             raise GraphQLError("Stage not found")
 
         self.extract_permission(user, stage)
+
+        def is_owner_or_admin() -> bool:
+            return user is not None and (
+                stage.owner_id == user.id or user.role in (ADMIN, SUPER_ADMIN)
+            )
 
         stage.name = input.name if hasattr(input, "name") and input.name else stage.name
         stage.description = (
@@ -383,13 +466,20 @@ class StageService:
             if hasattr(input, "description") and input.description
             else stage.description
         )
-        stage.file_location = (
-            input.fileLocation
-            if hasattr(input, "fileLocation") and input.fileLocation
-            else stage.file_location
-        )
+        new_slug = getattr(input, "fileLocation", None)
+        if new_slug and new_slug != stage.file_location:
+            # Editors may not rename the stage URL (it is the stage's MQTT and
+            # archive namespace); and it must stay unique.
+            if not is_owner_or_admin():
+                raise GraphQLError("Only the stage owner or an admin can change the stage URL")
+            self._validate_stage_slug(session, new_slug, exclude_stage_id=stage.id)
+            stage.file_location = new_slug
 
-        stage.owner_id = input.owner if hasattr(input, "owner") and input.owner else stage.owner_id
+        new_owner = getattr(input, "owner", None)
+        if new_owner and int(new_owner) != stage.owner_id:
+            if not is_owner_or_admin():
+                raise GraphQLError("Only the stage owner or an admin can transfer ownership")
+            stage.owner_id = new_owner
 
         self.update_stage_attribute(stage.id, "cover", input.cover, session)
         # Same guard as create_stage: partial updates (e.g. the Customisation
@@ -418,16 +508,16 @@ class StageService:
             return
 
         if stage_id:
-            stage_attribute = (
-                session.query(StageAttributeModel)
-                .filter(
+            stage_attribute = session.scalars(
+                select(StageAttributeModel)
+                .where(
                     and_(
                         StageAttributeModel.stage_id == stage_id,
                         StageAttributeModel.name == name,
                     )
                 )
-                .first()
-            )
+                .limit(1)
+            ).first()
             if stage_attribute:
                 stage_attribute.description = value
                 return
@@ -436,33 +526,37 @@ class StageService:
 
     def delete_stage(self, user: UserModel, id: int):
         session = get_session()
-        stage = session.query(StageModel).filter(StageModel.id == id).first()
+        stage = session.scalars(select(StageModel).where(StageModel.id == id).limit(1)).first()
         if not stage:
             raise GraphQLError("Stage not found")
 
         self.extract_permission(user, stage)
 
-        session.query(StageAttributeModel).filter(StageAttributeModel.stage_id == id).delete()
-        session.query(ParentStageModel).filter(ParentStageModel.stage_id == id).delete()
+        session.execute(delete(StageAttributeModel).where(StageAttributeModel.stage_id == id))
+        session.execute(delete(ParentStageModel).where(ParentStageModel.stage_id == id))
 
-        session.query(SceneModel).filter(SceneModel.stage_id == id).delete()
+        session.execute(delete(SceneModel).where(SceneModel.stage_id == id))
 
-        performances = session.query(PerformanceModel).filter(PerformanceModel.stage_id == id)
+        performance_ids = session.scalars(
+            select(PerformanceModel.id).where(PerformanceModel.stage_id == id)
+        ).all()
 
-        session.query(EventModel).filter(
-            EventModel.performance_id.in_([p.id for p in performances])
-        ).delete()
+        session.execute(delete(EventModel).where(EventModel.performance_id.in_(performance_ids)))
 
-        session.query(PerformanceModel).filter(PerformanceModel.stage_id == id).delete()
+        session.execute(delete(PerformanceModel).where(PerformanceModel.stage_id == id))
 
         session.delete(stage)
         return {"success": True, "message": "Stage deleted"}
 
     def duplicate_stage(self, user: UserModel, input: DuplicateStageInput):
         session = get_session()
-        stage = session.query(StageModel).filter(StageModel.id == input.id).first()
+        stage = session.scalars(
+            select(StageModel).where(StageModel.id == input.id).limit(1)
+        ).first()
         if not stage:
             raise GraphQLError("Stage not found")
+        # Same rule as every other stage mutation: owner, editor or admin.
+        self.extract_permission(user, stage)
 
         file_location = self.get_short_name(input.name, session)
 
@@ -482,11 +576,9 @@ class StageService:
         return convert_keys_to_camel_case(new_stage.to_dict())
 
     def copy_data(self, input: DuplicateStageInput, session, new_stage: StageModel):
-        stage_attributes = (
-            session.query(StageAttributeModel)
-            .filter(StageAttributeModel.stage_id == input.id)
-            .all()
-        )
+        stage_attributes = session.scalars(
+            select(StageAttributeModel).where(StageAttributeModel.stage_id == input.id)
+        ).all()
 
         for stage_attribute in stage_attributes:
             self.update_stage_attribute(
@@ -496,9 +588,9 @@ class StageService:
                 session,
             )
 
-        parent_stages = (
-            session.query(ParentStageModel).filter(ParentStageModel.stage_id == input.id).all()
-        )
+        parent_stages = session.scalars(
+            select(ParentStageModel).where(ParentStageModel.stage_id == input.id)
+        ).all()
         for parent_stage in parent_stages:
             session.add(
                 ParentStageModel(
@@ -514,11 +606,11 @@ class StageService:
 
         suffix = ""
         while True:
-            existed_stage = (
-                session.query(StageModel)
-                .filter(StageModel.file_location == f"{shortname}{suffix}")
-                .first()
-            )
+            existed_stage = session.scalars(
+                select(StageModel)
+                .where(StageModel.file_location == f"{shortname}{suffix}")
+                .limit(1)
+            ).first()
             if existed_stage:
                 suffix = int(suffix or 0) + 1
             else:
@@ -527,7 +619,7 @@ class StageService:
 
     def sweep_stage(self, user: UserModel, id: int):
         session = get_session()
-        stage = session.query(StageModel).filter(StageModel.id == id).first()
+        stage = session.scalars(select(StageModel).where(StageModel.id == id).limit(1)).first()
         if not stage:
             raise GraphQLError("Stage not found")
 
@@ -536,21 +628,20 @@ class StageService:
         # ANY stage, including one it is merely audience on (2026-09).
         self.extract_permission(user, stage)
 
-        events = (
-            session.query(EventModel)
-            .filter(EventModel.performance_id == None)  # noqa: E711  (SQLAlchemy column NULL comparison)
-            .filter(EventModel.topic.ilike("%/{}/%".format(stage.file_location)))
+        unswept = (
+            EventModel.performance_id == None,  # noqa: E711  (SQLAlchemy column NULL comparison)
+            EventModel.topic.ilike("%/{}/%".format(stage.file_location)),
         )
 
-        if events.count() > 0:
+        if session.scalar(select(func.count()).select_from(EventModel).where(*unswept)) > 0:
             performance = PerformanceModel(stage_id=stage.id)
 
             session.add(performance)
             session.flush()
 
-            events.update(
-                {EventModel.performance_id: performance.id},
-                synchronize_session="fetch",
+            session.execute(
+                update(EventModel).where(*unswept).values(performance_id=performance.id),
+                execution_options={"synchronize_session": "fetch"},
             )
         else:
             raise GraphQLError("The stage is already sweeped!")
@@ -559,20 +650,20 @@ class StageService:
 
     def update_status(self, user: UserModel, id: int):
         session = get_session()
-        stage = session.query(StageModel).filter(StageModel.id == id).first()
+        stage = session.scalars(select(StageModel).where(StageModel.id == id).limit(1)).first()
         if not stage:
             raise GraphQLError("Stage not found")
 
         self.extract_permission(user, stage)
 
-        attribute = (
-            session.query(StageAttributeModel)
-            .filter(
+        attribute = session.scalars(
+            select(StageAttributeModel)
+            .where(
                 StageAttributeModel.stage_id == id,
                 StageAttributeModel.name == "status",
             )
-            .first()
-        )
+            .limit(1)
+        ).first()
 
         if attribute is not None:
             attribute.description = "rehearsal" if attribute.description == "live" else "live"
@@ -581,32 +672,32 @@ class StageService:
             session.add(attribute)
         session.flush()
 
-        attribute = (
-            session.query(StageAttributeModel)
-            .filter(
+        attribute = session.scalars(
+            select(StageAttributeModel)
+            .where(
                 StageAttributeModel.stage_id == id,
                 StageAttributeModel.name == "status",
             )
-            .first()
-        )
+            .limit(1)
+        ).first()
         return {"result": attribute.description}
 
     def update_visibility(self, user: UserModel, id: int):
         session = get_session()
-        stage = session.query(StageModel).filter(StageModel.id == id).first()
+        stage = session.scalars(select(StageModel).where(StageModel.id == id).limit(1)).first()
         if not stage:
             raise GraphQLError("Stage not found")
 
         self.extract_permission(user, stage)
 
-        attribute = (
-            session.query(StageAttributeModel)
-            .filter(
+        attribute = session.scalars(
+            select(StageAttributeModel)
+            .where(
                 StageAttributeModel.stage_id == id,
                 StageAttributeModel.name == "visibility",
             )
-            .first()
-        )
+            .limit(1)
+        ).first()
 
         if attribute is not None:
             attribute.description = "true" if attribute.description != "true" else "false"
@@ -615,14 +706,14 @@ class StageService:
             session.add(attribute)
         session.flush()
 
-        attribute = (
-            session.query(StageAttributeModel)
-            .filter(
+        attribute = session.scalars(
+            select(StageAttributeModel)
+            .where(
                 StageAttributeModel.stage_id == id,
                 StageAttributeModel.name == "visibility",
             )
-            .first()
-        )
+            .limit(1)
+        ).first()
 
         return {"result": attribute.description}
 
@@ -630,7 +721,7 @@ class StageService:
         try:
             id = int(id)
         except (TypeError, ValueError):
-            raise GraphQLError("Stage not found")
+            raise GraphQLError("Stage not found") from None
         # Single atomic UPDATE, committed here rather than at request
         # teardown. Ariadne runs sync resolvers on the event loop with a
         # blocking psycopg2 driver, so a row lock must never be held across
@@ -641,7 +732,7 @@ class StageService:
         row = session.execute(
             update(StageModel)
             .where(StageModel.id == id)
-            .values(last_access=datetime.now())
+            .values(last_access=utcnow())
             .returning(StageModel.last_access)
         ).first()
         if row is None:
@@ -654,7 +745,7 @@ class StageService:
         session = get_session()
         return [
             convert_keys_to_camel_case(stage.to_dict())
-            for stage in session.query(ParentStageModel).all()
+            for stage in session.scalars(select(ParentStageModel)).all()
         ]
 
     @staticmethod
@@ -668,6 +759,8 @@ class StageService:
             values = json.loads(raw)
         except (TypeError, ValueError):
             values = str(raw).split(",")
+        if isinstance(values, (int, str)):
+            values = [values]
         if not isinstance(values, list):
             return []
         ids: list[int] = []
@@ -706,12 +799,11 @@ class StageService:
             )
         )
 
-        stages = (
-            session.query(StageModel)
-            .filter(visibility_filter)
+        stages = session.scalars(
+            select(StageModel)
+            .where(visibility_filter)
             .order_by(nulls_last(StageModel.last_access.desc()))
-            .all()
-        )
+        ).all()
 
         result = [
             {
@@ -769,24 +861,22 @@ class StageService:
         # and acknowledgement FYIs (approved=True). The same query
         # captures both — they're distinguished by `approved` when we
         # project to the right NotificationType below.
-        owner_rows = (
-            session.query(AssetUsageModel)
-            .filter(AssetUsageModel.owner_seen == False)  # noqa: E712
-            .filter(AssetUsageModel.asset.has(owner_id=user.id))
-            .all()
-        )
+        owner_rows = session.scalars(
+            select(AssetUsageModel)
+            .where(AssetUsageModel.owner_seen == False)  # noqa: E712
+            .where(AssetUsageModel.asset.has(owner_id=user.id))
+        ).all()
 
         # Requester-side: this user's own approved-and-not-yet-dismissed
         # requests. Strict requests only ever reach `approved=True` via
         # the owner-confirm path, so this naturally maps to "your
         # request was approved" — the new PERMISSION_APPROVED bell.
-        requester_rows = (
-            session.query(AssetUsageModel)
-            .filter(AssetUsageModel.user_id == user.id)
-            .filter(AssetUsageModel.approved == True)  # noqa: E712
-            .filter(AssetUsageModel.requester_seen == False)  # noqa: E712
-            .all()
-        )
+        requester_rows = session.scalars(
+            select(AssetUsageModel)
+            .where(AssetUsageModel.user_id == user.id)
+            .where(AssetUsageModel.approved == True)  # noqa: E712
+            .where(AssetUsageModel.requester_seen == False)  # noqa: E712
+        ).all()
 
         notifications = []
         for row in owner_rows:

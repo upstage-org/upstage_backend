@@ -74,10 +74,7 @@ class _NoConfig:
     def __exit__(self, *exc):
         return False
 
-    def query(self, *_args, **_kwargs):
-        return self
-
-    def filter(self, *_args, **_kwargs):
+    def scalars(self, *_args, **_kwargs):
         return self
 
     def first(self):

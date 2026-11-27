@@ -37,9 +37,9 @@ set -e
 # `VIRTUAL_ENV` is realigned too, so pip-audit audits the environment it
 # is actually running against instead of warning about the mismatch.
 #
-# No-op in CI: the `verify` job installs into the runner's own
-# interpreter and never creates `.venv`, so the guard is skipped and CI
-# stays byte-for-byte the same gate as the local hook.
+# CI takes the same branch: its jobs create `.venv` from uv.lock
+# (`uv sync --frozen --extra dev`), so CI stays byte-for-byte the same
+# gate as the local hook.
 REPO_ROOT=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
 if [ -x "$REPO_ROOT/.venv/bin/python" ]; then
     PATH="$REPO_ROOT/.venv/bin:$PATH"

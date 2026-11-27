@@ -19,14 +19,14 @@ that outlives the resolver fail loudly as "database is locked".
 from __future__ import annotations
 
 import asyncio
-from datetime import datetime
 
 import pytest
 from ariadne import MutationType, QueryType, graphql, make_executable_schema
 from graphql import GraphQLError
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, select
 from sqlalchemy.orm import sessionmaker
 
+from upstage_backend.global_config.helpers.clock import as_utc, utcnow
 from upstage_backend.global_config import db_context
 from upstage_backend.global_config.schema import end_transaction_after_root_mutation
 from upstage_backend.stages.db_models.stage import StageModel
@@ -48,8 +48,8 @@ mutation = MutationType()
 
 def _flush_only_touch(id: int) -> str:
     session = db_context.get_session()
-    stage = session.query(StageModel).filter(StageModel.id == id).first()
-    stage.last_access = datetime.now()
+    stage = session.scalars(select(StageModel).where(StageModel.id == id).limit(1)).first()
+    stage.last_access = utcnow()
     session.flush()  # row lock taken; no commit here, on purpose
     return stage.last_access.isoformat()
 
@@ -127,7 +127,7 @@ def test_concurrent_mutations_on_same_row_do_not_block(session_factory, field):
     # Request B gets the loop before A's teardown. This is where prod hung.
     result_b, session_b = _execute(session_factory, doc)
     assert "errors" not in result_b, result_b
-    assert _last_access(session_factory).isoformat() == result_b["data"][field]
+    assert as_utc(_last_access(session_factory)).isoformat() == result_b["data"][field]
     session_a.close()
     session_b.close()
 
@@ -208,7 +208,7 @@ def test_many_concurrent_requests_on_one_loop_all_succeed(session_factory):
     assert [r for r in results if "errors" in r] == []
     assert not any(open_transactions)
     stamps = sorted(r["data"]["touchAsync"] for r in results)
-    assert _last_access(session_factory).isoformat() == stamps[-1]
+    assert as_utc(_last_access(session_factory)).isoformat() == stamps[-1]
 
 
 def test_concurrent_requests_without_the_middleware_lock_each_other_out(session_factory):
