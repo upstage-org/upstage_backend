@@ -1,7 +1,12 @@
 name: upstage-services-${SITE}
 services:
   postgres:
-    image: postgres:latest
+    # Pinned to a major version on purpose: the data directory of one major
+    # cannot be opened by another, so `latest` would break the database the
+    # day a new major is published. Minor releases still arrive with a pull.
+    # Moving to a new major is a dump and restore (see README, "Upgrading
+    # PostgreSQL"); change this tag and the one on db_backup together.
+    image: postgres:19
     container_name: postgres_container_${SITE}
     user: "999:999"
     volumes:
@@ -43,7 +48,7 @@ services:
 
   db_backup:
     # Same image as the server, so pg_dump always matches the server version.
-    image: postgres:latest
+    image: postgres:19
     container_name: backup_container_${SITE}
     # Only started when COMPOSE_PROFILES=backup, which the prod run script sets.
     profiles: ["backup"]

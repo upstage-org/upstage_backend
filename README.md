@@ -71,7 +71,8 @@ grant camera/microphone access to secure origins.
 Prerequisites: Docker with the compose plugin. The app image is built from
 `python:3.14-slim-trixie` (`app_containers/docker-compose.yaml`); Python
 ≥ 3.12 on the host is only needed for host-side development, not to run the
-stack. The service tier runs `postgres:latest`. The baseline schema
+stack. The service tier runs `postgres:19` (pinned to the major version, see
+"Upgrading PostgreSQL" below). The baseline schema
 (`alembic/versions/baseline001_schema.sql`) was dumped from PostgreSQL 18 and
 sets `transaction_timeout`, so it needs PostgreSQL 17 or newer.
 
@@ -207,6 +208,33 @@ Postgres + Mosquitto. Site-specific settings (hostname, exposed WS port) are
 variables at the top of the script. The prod script also enables the
 `db_backup` container (`COMPOSE_PROFILES=backup`).
 
+#### Upgrading PostgreSQL
+
+The image is pinned to a major version (`postgres:19` in
+`service_containers/docker-compose-services.yaml`, for both `postgres` and
+`db_backup`). A minor release needs only `docker pull postgres:19` and a run
+of the service script. A new major cannot open the old data directory, so it
+is a dump and restore (done 18 → 19 on 2026-11-28; the database is small, so
+this takes about a minute). With `<site>` = `dev` or `prod`:
+
+1. Run the test suite against the new major first (see "Developing").
+2. Stop the app tier (`upstage_backend_<site>`, `upstage_event_archive_<site>`,
+   `upstage_stats_<site>`, and `backup_container_prod`) so nothing writes.
+3. `docker exec postgres_container_<site> pg_dumpall -U postgres > dumpall.sql`
+4. Stop and remove the Postgres container, then move the old data directory
+   aside — it is the rollback: `mv /postgres_data_<site>/data /postgres_data_<site>/data.pg<old>`,
+   and create an empty `data` owned by `999:999`, mode `700`.
+5. Change both image tags in the compose file to the new major and start
+   Postgres (it initialises an empty cluster with `POSTGRES_PASSWORD`).
+6. `docker exec -i postgres_container_<site> psql -U postgres -d postgres < dumpall.sql`.
+   Two errors are expected: role `postgres` and database `upstage` already exist.
+7. Compare row counts with the old cluster, run
+   `vacuumdb -U postgres --all --analyze-only`, then run the service script and
+   the app script as usual.
+
+To roll back: stop Postgres, put the old `data` directory back, restore the
+old image tag, start again.
+
 ### 3. Bring up the app tier
 
 ```sh
@@ -277,7 +305,7 @@ some of them depend on data created by earlier suites, so run the whole
 `src/upstage_backend` tree, not single files. CI
 (`.github/workflows/ci.yml`) runs on Python 3.14: a `verify` job
 (`scripts/verify.sh`) and a `tests` job that applies the migrations and runs
-the full suite against throwaway `postgres:latest` and
+the full suite against throwaway `postgres:19` and
 `eclipse-mosquitto:latest` services.
 
 The suite needs no Stripe, SMTP or stream secrets: the payment tests stub the

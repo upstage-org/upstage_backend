@@ -69,7 +69,7 @@ Versions:
 
 - `requires-python` is `>=3.12` (the lower bound for host virtualenvs).
 - The container image is built from `python:3.14-slim-trixie` by the inline Dockerfile in [`app_containers/docker-compose.yaml`](app_containers/docker-compose.yaml) (`x-common-build`): the builder stage runs `uv sync --frozen --no-dev --no-install-project` (falling back to an unfrozen sync) to populate `/usr/app/.venv`, and the runtime stage runs `pip install --no-deps --no-cache-dir -e .`.
-- CI ([`.github/workflows/ci.yml`](.github/workflows/ci.yml)) uses Python 3.14 with `postgres:latest` and `eclipse-mosquitto:latest` service containers.
+- CI ([`.github/workflows/ci.yml`](.github/workflows/ci.yml)) uses Python 3.14 with `postgres:19` and `eclipse-mosquitto:latest` service containers.
 - SQLAlchemy is `sqlalchemy[asyncio]>=2.1`. SQLAlchemy 2.1 defaults to the psycopg (v3) driver for `postgresql://` URLs; `with_psycopg2_driver()` in `global_config/env.py` rewrites the URL to name `psycopg2` explicitly.
 - The baseline schema (`alembic/versions/baseline001_schema.sql`) was dumped from PostgreSQL 18 and sets `transaction_timeout`, so it needs PostgreSQL 17 or newer.
 
